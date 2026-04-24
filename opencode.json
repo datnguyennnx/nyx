@@ -29,8 +29,8 @@
     }
   },
   "mode": {
-    "docs": {
-      "prompt": "{file:./modes/docs.md}",
+    "ship-effect-ts": {
+      "prompt": "{file:./modes/ship-effect-ts.md}",
       "tools": {
         "read": true,
         "write": true,
@@ -39,6 +39,7 @@
         "glob": true,
         "list": true,
         "bash": true,
+        "task": true,
         "patch": true
       }
     }
