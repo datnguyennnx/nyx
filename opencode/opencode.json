@@ -42,6 +42,20 @@
         "task": true,
         "patch": true
       }
+    },
+    "ship-swift-macos": {
+    "prompt": "{file:./modes/ship-swift-macos.md}",
+    "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "grep": true,
+        "glob": true,
+        "list": true,
+        "bash": true,
+        "task": true,
+        "patch": true
+      }
     }
   }
 }
