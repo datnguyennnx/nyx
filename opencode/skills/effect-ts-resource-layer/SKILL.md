@@ -75,6 +75,23 @@ Return findings with:
 - Risk level (low/medium/high)
 - Verification notes for any Effect-TS claims made regarding resource management
 
+# Severity Criteria
+When assigning risk levels, use these definitions:
+- **HIGH**: Resource leak (missing release), double-release crash risk, acquisition failure without cleanup — will cause production failures
+- **MEDIUM**: Hidden global singleton outside Layer, missing Scope for local resources, non-idempotent finalizer — wrong lifetime management but may work incidentally
+- **LOW**: Layer where Effect.succeed suffices, unnecessary Layer.memoize, mixing config in a Layer that could be split — suboptimal but not dangerous
+
+# Acceptable Patterns (do NOT flag)
+These patterns are correct usage — do not flag them as anti-patterns:
+- `Layer.succeed` for pure values or already-created resources needing no cleanup — this IS correct
+- `Layer.effect` with `Effect.acquireRelease` for effectful resource construction — this IS the preferred pattern
+- `Layer.merge` (parallel) and `Layer.provide` (sequential) composition — this IS proper dependency wiring
+- `Scope` for localized resource lifetime when Layer sharing isn't appropriate — this IS correct
+- `Layer.memoize` for genuinely expensive, shareable resources — this IS appropriate caching
+- `Effect.scoped` for short-lived resources within a single effect — this IS correct local scoping
+- Idempotent and error-tolerant finalizers (safe to call multiple times) — this IS good practice
+- Service interfaces requiring only service tags (not implementation types) in their Context — this IS clean boundary
+
 # Delegation
 Delegate to:
 - effect-ts-anti-patterns for unsafe resource lifecycle detection and Promise-first resource usage

@@ -69,6 +69,24 @@ Return findings with:
 - Risk level (low/medium/high)
 - Verification notes for any Effect-TS claims made regarding error handling
 
+# Severity Criteria
+When assigning risk levels, use these definitions:
+- **HIGH**: Silent error swallowing that hides bugs, unbound retry that can hang forever, defect information loss that prevents debugging — will cause production incidents
+- **MEDIUM**: Generic Error usage where typed errors are appropriate, catch-all that doesn't preserve defects, missing error mapping at boundaries — wrong by convention but may work incidentally
+- **LOW**: Over-specified retry policy without evidence of need, error type that leaks minor implementation detail — suboptimal but not dangerous
+
+# Acceptable Patterns (do NOT flag)
+These patterns are correct usage — do not flag them as anti-patterns:
+- `Effect.catchTag` / `Effect.catchTags` for specific typed error handling — this IS the preferred pattern
+- `Effect.catchAll` at process entry points (main, workers) combined with defect logging — this IS appropriate boundary handling
+- `Effect.mapError` for error transformation at domain boundaries — this IS proper error mapping
+- `Effect.sandbox` / `Effect.unsandbox` for preserving defect information — this IS correct defect handling
+- `Effect.retry` with bounded `Schedule` (exponential with maxRetries, spaced with maxRecurs) — this IS bounded retry
+- `Effect.timeout` with explicit duration — this IS proper timeout bounding
+- `Effect.orElse` / `Effect.orElseSucceed` for safe fallback strategies — this IS proper recovery
+- `Effect.either` / `Effect.option` for converting failures to values at consumption points — this IS correct error absorption
+- Infrastructure-level generic errors (database driver, HTTP client errors) at their own boundary — these ARE appropriate until mapped to domain errors
+
 # Delegation
 Delegate to:
 - effect-ts-anti-patterns for generic Error detection and Promise-first code

@@ -77,6 +77,24 @@ Return findings with:
 - Risk level (low/medium/high)
 - Verification notes for any Effect-TS claims made regarding concurrency
 
+# Severity Criteria
+When assigning risk levels, use these definitions:
+- **HIGH**: Resource exhaustion, memory leak, deadlock, data corruption — will cause failures under real-world concurrency
+- **MEDIUM**: Unbounded behavior that degrades under load, missing interruption handling that causes stuck fibers, incorrect coordination that may cause race conditions — not always crashing but unreliable
+- **LOW**: Over-coordination where simple parallelism suffices, suboptimal primitive choice that works but isn't idiomatic — functionally correct but not best practice
+
+# Acceptable Patterns (do NOT flag)
+These patterns are correct usage — do not flag them as anti-patterns:
+- `Effect.forEach` with `{ concurrency: n }` — this IS bounded parallelism
+- `Effect.fork` with proper supervision and `Effect.join` — this IS correct fiber usage
+- `Queue.bounded` or `Queue.sliding` with explicit capacity — this IS proper backpressure
+- `Semaphore` with explicit permit count limiting resource access — this IS proper bounding
+- `Effect.race` with cancellation of loser — this IS correct competitive racing
+- `Ref` with `Effect.update` / `Effect.modify` for atomic state — this IS safe concurrent state
+- `Deferred` for one-time synchronization between fibers — this IS correct usage
+- `Effect.scoped` wrapping concurrent operations needing deterministic cleanup — this IS proper resource safety
+- `Effect.addFinalizer` or `Effect.ensure` for fiber cleanup on interruption — this IS correct interruption handling
+
 # Delegation
 Delegate to:
 - effect-ts-anti-patterns for Promise-first concurrency detection and unsafe resource usage

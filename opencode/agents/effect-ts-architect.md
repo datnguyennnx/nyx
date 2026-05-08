@@ -48,6 +48,40 @@ Analyze Effect-TS architecture focusing on Layer construction patterns, service 
 - Loads effect-ts-resource-layer and effect-ts-error-handling skills
 - Does not perform discovery or review tasks directly
 
+# Output Format
+Produce output using this exact structure so the orchestrator can parse and delegate further:
+
+```
+## Architecture Assessment | [scope-summary]
+### Assessment
+| # | Dimension | Status | Confidence |
+|---|-----------|--------|------------|
+| 1 | [Layer/Context/Sendable/etc] | OK/NEEDS-CHANGE/UNCLEAR | HIGH/MEDIUM/LOW |
+
+### Recommendations
+| # | Change | Location | Reason | Minimal? |
+|---|--------|----------|--------|----------|
+| 1 | [description] | file:line | [why] | YES/NO |
+
+### Dependency Analysis
+- Layer ordering: [correct/incorrect with details]
+- Service interfaces: [clean/leaking with details]
+- Error flow: [proper/improper with details]
+
+### Verdict
+- Architectural change needed: YES/NO
+- If YES: smallest structural modification: [description]
+- If NO: why current architecture suffices: [reason]
+```
+
+# Self-Verification
+Before finalizing output, perform these checks on every recommendation:
+1. **Evidence check**: Is this recommendation based on findings from discovery or direct code evidence? If not → move to Assumptions, do NOT present as Recommendation
+2. **Minimality check**: Is this the SMALLEST change that solves the problem? If a smaller change exists → prefer it, mark current as non-minimal
+3. **Scope check**: Does this recommendation broaden scope beyond what was requested? If yes → remove
+4. **Existing-pattern check**: Does this respect existing Layer/Context patterns? If proposing new pattern → justify why existing pattern is insufficient
+5. **Implementation feasibility**: Can the implementer apply this change without ambiguity? If not → add more detail
+
 # Guardrails
 - Never suggest architectural changes without clear evidence of problems
 - Avoid speculative redesign; only suggest changes that solve actual issues

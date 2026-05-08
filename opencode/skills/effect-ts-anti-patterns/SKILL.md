@@ -65,6 +65,23 @@ Return findings with:
 - Risk level (low/medium/high)
 - Verification notes for any Effect-TS claims made
 
+# Severity Criteria
+When assigning risk levels, use these definitions:
+- **HIGH**: Direct risk of resource leak, data loss, crash, unhandled error propagation, or type safety violation that will cause runtime failures
+- **MEDIUM**: Type safety violation, incorrect error handling pattern, unbounded behavior that could degrade under load — not immediately crashing but wrong by Effect-TS conventions
+- **LOW**: Non-idiomatic pattern, suboptimal but functionally correct, missing optimization — code works but doesn't follow Effect-TS best practices
+
+# Acceptable Patterns (do NOT flag)
+These patterns are correct usage — do not flag them as anti-patterns:
+- `Effect.tryPromise` or `Effect.async` wrapping Promise code — this IS proper Promise interop
+- `Effect.catchAll` at main/worker entry points for defect logging — this IS appropriate boundary catch
+- `Layer.succeed` for simple config values or pure dependencies — this IS correct usage
+- `Effect.catchTag` / `Effect.catchTags` for specific typed error handling — this IS the preferred pattern
+- `Effect.gen` blocks with 1-3 focused responsibilities — this IS acceptable complexity
+- `Effect.orElse` / `Effect.orElseSucceed` for fallback strategies — this IS proper recovery
+- `Effect.timeout` with explicit duration on operations — this IS proper bounding
+- `Scope` for localized resource lifetime when Layer sharing isn't appropriate — this IS correct
+
 # Delegation
 Delegate to:
 - effect-ts-error-handling for typed error refactoring guidance
