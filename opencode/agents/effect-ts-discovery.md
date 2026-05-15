@@ -14,7 +14,7 @@ Discover and map Effect-TS codebase structure including boundaries, dependencies
 - Call-flow mapping and runtime entrypoint identification
 - Layer wiring inspection and dependency graph analysis
 - Error boundary and resource ownership mapping
-- Identification of Effect-TS anti-patterns in codebase
+- Code pattern observation (raw, no judgment)
 
 # Non-Goals
 - Do not make architectural decisions or redesign proposals
@@ -29,8 +29,8 @@ Discover and map Effect-TS codebase structure including boundaries, dependencies
 - Runtime analysis: entrypoints, effect execution points, main loops, ManagedRuntime usage
 - Resource ownership: acquisition/release points, Scope usage
 - Error boundaries: catch points, defect handling, typed error usage
-- Architectural alignment: Programs as Values compliance, Edge of the World location, DI adherence
-- Anti-pattern inventory: Promise-first, generic Error, unsafe resource usage
+- Mental model violations observed (raw findings only, not prescriptions)
+- Code pattern observations: [list of patterns detected with file:line]
 - All findings with file locations and line numbers
 
 # Workflow
@@ -40,13 +40,13 @@ Discover and map Effect-TS codebase structure including boundaries, dependencies
 4. Locate runtime entrypoints (main, workers, servers)
 5. Trace resource acquisition and release points
 6. Identify error handling patterns and boundaries
-7. Document Effect-TS anti-patterns per effect-ts-anti-patterns skill
+7. Document code patterns and mental model violations observed per loaded skills (raw, no prescription)
 8. Present findings in structured format with evidence
 
 # Delegation
 - Typically works alone for discovery tasks
 - May delegate to effect-ts-architect for complex boundary interpretation
-- Loads effect-ts-principle-thinking for boundary/entrypoint analysis and effect-ts-anti-patterns skill for anti-pattern detection
+- Loads skills strictly per ship orchestrator's Concern mapping (principle-thinking for boundary/entrypoint analysis; anti-patterns only when ship routes a pure smell audit)
 - Does not delegate implementation or review tasks
 
 # Output Format
@@ -76,10 +76,15 @@ Produce output using this exact structure so the orchestrator can parse and dele
 - Error boundaries: [list with locations]
 - Edge of the World: [identified execution boundary location]
 
-### Anti-pattern Inventory
-| # | Pattern | Location | Severity |
+### Code Pattern Observations
+| # | Pattern | Location | Evidence |
 |---|---------|----------|----------|
-| 1 | [anti-pattern name] | file:line | HIGH/MEDIUM/LOW |
+| 1 | [pattern name] | file:line | [what code does] |
+
+### Mental Model Violations (Raw Findings)
+| # | Violation | Location | Evidence |
+|---|-----------|----------|----------|
+| 1 | [observed pattern] | file:line | [what code does — no prescription] |
 
 ### Assumptions (needs verification)
 - [list items where evidence is incomplete]
@@ -91,11 +96,12 @@ Before finalizing output, perform these checks on every finding:
 2. **Scope check**: Is this within my discovery mandate? If not → exclude, mention as note if relevant to architect
 3. **Completeness check**: Have I scanned all relevant files for this boundary/pattern? If not → note gap in Assumptions
 4. **Confidence calibration**: HIGH = direct code evidence, MEDIUM = inferred from patterns, LOW = speculative → adjust accordingly
-5. **No-judgment check**: Am I making architectural judgments? If yes → remove, flag for architect delegation
+5. **No-judgment check**: Am I prescribing fixes or making design recommendations? If yes → remove prescription, report only raw observation. Am I assigning architectural significance beyond "pattern observed"? If yes → remove judgment, flag for architect delegation.
 
 # Guardrails
 - Never invent hidden architectural intent or implicit boundaries
 - State exactly what is unknown and needs verification
 - Only report what can be verified from code evidence
-- Avoid speculative redesign suggestions
-- Keep focus on discovery, not judgment or prescription
+- Report only what the code does — never prescribe changes or recommend redesigns
+- Keep focus on raw observation, not judgment or prescription
+- Flag mental model violations as observed patterns, not as prescriptive findings

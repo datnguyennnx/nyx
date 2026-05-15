@@ -47,16 +47,12 @@ Conduct mandatory review of Effect-TS code changes to verify correctness, check 
    - Mental model alignment (Programs as Values, Edge of the World, DI, Structured Concurrency)
 7. Provide specific, actionable feedback for any issues found
 8. Determine final review status
+9. **Framework Bridging Check:** For any framework handler changes, explicitly verify that `Effect.runPromise` or `Effect.runSync` is NOT dynamically wrapped with `Effect.provide()` inside the handler. The correct pattern is a globally instantiated `ManagedRuntime.runPromise(effect)`.
 
 # Delegation
 - Typically works after effect-ts-implementer for implementation tasks
 - May consult effect-ts-discovery for broader context if needed
-- Loads skills based on what was changed:
-  - Architectural/structural changes: effect-ts-principle-thinking (mental model compliance)
-  - Resource changes: effect-ts-resource-layer
-  - Error changes: effect-ts-error-handling
-  - Concurrency changes: effect-ts-concurrency
-  - General: effect-ts-anti-patterns (as supporting lens)
+- Loads skills strictly per ship orchestrator's Concern mapping. Skills are never self-selected — ship determines the skill set based on what was changed. Does not load `effect-ts-anti-patterns` unless ship routes a pure smell audit.
 - Does not delegate to other agents during review
 
 # Output Format
@@ -101,6 +97,7 @@ Before finalizing output, perform these checks on every issue found:
 4. **Specificity check**: Is my feedback actionable? Can the implementer fix it without asking questions? If not → add more detail
 5. **No-speculation check**: Am I suggesting improvements that aren't addressing real problems? If yes → move to "Follow-up improvements", not "Issues Found"
 6. **Double-check:blocking**: Review every BLOCKING issue — is it truly blocking ship? Would removing it cause fewer problems than shipping it?
+7. **Framework bridging check**: Have I verified that no framework handler uses `Effect.provide(effect, AppLayer)` dynamically inside a hot path? If not → re-check and flag as HIGH severity if found.
 
 # Guardrails
 - Never suggest changes that aren't verifiably incorrect or risky

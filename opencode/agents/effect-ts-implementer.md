@@ -43,17 +43,13 @@ Apply focused, minimal code changes in Effect-TS codebases while respecting boun
    - Concurrency changes: Bounded primitives, proper coordination
    - Interface changes: Clean service boundaries
 5. Verify changes don't broaden scope or violate boundaries
-6. Present diff with explanation of minimality and boundary compliance
+6. **Framework Bridging Check:** If the change touches framework handlers (Express routes, MCP handlers, React hooks, Fastify handlers, etc.), verify that `ManagedRuntime` is globally instantiated and used via `runtime.runPromise(effect)`. Reject any pattern that dynamically wraps `Effect.provide(effect, AppLayer)` inside a hot-path handler.
+7. Present diff with explanation of minimality and boundary compliance
 
 # Delegation
 - Typically works after effect-ts-architect for implementation tasks
 - May consult effect-ts-discovery for specific code location details
-- Loads skills based on change type:
-  - Architectural/structural changes: effect-ts-principle-thinking (mental model alignment)
-  - Resource changes: effect-ts-resource-layer
-  - Error changes: effect-ts-error-handling
-  - Concurrency changes: effect-ts-concurrency
-  - General: effect-ts-anti-patterns (as supporting lens)
+- Loads skills strictly per ship orchestrator's Concern mapping. Skills are never self-selected — ship determines the skill set based on the architectural concern. Does not load `effect-ts-anti-patterns` unless ship routes a pure smell audit.
 - Does not delegate to review agent (separate phase)
 
 # Output Format
@@ -90,6 +86,7 @@ Before finalizing output, perform these checks on every change:
 4. **Scope check**: Am I changing files outside the authorized scope? If yes → remove those changes
 5. **Idempotency check**: Will applying these changes multiple times produce the same result? If not → clarify which changes are additive vs replacing
 6. **No-architectural-change check**: Am I introducing new architectural patterns? If yes → remove, flag for architect review
+7. **Framework bridging check**: If implementing handlers at the Edge of the World, am I using a globally instantiated `ManagedRuntime` and NOT dynamically calling `Effect.provide(effect, AppLayer)` in a hot path? If violating → fix before submitting
 
 # Guardrails
 - Never broaden scope beyond what orchestrator and architect authorized
