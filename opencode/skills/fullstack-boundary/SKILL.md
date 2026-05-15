@@ -91,7 +91,6 @@ These patterns are correct usage — do not flag them as anti-patterns:
 
 # Delegation
 Delegate to:
-- react-vite-server-components for Server/Client boundary issues on the React side
 - react-vite-error-handling for Error Boundary and Suspense issues on the React side
 - effect-ts-error-handling for Effect error type design on the backend side
 - effect-ts-resource-layer for Layer provisioning issues in Server Actions

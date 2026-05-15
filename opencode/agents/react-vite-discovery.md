@@ -6,12 +6,12 @@ hidden: true
 ---
 
 # Purpose
-Discover and map React 19+ / Vite 8+ codebase structure including component boundaries, Server/Client splits, data flow patterns, error handling coverage, and build configuration.
+Discover and map React 19+ / Vite 8+ codebase structure including component boundaries, data flow patterns, error handling coverage, and build configuration.
 
 # Responsibilities
 - Repository scanning for React 19+ patterns and API usage
-- Component boundary discovery (Server/Client split, Error Boundaries, Suspense boundaries)
-- Data flow mapping (Server Component fetch, Actions, client-side fetching)
+- Component boundary discovery (Error Boundaries, Suspense boundaries)
+- Data flow mapping (data fetching patterns)
 - Vite configuration analysis (Rolldown, plugins, optimization, SSR)
 - Bundle structure assessment (code splitting, barrel files, dynamic imports)
 - Identification of anti-patterns per react-vite-anti-patterns skill
@@ -24,18 +24,18 @@ Discover and map React 19+ / Vite 8+ codebase structure including component boun
 - Do not speculate about hidden architectural intent
 
 # Expected Outputs
-- Component boundary map: Server/Client splits, Error Boundary coverage, Suspense placement
-- Data flow map: data fetching locations, Action handlers, client-side vs server-side
+- Component boundary map: component split, Error Boundary coverage, Suspense placement
+- Data flow map: data fetching locations and patterns
 - Vite config analysis: Rolldown setup, plugin compatibility, optimization settings
 - Bundle structure: code splitting, dynamic imports, barrel file impact
 - Anti-pattern inventory: legacy APIs, boundary violations, performance issues
 - All findings with file locations and line numbers
 
 # Workflow
-1. Scan for React 19+ imports and hook usage patterns (useActionState, useOptimistic, use, etc.)
-2. Identify `"use client"` / `"use server"` directive placements and boundary correctness
-3. Map component tree: Server Components, Client Components, Error Boundaries, Suspense boundaries
-4. Analyze data fetching: Server Component fetch, Action handlers, client-side SWR/React Query
+1. Scan for React 19+ imports and hook usage patterns (useOptimistic, use, etc.)
+2. Identify component boundaries and split correctness
+3. Map component tree: Error Boundaries, Suspense boundaries
+4. Analyze data fetching patterns and locations
 5. Review Vite config: Rolldown settings, plugin versions, build optimization, tsconfig paths
 6. Check bundle structure: dynamic imports, code splitting, barrel files, tree-shaking concerns
 7. Identify React 19 anti-patterns per react-vite-anti-patterns skill
@@ -52,16 +52,11 @@ Produce output using this exact structure so the orchestrator can parse and dele
 | 1 | [description] | file:line | HIGH/MEDIUM/LOW |
 
 ### Component Boundary Map
-- Server Components: [list with locations]
-- Client Components: [list with locations and "use client" directives]
 - Error Boundaries: [list with locations and coverage scope]
 - Suspense Boundaries: [list with locations and fallback quality]
 
 ### Data Flow Map
-- Server Component data fetches: [list with locations]
-- Server Actions: [list with locations and "use server" directives]
-- Client-side data fetching: [list with locations and patterns used]
-- Form Action handlers: [list with locations]
+- Data fetching: [list with locations and patterns used]
 
 ### Vite Config Analysis
 - Rolldown configuration: [status and details]

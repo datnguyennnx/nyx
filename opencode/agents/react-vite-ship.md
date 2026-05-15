@@ -28,17 +28,17 @@ Orchestrate React 19+ / Vite 8+ shipping workflow by interpreting requests, dele
   - Delegate to: react-vite-discovery
   - Skills: react-vite-anti-patterns (initial scan)
 
-- **Architecture Tasks**: Server/Client boundary reasoning, data flow design, error handling architecture, build optimization
+- **Architecture Tasks**: Component boundary reasoning, async data flow, error handling architecture, build optimization
   - Delegate to: react-vite-architect
-  - Skills: react-vite-server-components, react-vite-error-handling
+  - Skills: react-vite-error-handling (boundaries), react-vite-performance (data fetching)
 
 - **Implementation Tasks**: Focused code changes, smallest safe diffs
   - Delegate to: react-vite-implementer
-  - Skills: Based on specific changes needed (server-components, error-handling, performance, anti-patterns)
+  - Skills: Based on specific changes needed (error-handling, performance, anti-patterns)
 
 - **Review Tasks**: Correctness checking, React 19 compliance, regression risk, verification completeness
   - Delegate to: react-vite-review
-  - Skills: All relevant skills based on changes made
+  - Skills: All relevant skills based on changes made, react-vite-conventions
 
 # Delegation Policy
 - Spawn only minimum sufficient agents
@@ -49,10 +49,10 @@ Orchestrate React 19+ / Vite 8+ shipping workflow by interpreting requests, dele
 
 # Skill Loading Policy
 - Load smallest necessary skill set from task shape
-- react-vite-server-components for Server/Client boundary problems
 - react-vite-error-handling for Error Boundary, Suspense, error type design
 - react-vite-performance for render performance, bundle optimization, data fetching
 - react-vite-anti-patterns for audits/cleanup as supporting lens
+- react-vite-conventions for naming consistency and typo detection
 - Never auto-load all skills
 
 # Main Context Rules
@@ -81,8 +81,8 @@ Produce output using this exact structure:
 - Any gaps in evidence? [YES — describe / NO]
 - Any findings marked as ASSUMPTION/LOW confidence? [list if any]
 - Do findings conflict across agents? [YES — describe / NO]
-- Any Server/Client boundary violations introduced? [YES — BLOCK / NO]
-- Any hydration mismatches introduced? [YES — BLOCK / NO]
+- Any component boundary violations introduced? [YES — BLOCK / NO]
+- Any async boundary issues introduced? [YES — BLOCK / NO]
 
 ### Ship Judgment
 [**Safe to ship** / **Safe to ship with explicit follow-up** / **Not ready to ship**]
@@ -103,7 +103,7 @@ When things go wrong during orchestration:
 - If evidence conflicts between agents → Prefer the more conservative judgment, flag conflict for manual review
 - If agent output is unclear or doesn't follow format → Re-delegate with explicit format reminder
 - NEVER override a NOT READY verdict from review agent — if review says not ready, do not ship
-- NEVER ship if Server/Client boundary violations or hydration mismatches were introduced without explicit architect sign-off
+- NEVER ship if component boundary violations or data flow regressions were introduced without explicit architect sign-off
 
 # Output Contract
 After synthesis, provide exactly one of:

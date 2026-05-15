@@ -13,7 +13,7 @@ Reviewing React 19+ / Vite 8+ code to:
 - Leverage React 19 rendering APIs (useTransition, useDeferredValue, Suspense streaming)
 - Optimize data fetching patterns (parallel fetching, streaming SSR, progressive loading)
 - Configure resource loading (preload, preinit, prefetchDNS, preconnect)
-- Reduce client bundle size (Server Components, dynamic imports, proper `"use client"` boundaries)
+- Reduce client bundle size (dynamic imports, code splitting)
 - Identify and fix hydration performance issues
 
 # Inputs
@@ -27,10 +27,9 @@ Reviewing React 19+ / Vite 8+ code to:
 - SSR streaming configuration
 
 # Core principles
-- React 19 Actions and useTransition handle pending state and re-render prioritization automatically — don't reinvent manually
+- React 19 useTransition handles pending state and re-render prioritization automatically — don't reinvent manually
 - Re-render optimization starts with state locality — push state down to the components that need it
 - Memoization (React.memo, useMemo, useCallback) is a last resort after state locality and composition
-- Server Components reduce client bundle size by shipping zero JavaScript for static content
 - Rolldown tree-shaking requires proper module boundaries — avoid barrel files that re-export everything
 - Code splitting should be at route boundaries by default, lazy-loaded for below-fold content
 - Resource loading should use Vite 8 preload APIs (preinit, preload) for critical resources
@@ -41,7 +40,6 @@ Reviewing React 19+ / Vite 8+ code to:
 - Use `useDeferredValue` with initial value for search/filter inputs
 - Use `React.memo` only after profiling confirms unnecessary re-renders
 - Push state down to leaf components to minimize re-render scope
-- Use Server Components for static content to eliminate client JavaScript
 - Use dynamic `import()` for route-level code splitting and below-fold content
 - Configure Rolldown `output.manualChunks` for vendor splitting
 - Use `preload` and `preinit` from `react-dom` for critical resource hints
@@ -56,7 +54,7 @@ Reviewing React 19+ / Vite 8+ code to:
 - **State in ancestor components**: Placing state high in the tree when only leaf components need it, causing broad re-renders
 - **Inline reference creation**: Creating new object/function references in render that trigger child re-renders (inline styles, callbacks without stable reference)
 - **Missing code splitting**: Importing entire heavy libraries (charting, editors) at the top level instead of lazy-loading
-- **Waterfall data fetching**: Sequential `await` calls in Server Components that could be parallelized with `Promise.all`
+- **Waterfall data fetching**: Sequential `await` calls in async components that could be parallelized with `Promise.all`
 - **No Suspense boundaries**: Monolithic Suspense boundaries or none at all, preventing streaming content
 - **Over-bundling**: Single large chunk instead of vendor splitting for framework, UI library, and app code
 - **Barrel file tree-shaking break**: Large index.ts files that re-export everything, preventing Rolldown from eliminating unused code
@@ -100,22 +98,26 @@ These patterns are correct usage — do not flag them as anti-patterns:
 - `useTransition` for non-urgent state updates — this IS correct prioritization
 - `useDeferredValue` with initial value for search inputs — this IS correct deferral
 - Dynamic `import()` for route-level code splitting — this IS recommended
-- Server Components for static content — this IS the ideal pattern for reducing client bundle
 - Suspense boundaries around async content — this IS required for streaming
 - Vite 8 Rolldown `output.manualChunks` for vendor splitting — this IS recommended
 - `preload`/`preinit` for critical resources — this IS recommended resource loading
 
-# Delegation
-Delegate to:
-- react-vite-anti-patterns for legacy API detection and general pattern violations
-- react-vite-server-components for Server Component boundary issues affecting bundle size
-- react-vite-error-handling for Error Boundary placement affecting error recovery UX
+# Related Skills
+Orchestrator may load these based on task shape — skills do not delegate directly:
+- react-vite-anti-patterns: legacy API detection, tree-shaking issues
+- react-vite-performance: render performance, bundle optimization
+- react-vite-error-handling: Error Boundary and Suspense coverage
+
+# Vite 8 Build Context
+- Default builder: Rollup (Vite 8 default — Rolldown is opt-in)
+- Rolldown opt-in: explicit `builder: 'rolldown'` in vite.config.ts required
+- When Rolldown active: use `rolldownOptions` (not `rollupOptions`)
+- When Rolldown NOT active: use `rollupOptions` as before
+- `@vitejs/plugin-react` v6 with Oxc: requires `jsxRuntime: 'automatic'`
 
 # Guardrails
 - Never suggest memoization without profiling evidence or clear heuristic justification
 - Do not suggest code splitting for components that render above the fold on initial load
 - Avoid over-splitting chunks — too many small chunks creates network overhead
-- Do not suggest converting client components to Server Components if they need interactivity
 - Preserve existing Suspense boundary placements unless they are missing or monolithic
 - Do not suggest removing barrel files without verifying the module boundary patterns are preserved
-- Respect framework-specific patterns (Next.js App Router, Remix, etc.) for code splitting and loading

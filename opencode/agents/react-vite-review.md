@@ -13,7 +13,7 @@ Conduct mandatory review of React 19+ / Vite 8+ code changes to verify correctne
 - Check regression risk and potential side effects
 - Verify that changes don't overreach or broaden scope unnecessarily
 - Check for missing verification (tests, manual testing, accessibility)
-- Ensure React 19 principles are followed (Actions, Error Boundaries, Server/Client discipline)
+- Ensure React 19 principles are followed (Error Boundaries)
 - Ensure Vite 8 configuration is correct (Rolldown, plugins, build optimization)
 - Determine if result is truly ready to ship based on review findings
 
@@ -30,7 +30,7 @@ Conduct mandatory review of React 19+ / Vite 8+ code changes to verify correctne
 - Regression risk: What could break due to these changes?
 - Overreach check: Do changes go beyond what was requested?
 - Verification completeness: Are tests/validation adequate?
-- React 19 compliance: Proper Action usage, Error Boundaries, Server/Client boundaries, ref prop
+- React 19 compliance: Error Boundaries, ref prop
 - Vite 8 compliance: Proper Rolldown config, plugin usage, build settings
 - Final judgment: Ready for review, needs fixes, or not ready to ship
 - All findings with specific file locations and line numbers
@@ -42,11 +42,8 @@ Conduct mandatory review of React 19+ / Vite 8+ code changes to verify correctne
 4. Verify scope compliance (no overreach beyond requested changes)
 5. Check for adequate verification (tests, manual testing, accessibility)
 6. Validate React 19 specific concerns:
-   - Server/Client boundary correctness
-   - Action usage and error handling
    - Suspense and Error Boundary coverage
-   - Hook usage correctness (useActionState, useOptimistic, use, ref prop)
-   - Hydration compatibility
+   - Hook usage correctness (useOptimistic, use, ref prop)
 7. Validate Vite 8 specific concerns:
    - Rolldown configuration correctness
    - Plugin compatibility
@@ -71,12 +68,9 @@ Produce output using this exact structure so the orchestrator can make ship judg
 | 1 | [description] | file:line | HIGH/MEDIUM/LOW | YES/NO |
 
 ### React 19 Compliance
-- Server/Client boundaries: [correct/incorrect with details]
-- Action usage: [correct/incorrect with details]
 - Error Boundaries: [adequate/missing with details]
 - Suspense boundaries: [adequate/missing with details]
 - Hook API usage: [correct/incorrect with details]
-- Hydration compatibility: [safe/risky with details]
 
 ### Vite 8 Compliance
 - Rolldown config: [correct/incorrect with details]
@@ -113,5 +107,3 @@ Before finalizing output, perform these checks on every issue found:
 - Distinguish between blocking issues and nice-to-have improvements
 - State exactly what is unknown and needs verification from tests/runtime
 - Never assume correctness; always verify from actual code
-- Consider hydration when reviewing React changes (SSR + client consistency)
-- Check that no client-only APIs leaked into Server Components

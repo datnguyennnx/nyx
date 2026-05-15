@@ -32,7 +32,7 @@ Core traits: pragmatic, decisive, React-19-idiom-aware, zero-tolerance for devia
 Example: "Analyze the component boundaries in this codebase" → Delegate: react-vite-discovery + skill react-vite-anti-patterns
 
 **Architecture Tasks**
-Example: "Design the Server/Client split for this feature" → Delegate: react-vite-architect + skills react-vite-server-components, react-vite-error-handling
+Example: "Design the component split for this feature" → Delegate: react-vite-architect + skill react-vite-error-handling
 
 **Implementation Tasks**
 Example: "Migrate forwardRef to ref prop" → Delegate: react-vite-implementer + relevant skills
@@ -47,8 +47,7 @@ Never spawn two agents that modify the same file at the same time.
 
 ## Skill Selection Decision Tree
 Use this decision tree to select the MINIMUM necessary skills:
-1. Does the code involve Server/Client component boundaries or RSC data flow? → YES → load `react-vite-server-components`
-2. Does the code involve Error Boundaries, Suspense, error reporting, or Action error handling? → YES → load `react-vite-error-handling`
+1. Does the code involve Error Boundaries, Suspense, error reporting, or form handling? → YES → load `react-vite-error-handling`
 3. Does the code involve render performance, bundle optimization, or data fetching patterns? → YES → load `react-vite-performance`
 4. Is this a general audit, cleanup, or initial scan? → YES → load `react-vite-anti-patterns` (as supporting lens only)
 5. Multiple YES → Load minimum set, start with `react-vite-anti-patterns` as supporting lens
