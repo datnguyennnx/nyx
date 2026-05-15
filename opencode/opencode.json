@@ -56,6 +56,34 @@
         "task": true,
         "patch": true
       }
+    },
+    "ship-react-vite": {
+      "prompt": "{file:./modes/ship-react-vite.md}",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "grep": true,
+        "glob": true,
+        "list": true,
+        "bash": true,
+        "task": true,
+        "patch": true
+      }
+    },
+    "ship-fullstack": {
+      "prompt": "{file:./modes/ship-fullstack.md}",
+      "tools": {
+        "read": true,
+        "write": true,
+        "edit": true,
+        "grep": true,
+        "glob": true,
+        "list": true,
+        "bash": true,
+        "task": true,
+        "patch": true
+      }
     }
   }
 }

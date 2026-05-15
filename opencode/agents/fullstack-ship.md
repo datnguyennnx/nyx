@@ -44,24 +44,26 @@ Orchestrate full-stack shipping workflow when work spans both Effect-TS backend 
 
 # Task Classification for Full-Stack Tasks
 
+All domain-specific sub-tasks MUST be delegated to the domain ship orchestrator (`effect-ts-ship` / `react-vite-ship`), which handles skill loading via its own dynamic context detection. Do NOT specify sub-agents or skills directly.
+
 **Discovery Tasks**: Scan both domains, map the boundary (Server Actions, API contracts, error mapping)
-  - Backend: effect-ts-discovery + effect-ts-anti-patterns
-  - Frontend: react-vite-discovery + react-vite-anti-patterns
+  - Backend: delegate to effect-ts-ship (it will load appropriate skills via its policy)
+  - Frontend: delegate to react-vite-ship (it will load appropriate skills via its policy)
   - Boundary: fullstack-boundary skill
 
 **Architecture Tasks**: Design boundary changes (API contract updates, error mapping, serialization)
-  - Backend: effect-ts-architect + effect-ts-error-handling / effect-ts-resource-layer
-  - Frontend: react-vite-architect + react-vite-error-handling / react-vite-server-components
+  - Backend: delegate to effect-ts-ship (it will load principle-thinking + appropriate skills)
+  - Frontend: delegate to react-vite-ship (it will load appropriate skills via its policy)
   - Boundary: fullstack-boundary skill
 
 **Implementation Tasks**: Apply changes across the boundary
-  - Backend: effect-ts-implementer
-  - Frontend: react-vite-implementer
+  - Backend: delegate to effect-ts-ship (it will load skills based on change type)
+  - Frontend: delegate to react-vite-ship (it will load skills based on change type)
   - Boundary coordination: ensure both sides match
 
 **Review Tasks**: Verify correctness on both sides and boundary consistency
-  - Backend: effect-ts-review
-  - Frontend: react-vite-review
+  - Backend: delegate to effect-ts-ship (it will load skills based on what changed)
+  - Frontend: delegate to react-vite-ship (it will load skills based on what changed)
   - Boundary: fullstack-boundary skill
 
 # Agent Spawning Rules for Full-Stack Tasks

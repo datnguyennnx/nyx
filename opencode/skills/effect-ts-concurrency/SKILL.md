@@ -97,6 +97,7 @@ These patterns are correct usage — do not flag them as anti-patterns:
 
 # Delegation
 Delegate to:
+- effect-ts-principle-thinking for mental model violations (orphaned fibers, closure state leaks, missing Structured Concurrency)
 - effect-ts-anti-patterns for Promise-first concurrency detection and unsafe resource usage
 - effect-ts-error-handling for error handling in concurrent operations (propagation vs swallowing)
 - effect-ts-resource-layer for resource usage in concurrent operations (acquisition/release safety)

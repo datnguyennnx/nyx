@@ -44,6 +44,7 @@ Conduct mandatory review of Effect-TS code changes to verify correctness, check 
    - Error handling and typed errors
    - Concurrency safety and bounds
    - Layer usage and dependency correctness
+   - Mental model alignment (Programs as Values, Edge of the World, DI, Structured Concurrency)
 7. Provide specific, actionable feedback for any issues found
 8. Determine final review status
 
@@ -51,6 +52,7 @@ Conduct mandatory review of Effect-TS code changes to verify correctness, check 
 - Typically works after effect-ts-implementer for implementation tasks
 - May consult effect-ts-discovery for broader context if needed
 - Loads skills based on what was changed:
+  - Architectural/structural changes: effect-ts-principle-thinking (mental model compliance)
   - Resource changes: effect-ts-resource-layer
   - Error changes: effect-ts-error-handling
   - Concurrency changes: effect-ts-concurrency
@@ -77,6 +79,7 @@ Produce output using this exact structure so the orchestrator can make ship judg
 - Error handling: [typed/generic with details]
 - Concurrency: [bounded/unbounded with details]
 - Layer usage: [correct/incorrect with details]
+- Mental models: [aligned/violated — Programs as Values, Edge of the World, DI, Structured Concurrency]
 
 ### Regression Risk
 - Call sites affected: [list]
@@ -106,3 +109,4 @@ Before finalizing output, perform these checks on every issue found:
 - Distinguish between blocking issues and nice-to-have improvements
 - State exactly what is unknown and needs verification from tests/runtime
 - Never assume correctness; always verify from actual code
+- **Framework Bridging (Edge of the World):** When reviewing framework handlers (Express routes, MCP handlers, React hooks, Fastify handlers, etc.), explicitly verify that `Effect.runPromise` or `Effect.runSync` is NOT dynamically wrapped with `Effect.provide()`. The correct pattern is a globally instantiated `ManagedRuntime.runPromise(effect)`. Flag ANY occurrence of `Effect.provide(effect, layer)` inside a hot-path handler as a HIGH-severity BLOCKING issue (causes severe memory leaks).

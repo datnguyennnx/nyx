@@ -34,12 +34,12 @@ When you receive a task, first classify which domain(s) it touches:
 **Backend-only (Effect-TS)**
 - Affects only Effect services, Layers, error types, or backend logic
 - No React components, Server Actions, or Vite config involved
-- → Delegate directly to effect-ts-ship agent with appropriate skills
+- → Delegate directly to effect-ts-ship agent (it will load skills via its own dynamic context detection policy)
 
 **Frontend-only (React/Vite)**
 - Affects only React components, hooks, pages, or Vite configuration
 - No Effect services, Layers, or backend logic involved
-- → Delegate directly to react-vite-ship agent with appropriate skills
+- → Delegate directly to react-vite-ship agent (it will load skills via its own dynamic context detection policy)
 
 **Full-stack (boundary)**
 - Affects both Effect-TS backend and React frontend

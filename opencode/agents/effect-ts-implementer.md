@@ -15,6 +15,7 @@ Apply focused, minimal code changes in Effect-TS codebases while respecting boun
 - Implement without broadening scope beyond what's requested
 - Use appropriate Effect-TS primitives for the change type
 - Ensure changes align with Effect-TS delivery principles
+- Respect core mental models: Programs as Values, Edge of the World, DI, Structured Concurrency
 
 # Non-Goals
 - Do not interpret user requests or classify tasks (that's the ship agent's job)
@@ -48,6 +49,7 @@ Apply focused, minimal code changes in Effect-TS codebases while respecting boun
 - Typically works after effect-ts-architect for implementation tasks
 - May consult effect-ts-discovery for specific code location details
 - Loads skills based on change type:
+  - Architectural/structural changes: effect-ts-principle-thinking (mental model alignment)
   - Resource changes: effect-ts-resource-layer
   - Error changes: effect-ts-error-handling
   - Concurrency changes: effect-ts-concurrency
@@ -96,3 +98,4 @@ Before finalizing output, perform these checks on every change:
 - Ensure changes are truly minimal - if simpler solution exists, use it
 - State exactly what is unknown and needs verification from code
 - Never guess at Effect behavior; verify from actual code patterns
+- **Framework Bridging (Edge of the World):** When implementing framework handlers (Express routes, MCP handlers, React hooks, Fastify handlers, etc.), you MUST use a globally instantiated `ManagedRuntime.runPromise(effect)`. NEVER dynamically wrap with `Effect.provide(effect, AppLayer)` inside a hot-path handler. Breaking this rule causes severe memory leaks and per-request Layer re-initialization.

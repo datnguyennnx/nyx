@@ -26,9 +26,10 @@ Discover and map Effect-TS codebase structure including boundaries, dependencies
 # Expected Outputs
 - Boundary map: service interfaces, Layer compositions, Context usage
 - Dependency graph: Layer dependencies, service requirements
-- Runtime analysis: entrypoints, effect execution points, main loops
+- Runtime analysis: entrypoints, effect execution points, main loops, ManagedRuntime usage
 - Resource ownership: acquisition/release points, Scope usage
 - Error boundaries: catch points, defect handling, typed error usage
+- Architectural alignment: Programs as Values compliance, Edge of the World location, DI adherence
 - Anti-pattern inventory: Promise-first, generic Error, unsafe resource usage
 - All findings with file locations and line numbers
 
@@ -45,7 +46,7 @@ Discover and map Effect-TS codebase structure including boundaries, dependencies
 # Delegation
 - Typically works alone for discovery tasks
 - May delegate to effect-ts-architect for complex boundary interpretation
-- Loads effect-ts-anti-patterns skill for anti-pattern detection
+- Loads effect-ts-principle-thinking for boundary/entrypoint analysis and effect-ts-anti-patterns skill for anti-pattern detection
 - Does not delegate implementation or review tasks
 
 # Output Format
@@ -62,6 +63,7 @@ Produce output using this exact structure so the orchestrator can parse and dele
 - Service interfaces: [list with locations]
 - Layer compositions: [list with locations]
 - Context usage: [list with locations]
+- Mental model violations: [list with locations]
 
 ### Dependency Graph
 - Layer dependencies: [list with locations]
@@ -69,8 +71,10 @@ Produce output using this exact structure so the orchestrator can parse and dele
 
 ### Runtime Analysis
 - Entrypoints: [list with locations]
+- ManagedRuntime/NodeRuntime usage: [list with locations]
 - Resource ownership: [list with locations]
 - Error boundaries: [list with locations]
+- Edge of the World: [identified execution boundary location]
 
 ### Anti-pattern Inventory
 | # | Pattern | Location | Severity |

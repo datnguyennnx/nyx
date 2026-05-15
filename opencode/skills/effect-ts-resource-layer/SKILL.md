@@ -94,6 +94,7 @@ These patterns are correct usage — do not flag them as anti-patterns:
 
 # Delegation
 Delegate to:
+- effect-ts-principle-thinking for mental model violations (per-request Layer provisioning, mid-flight execution, DI violations)
 - effect-ts-anti-patterns for unsafe resource lifecycle detection and Promise-first resource usage
 - effect-ts-error-handling for error handling in resource acquisition and release logic
 - effect-ts-concurrency for resource usage in concurrent operations (pooling, semaphores)

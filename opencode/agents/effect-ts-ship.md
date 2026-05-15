@@ -26,19 +26,19 @@ Orchestrate Effect-TS shipping workflow by interpreting requests, delegating to 
 # Task Classification
 - **Discovery Tasks**: Repository scanning, boundary identification, call-flow mapping
   - Delegate to: effect-ts-discovery
-  - Skills: effect-ts-anti-patterns (initial scan)
-  
+  - Skills: Determined by what is being discovered (see Skill Loading Policy below)
+
 - **Architecture Tasks**: Layer/service boundary reasoning, dependency analysis, Scope ownership
   - Delegate to: effect-ts-architect
-  - Skills: effect-ts-resource-layer, effect-ts-error-handling
-  
+  - Skills: effect-ts-principle-thinking always loaded; then based on architectural concern (resource-layer, error-handling)
+
 - **Implementation Tasks**: Focused code changes, smallest safe diffs
   - Delegate to: effect-ts-implementer
-  - Skills: Based on specific changes needed (resource-layer, error-handling, concurrency, anti-patterns)
-  
+  - Skills: Determined by change type (see Skill Loading Policy below)
+
 - **Review Tasks**: Correctness checking, regression risk, verification completeness
   - Delegate to: effect-ts-review
-  - Skills: All relevant skills based on changes made
+  - Skills: Determined by what was changed (see Skill Loading Policy below)
 
 # Delegation Policy
 - Spawn only minimum sufficient agents
@@ -48,12 +48,26 @@ Orchestrate Effect-TS shipping workflow by interpreting requests, delegating to 
 - Never spawn agents that would create overlapping ownership
 
 # Skill Loading Policy
-- Load smallest necessary skill set from task shape
-- effect-ts-resource-layer for ownership/composition problems
-- effect-ts-error-handling for failure semantics/recovery boundaries
-- effect-ts-concurrency only when true concurrency/coordination involved
-- effect-ts-anti-patterns for audits/cleanup as supporting lens
-- Never auto-load all skills
+Load only the MINIMUM set of skills. Use this dynamic context detection:
+
+**Always loaded when architecture/design/entrypoints are involved:**
+- `effect-ts-principle-thinking` — core mental models (Programs as Values, Edge of the World, DI, Structured Concurrency)
+
+**Load based on explicit keywords in the user's prompt or task description:**
+| Trigger Keywords | Load This Skill (ONLY) |
+|---|---|
+| servers, APIs, entrypoints, routes, handlers, framework, bridge, ManagedRuntime, NodeRuntime, BunRuntime | `effect-ts-principle-thinking` |
+| database, connections, clients, acquireRelease, Scope, Layer, lifecycle, pool, file handles | `effect-ts-resource-layer` + `effect-ts-principle-thinking` |
+| retries, timeouts, boundaries, crashes, errors (typed), catch, fallback, recovery, TaggedError | `effect-ts-error-handling` + `effect-ts-principle-thinking` |
+| limits, bursts, fibers, fork, parallel, Semaphore, Queue, concurrent, race, Deferred | `effect-ts-concurrency` + `effect-ts-principle-thinking` |
+| audit, cleanup, scan, code smell, syntax, Promise interop, gen block, hidden dependency | `effect-ts-anti-patterns` (ONLY — do NOT stack other skills) |
+
+**Loading rules:**
+- `effect-ts-principle-thinking` is the architectural backbone — load it for ALL non-trivial tasks
+- NEVER load `effect-ts-anti-patterns` globally or as a default. It is ONLY for explicit code smell audits
+- NEVER auto-load all skills. Each skill consumes context window — be surgical
+- When multiple triggers match, start with `principle-thinking`, then add the MOST specific skill only
+- If no triggers match, assess whether the task really needs any skill at all
 
 # Main Context Rules
 - Only for request interpretation, delegation planning, skill selection
