@@ -46,28 +46,36 @@ Orchestrate Effect-TS shipping workflow by interpreting requests, delegating to 
 - Multiple agents only when task splits by concern/boundary/risk
 - Prefer one owner + one reviewer when agents would modify same files
 - Never spawn agents that would create overlapping ownership
+- **Stop and Rethink Guardrail:** Before spawning subagents, count the number of skills assigned to each agent. If any agent is assigned more than 3 skills, you MUST stop, divide the target scope into smaller directories, and spawn separate agents with fewer skills. This prevents context bloat from overloading any single agent.
 
 # Skill Loading Policy
-Load only the MINIMUM set of skills. Use this dynamic context detection:
+Skills are loaded STRICTLY based on the architectural layer of the code being targeted. This is a lazy-loading architecture — agents MUST NOT load any skill outside the mapping below unless explicitly requested by the user.
 
-**Always loaded when architecture/design/entrypoints are involved:**
-- `effect-ts-principle-thinking` — core mental models (Programs as Values, Edge of the World, DI, Structured Concurrency)
+## Layer-to-Skill Mapping (Strict)
+Use the EXACT mapping below. No other skill combinations are permitted for a given layer.
 
-**Load based on explicit keywords in the user's prompt or task description:**
-| Trigger Keywords | Load This Skill (ONLY) |
-|---|---|
-| servers, APIs, entrypoints, routes, handlers, framework, bridge, ManagedRuntime, NodeRuntime, BunRuntime | `effect-ts-principle-thinking` |
-| database, connections, clients, acquireRelease, Scope, Layer, lifecycle, pool, file handles | `effect-ts-resource-layer` + `effect-ts-principle-thinking` |
-| retries, timeouts, boundaries, crashes, errors (typed), catch, fallback, recovery, TaggedError | `effect-ts-error-handling` + `effect-ts-principle-thinking` |
-| limits, bursts, fibers, fork, parallel, Semaphore, Queue, concurrent, race, Deferred | `effect-ts-concurrency` + `effect-ts-principle-thinking` |
-| audit, cleanup, scan, code smell, syntax, Promise interop, gen block, hidden dependency | `effect-ts-anti-patterns` (ONLY — do NOT stack other skills) |
+| Architectural Layer | Load These Skills (ONLY) | Focus |
+|---|---|---|
+| **Infrastructure** (resource lifecycle: DB access, config, external clients, file I/O) | `effect-ts-resource-layer`, `effect-ts-principle-thinking` | acquireRelease, Connection Pools, Config Layers |
+| **Data Access / Workers** (rate-limited APIs, background jobs, external data sources, concurrent throughput) | `effect-ts-concurrency`, `effect-ts-error-handling`, `effect-ts-principle-thinking` | Rate limiting, 429 retries, Semaphores, Schedule, mapping HTTP to Domain Errors |
+| **Application / Domain** (business logic, services, entities, pure domain) | `effect-ts-error-handling`, `effect-ts-principle-thinking` | Typed Errors, Business Logic boundaries, Effect.Clock usage |
+| **Presentation / API** (HTTP handlers, WebSocket handlers, framework entry points) | `effect-ts-principle-thinking`, `effect-ts-error-handling` | ManagedRuntime, Edge of the World bridging, Error Response mapping |
 
-**Loading rules:**
-- `effect-ts-principle-thinking` is the architectural backbone — load it for ALL non-trivial tasks
-- NEVER load `effect-ts-anti-patterns` globally or as a default. It is ONLY for explicit code smell audits
-- NEVER auto-load all skills. Each skill consumes context window — be surgical
-- When multiple triggers match, start with `principle-thinking`, then add the MOST specific skill only
-- If no triggers match, assess whether the task really needs any skill at all
+## How to Determine the Layer
+Analyze the code's purpose and file paths in the task scope to classify which architectural layer it belongs to. Common conventions:
+- `infrastructure/`, `db/`, `config/`, `clients/`, `repositories/` → **Infrastructure**
+- `workers/`, `data-sources/`, `queues/`, `schedulers/` → **Data Access / Workers**
+- `application/`, `domain/`, `services/`, `entities/`, `use-cases/` → **Application / Domain**
+- `presentation/`, `api/`, `http/`, `ws/`, `routes/`, `handlers/`, `controllers/` → **Presentation / API**
+
+These are illustrative — use the actual purpose of the code, not the folder name alone.
+
+## Loading Rules
+- `effect-ts-principle-thinking` is the architectural backbone — it is explicitly listed per layer above
+- NEVER load `effect-ts-anti-patterns` globally or as a default. It is ONLY for explicit code smell audits requested by the user
+- NEVER load all skills. Each skill consumes context window — be surgical
+- If a task spans multiple layers, split into separate agents per layer, each loading only its mapped skills
+- If no layer matches, assess whether the task really needs any skill at all, and always include `effect-ts-principle-thinking` as the minimum
 
 # Main Context Rules
 - Only for request interpretation, delegation planning, skill selection

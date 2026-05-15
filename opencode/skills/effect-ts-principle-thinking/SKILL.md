@@ -26,7 +26,7 @@ This skill aligns architectural design and code implementation with the fundamen
 - **Structured Concurrency:** No fiber should ever be orphaned. All background tasks must be tied to a `Scope` (e.g., via `Effect.forkScoped` or `Effect.forkDaemon` within a Layer).
 - **Explicit Dependencies (DI):** Dependencies, configurations, and state must be passed through `Context.Tag` and resolved via `Layer`s, never through closures, singletons, or global variables.
 - **Errors are Data:** Expected failures are part of the type signature (`Effect<Success, Error, Requirements>`). Only truly unrecoverable issues should result in Defects/Die.
-- **Time is Monotonic:** Time-based operations use `Schedule` and Effect's internal Clock, avoiding wall-clock anomalies (like sleep/wake cascading).
+- **Time is Monotonic (Clock, not Date):** All time-based operations must use `Effect.Clock` and `Schedule`, never `Date.now()`, `new Date()`, or `setTimeout`. Using wall-clock time breaks referential transparency, testability, and determinism — core tenets of Programs as Values.
 
 # Preferred patterns
 - **Entry Points:** Use `NodeRuntime.runMain` or `BunRuntime.runMain` at the top level to handle graceful shutdown and UNIX signals automatically.
@@ -40,6 +40,7 @@ This skill aligns architectural design and code implementation with the fundamen
 - **Per-Request Layer Provisioning:** Calling `Effect.provide(effect, AppLayer)` inside a hot path route handler (causes massive memory leaks and performance drops due to re-initializing the entire app per request).
 - **Closure State Leaks:** Using `let` or `const` variables outside an Effect block to share state between fibers, bypassing Effect's concurrency safety.
 - **Orphaned Background Loops:** Using `setInterval` or recursive `setTimeout` inside an Effect wrapper instead of using `Effect.schedule` + `Effect.forkDaemon`.
+- **Wall-Clock Time Usage:** Using `Date.now()` or `new Date()` for time measurements or time-based decisions instead of `Effect.clock` with `Clock.currentTimeMillis` or `Clock.currentTimeNanos` — breaks referential transparency, testability, and determinism (Programs as Values violation).
 - **Swallowing the Error Channel:** Using `.catch()` on Promises at the boundary without converting them into standard protocol responses (e.g., mapping Effect errors to JSON-RPC errors before returning from `ManagedRuntime`).
 
 # Workflow
@@ -57,8 +58,8 @@ Return findings with:
 - Verification instructions to ensure the fix maintains correct framework integration.
 
 # Severity Criteria
-- **HIGH:** Calling `Effect.runPromise` inside a request handler with `.provide()` (causes severe memory leaks); Orphaned background fibers without Scope; Unhandled Promise rejections at the boundary.
-- **MEDIUM:** Using closure state instead of `Ref` (causes race conditions); using wall-clock timers instead of `Schedule` (causes cascading).
+- **HIGH:** Calling `Effect.runPromise` inside a request handler with `.provide()` (causes severe memory leaks); Orphaned background fibers without Scope; Unhandled Promise rejections at the boundary; Using `Date.now()`, `new Date()`, or `setTimeout` instead of `Effect.Clock` or `Effect.sleep` — breaks testability and determinism (core tenets of Programs as Values).
+- **MEDIUM:** Using closure state instead of `Ref` (causes race conditions).
 - **LOW:** Suboptimal use of Layers where simple Context provision is enough; over-complicating purely synchronous data transformations.
 
 # Acceptable Patterns (do NOT flag)
