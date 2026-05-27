@@ -2,6 +2,7 @@
 name: swift-implementer
 description: Specialized agent for applying focused code changes in Swift 6.3 / macOS code with minimal safe diffs that respect actor isolation and strict concurrency rules.
 mode: subagent
+model: opencode/deepseek-v4-flash
 hidden: true
 ---
 

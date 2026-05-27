@@ -2,6 +2,7 @@
 name: effect-ts-discovery
 description: Specialized agent for repository scanning, boundary discovery, and runtime analysis in Effect-TS codebases.
 mode: subagent
+model: opencode/deepseek-v4-flash
 hidden: true
 ---
 

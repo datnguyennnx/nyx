@@ -2,6 +2,7 @@
 name: effect-ts-implementer
 description: Specialized agent for applying focused code changes in Effect-TS code with minimal safe diffs.
 mode: subagent
+model: opencode/deepseek-v4-flash
 hidden: true
 ---
 

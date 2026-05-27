@@ -2,6 +2,7 @@
 name: swift-review
 description: Specialized agent for mandatory review of non-trivial Swift 6.3 changes, checking strict concurrency correctness, regression risk, SwiftUI state hygiene, and ship readiness.
 mode: subagent
+model: opencode/deepseek-v4-flash
 hidden: true
 ---
 

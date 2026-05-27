@@ -2,6 +2,7 @@
 name: swift-discovery
 description: Specialized agent for scanning Swift 6.3 / macOS project structure, actor isolation boundaries, module dependencies, and SwiftUI state graph.
 mode: subagent
+model: opencode/deepseek-v4-flash
 hidden: true
 ---
 

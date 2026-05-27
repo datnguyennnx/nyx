@@ -2,6 +2,7 @@
 name: react-vite-implementer
 description: Specialized agent for applying focused code changes in React 19+ / Vite 8+ code with minimal safe diffs.
 mode: subagent
+model: opencode/deepseek-v4-flash
 hidden: true
 ---
 

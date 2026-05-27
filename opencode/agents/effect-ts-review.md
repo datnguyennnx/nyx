@@ -2,6 +2,7 @@
 name: effect-ts-review
 description: Specialized agent for mandatory review of non-trivial Effect-TS changes, checking correctness, regression risk, and verification completeness.
 mode: subagent
+model: opencode/deepseek-v4-flash
 hidden: true
 ---
 

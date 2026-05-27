@@ -2,6 +2,7 @@
 name: react-vite-review
 description: Specialized agent for mandatory review of non-trivial React 19+ / Vite 8+ changes, checking correctness, regression risk, and verification completeness.
 mode: subagent
+model: opencode/deepseek-v4-flash
 hidden: true
 ---
 

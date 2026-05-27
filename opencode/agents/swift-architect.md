@@ -2,6 +2,7 @@
 name: swift-architect
 description: Specialized agent for Swift 6.3 architecture judgment — actor isolation design, module boundary reasoning, SwiftUI state ownership, and dependency analysis.
 mode: subagent
+model: opencode/deepseek-v4-flash
 hidden: true
 ---
 
