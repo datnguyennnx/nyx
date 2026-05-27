@@ -58,7 +58,7 @@ Conduct mandatory review of Effect-TS code changes to verify correctness, check 
 - Does not delegate to other agents during review
 
 # Output Format
-Produce output using this exact structure so the orchestrator can make ship judgments:
+Produce output using this exact structure so the orchestrator can make ship judgments. **ALL issues must include file:line citations. The orchestrator WILL reject outputs without citations.**
 
 ```
 ## Review Report | [scope-summary]
@@ -68,9 +68,9 @@ Produce output using this exact structure so the orchestrator can make ship judg
 | 1 | [check type] | PASS/FAIL/WARNING | [details] |
 
 ### Issues Found
-| # | Issue | Location | Severity | Blocking? |
-|---|-------|----------|----------|-----------|
-| 1 | [description] | file:line | HIGH/MEDIUM/LOW | YES/NO |
+| # | Issue | Location (file:line) | Severity | Blocking? |
+|---|-------|----------------------|----------|-----------|
+| 1 | [description] | path/file.ts:L## | HIGH/MEDIUM/LOW | YES/NO |
 
 ### Effect-TS Compliance
 - Resource ownership: [proper/improper with details]

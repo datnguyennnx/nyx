@@ -52,14 +52,14 @@ Discover and map Effect-TS codebase structure including boundaries, dependencies
 - Does not delegate implementation or review tasks
 
 # Output Format
-Produce output using this exact structure so the orchestrator can parse and delegate further:
+Produce output using this exact structure so the orchestrator can parse and delegate further. **ALL findings must include file:line citations. The orchestrator WILL reject outputs without citations.**
 
 ```
 ## Discovery Report | [scope-summary]
 ### Findings
-| # | Finding | Location | Confidence |
-|---|---------|----------|------------|
-| 1 | [description] | file:line | HIGH/MEDIUM/LOW |
+| # | Finding | Location (file:line) | Confidence |
+|---|---------|----------------------|------------|
+| 1 | [description] | path/to/file.ts:L## | HIGH/MEDIUM/LOW |
 
 ### Boundary Map
 - Service interfaces: [list with locations]
@@ -79,14 +79,14 @@ Produce output using this exact structure so the orchestrator can parse and dele
 - Edge of the World: [identified execution boundary location]
 
 ### Code Pattern Observations
-| # | Pattern | Location | Evidence |
-|---|---------|----------|----------|
-| 1 | [pattern name] | file:line | [what code does] |
+| # | Pattern | Location (file:line) | Evidence |
+|---|---------|----------------------|----------|
+| 1 | [pattern name] | path/file.ts:L## | [what code does] |
 
 ### Mental Model Violations (Raw Findings)
-| # | Violation | Location | Evidence |
-|---|-----------|----------|----------|
-| 1 | [observed pattern] | file:line | [what code does — no prescription] |
+| # | Violation | Location (file:line) | Evidence |
+|---|-----------|----------------------|----------|
+| 1 | [observed pattern] | path/file.ts:L## | [what code does — no prescription] |
 
 ### Assumptions (needs verification)
 - [list items where evidence is incomplete]

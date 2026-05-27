@@ -59,14 +59,14 @@ Apply focused, minimal code changes in Effect-TS codebases while respecting boun
 - Does not delegate to review agent (separate phase)
 
 # Output Format
-Produce output using this exact structure so the orchestrator and reviewer can parse and verify:
+Produce output using this exact structure so the orchestrator and reviewer can parse and verify. **ALL changes must include exact file:line. The orchestrator WILL reject outputs without citations.**
 
 ```
 ## Implementation Report | [scope-summary]
 ### Changes
-| # | File | Lines | Change Type | Primitive Used |
-|---|------|-------|-------------|----------------|
-| 1 | [path] | L##-L## | [Resource/Error/Concurrency/Interface] | [Layer.effect/TaggedError/etc] |
+| # | File | Lines (exact) | Change Type | Primitive Used |
+|---|------|--------------|-------------|----------------|
+| 1 | path/to/file.ts | L##-L## | Resource/Error/Concurrency/Interface | Layer.effect/TaggedError/etc |
 
 ### Change Details
 For each change:

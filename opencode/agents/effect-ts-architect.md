@@ -52,7 +52,7 @@ Analyze Effect-TS architecture focusing on Layer construction patterns, service 
 - MUST load `effect-ts` as the base skill for research methodology and access to reference guides (`../skills/effect-ts/references/guide-layers.md`, `../skills/effect-ts/references/guide-effect.md`, `../skills/effect-ts/references/guide-error-handling.md`)
 
 # Output Format
-Produce output using this exact structure so the orchestrator can parse and delegate further:
+Produce output using this exact structure so the orchestrator can parse and delegate further. **ALL recommendations must cite file:line evidence from discovery. The orchestrator WILL reject outputs without citations.**
 
 ```
 ## Architecture Assessment | [scope-summary]
@@ -62,9 +62,9 @@ Produce output using this exact structure so the orchestrator can parse and dele
 | 1 | [Layer/Context/Sendable/etc] | OK/NEEDS-CHANGE/UNCLEAR | HIGH/MEDIUM/LOW |
 
 ### Recommendations
-| # | Change | Location | Reason | Minimal? |
-|---|--------|----------|--------|----------|
-| 1 | [description] | file:line | [why] | YES/NO |
+| # | Change | Location (file:line) | Reason | Evidence From | Minimal? |
+|---|--------|----------------------|--------|--------------|----------|
+| 1 | [description] | path/file.ts:L## | [why] | [discovery finding #N] | YES/NO |
 
 (Architect → Implementer Handoff: the ship agent passes recommendations to the implementer using this table. Each row maps one-to-one with implementer tasks.)
 
