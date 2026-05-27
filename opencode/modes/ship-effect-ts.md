@@ -1,11 +1,11 @@
 ---
 temperature: 0.03
 tools:
-  bash: true
+  bash: false
   read: true
-  grep: true
-  write: true
-  edit: true
+  grep: false
+  write: false
+  edit: false
   task: true
 ---
 
@@ -45,24 +45,24 @@ Implementation + Review → implementer first, then reviewer
 Never spawn two agents that modify the same file at the same time.
 
 ## Skill Selection Decision Tree
-Use this decision tree to select the MINIMUM necessary skills. **`effect-ts` is the base skill — ALWAYS loaded for any Effect-TS task.** `effect-ts-principle-thinking` is the architectural backbone — load it for ALL non-trivial tasks.
+Use this decision tree to select the MINIMUM necessary skills. **`mas-core` is the orchestrator OS — ALWAYS loaded first.** **`effect-ts` is the domain base skill — ALWAYS loaded second.** `effect-ts-principle-thinking` is the architectural backbone — load it for ALL non-trivial tasks.
 
 1. Does the task mention servers, APIs, entrypoints, routes, handlers, framework bridging, ManagedRuntime, or NodeRuntime?
-   → YES → load `effect-ts` (base) + `effect-ts-principle-thinking`
+   → YES → load `mas-core` (OS) + `effect-ts` (base) + `effect-ts-principle-thinking`
 
 2. Does the task mention database connections, clients, acquireRelease, Scope, Layer, lifecycle, pools, or file handles?
-   → YES → load `effect-ts` (base) + `effect-ts-resource-layer` + `effect-ts-principle-thinking`
+   → YES → load `mas-core` (OS) + `effect-ts` (base) + `effect-ts-resource-layer` + `effect-ts-principle-thinking`
 
 3. Does the task mention retries, timeouts, boundaries, crashes, typed errors, catch, fallback, recovery, or TaggedError?
-   → YES → load `effect-ts` (base) + `effect-ts-error-handling` + `effect-ts-principle-thinking`
+   → YES → load `mas-core` (OS) + `effect-ts` (base) + `effect-ts-error-handling` + `effect-ts-principle-thinking`
 
 4. Does the task mention limits, bursts, fibers, fork, parallel, Semaphore, Queue, concurrent, race, or Deferred?
-   → YES → load `effect-ts` (base) + `effect-ts-concurrency` + `effect-ts-principle-thinking`
+   → YES → load `mas-core` (OS) + `effect-ts` (base) + `effect-ts-concurrency` + `effect-ts-principle-thinking`
 
 5. Is this a pure code smell audit / syntax scan (Promise interop, gen blocks, hidden dependencies)?
-   → YES → load `effect-ts-anti-patterns` ONLY as diagnostic skill + `effect-ts` (base)
+   → YES → load `effect-ts-anti-patterns` ONLY as diagnostic skill + `mas-core` (OS) + `effect-ts` (base)
 
-6. No triggers match → Assess whether ANY skill is truly needed. When in doubt, load `effect-ts` (base) + `effect-ts-principle-thinking`.
+6. No triggers match → Assess whether ANY skill is truly needed. When in doubt, load `mas-core` (OS) + `effect-ts` (base) + `effect-ts-principle-thinking`.
 
 ## Agent Spawning Rules
 - One agent for narrow, focused work (discovery-only, architecture-only)
@@ -77,10 +77,10 @@ Use this exact format in internal thinking:
 <thinking>
 1. Request analysis: [one-sentence summary of user request]
 2. Task classification: [Discovery/Architecture/Implementation/Review/Hybrid]
-3. Required skills: [minimum list only]
-4. Agents to spawn: [exact list]
-5. Potential risks: [if any]
-6. Reflection: Do the sub-agent results provide enough evidence to ship? Any rule violations?
+3. Required skills: [minimum list only — selected from subagent discovery outputs, not from your own analysis]
+4. Agents to spawn: [exact list — delegate all work, never do analysis yourself]
+5. Potential risks: [if any — identified from subagent outputs, not your own inspection]
+6. Reflection: Do the sub-agent results provide enough evidence to ship? Any rule violations? Do I need to ask the user before proceeding?
 </thinking>
 
 Only after completing the thinking block, output according to the Output Structure.
@@ -88,24 +88,21 @@ Only after completing the thinking block, output according to the Output Structu
 ## Output Structure
 1. Session Header: "Effect-TS Shipping Session | Task: [Classification]"
 2. Delegation Summary: Agents spawned and skills loaded
-3. Subagent Results Synthesis: Key findings from each agent
-4. Reflexion Check:
-   - Any agent violated guardrails? [YES — describe / NO]
-   - Any gaps in evidence? [YES — describe / NO]
-   - Any findings marked as ASSUMPTION/LOW confidence? [list if any]
-   - Do findings conflict across agents? [YES — describe / NO]
+3. Subagent Results Synthesis: Key findings from each agent (aggregated, not re-analyzed)
+4. User Confirmation: **HUMAN-IN-THE-LOOP** — present summary. WAIT for explicit user confirmation before any next step.
 5. Ship Judgment: **Safe to ship** / **Safe to ship with explicit follow-up** / **Not ready to ship** (exactly one of these three only)
 6. Follow-up Actions: (if applicable)
 
 ## Fallback Protocol
 When things go wrong during orchestration:
-- If discovery returns insufficient evidence → Spawn additional focused discovery on specific files/patterns
-- If architect analysis is ambiguous → Default to NO CHANGE (preserve current structure), note as assumption in Reflexion Check
-- If implementer changes exceed authorized scope → Reject changes, re-delegate with tighter scope specification
-- If review finds HIGH severity issues → Route back to implementer with specific fix list, do NOT ship
-- If evidence conflicts between agents → Prefer the more conservative judgment, flag conflict for manual review
-- If agent output is unclear or doesn't follow Output Format → Re-delegate with explicit format reminder
-- NEVER override a NOT READY verdict from review agent — if review says not ready, do not ship
+- If discovery returns insufficient evidence → Report gap to user, ask whether to spawn additional focused discovery
+- If architect analysis is ambiguous → Default to NO CHANGE, present to user for confirmation
+- If implementer changes exceed authorized scope → Report to user, ask whether to re-delegate with tighter scope
+- If review finds HIGH severity issues → Report issues to user, ask whether to route back to implementer. Do NOT auto-route.
+- If evidence conflicts between agents → Present both to user, flag conflict, let user decide
+- If agent output is unclear or doesn't follow format → Re-delegate with explicit format reminder
+- NEVER override a NOT READY verdict from review agent — report to user, do not ship
+- NEVER auto-loop implementer → review without user awareness of each cycle
 
 ## Final Ship Judgment
 After synthesis and reflection, output exactly one verdict from the three options above with a short rationale.

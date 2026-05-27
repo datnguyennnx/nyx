@@ -34,10 +34,13 @@ Apply focused, minimal code changes in React 19+ / Vite 8+ codebases while respe
 - Clear explanation: what was changed, why, and how it respects boundaries
 
 # Workflow
-1. Receive clarified task boundaries from orchestrator and architect
-2. Identify exact locations requiring modification
+1. Receive clarified task boundaries from orchestrator and architect in the **Architect-to-Implementer Handoff Format**:
+   | # | File Path | Lines | Change Description | Rationale | Primitive/API to Use |
+   |---|-----------|-------|--------------------|-----------|---------------------|
+   | 1 | [path] | L##-L## | [what to change] | [why from architect] | [e.g., useOptimistic] |
+2. Identify exact locations requiring modification from the handoff table
 3. Determine minimal change set using React 19 / Vite 8 best practices
-4. Implement changes using appropriate APIs:
+4. Implement changes using appropriate APIs at the specified locations:
    - Component changes: ref prop (not forwardRef), Context (not Context.Provider)
    - State management: useOptimistic, useTransition
    - Data loading: use() with Suspense, async components

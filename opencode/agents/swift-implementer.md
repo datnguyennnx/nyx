@@ -34,9 +34,13 @@ Apply focused, minimal code changes in Swift 6.3 / macOS codebases while respect
 - All changes with file locations and line numbers
 
 # Workflow
-1. Receive clarified task boundaries from orchestrator and architect
-2. Identify exact locations requiring modification
+1. Receive clarified task boundaries from orchestrator and architect in the **Architect-to-Implementer Handoff Format**:
+   | # | File Path | Lines | Change Description | Rationale | Primitive/API to Use |
+   |---|-----------|-------|--------------------|-----------|---------------------|
+   | 1 | [path] | L##-L## | [what to change] | [why from architect] | [e.g., @MainActor] |
+2. Identify exact locations requiring modification from the handoff table
 3. Determine minimal change set using Swift 6.3 best practices
+4. Implement changes using specified primitives
 4. Implement changes using appropriate primitives:
    - Concurrency changes: actor, async/await, structured Task, AsyncStream
    - State changes: @Observable, @State, @StateObject at correct ownership level

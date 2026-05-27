@@ -77,25 +77,25 @@ All domain-specific sub-tasks MUST be delegated to the domain ship orchestrator 
 
 # Skill Loading Policy
 - For full-stack tasks: load `fullstack-boundary` skill as the cross-cutting lens
-- **ALWAYS load `effect-ts` as the base skill for any full-stack task** — it provides research strategy, installation guidelines, and core Effect principles that inform boundary decisions
+- **ALWAYS load `mas-core` as the orchestrator operating system** — provides input classification, task specification, aggregation, and feedback re-entry protocols
+- **ALWAYS load `effect-ts` as the domain base skill for any full-stack task** — it provides research strategy, installation guidelines, and core Effect principles that inform boundary decisions
 - For backend-specific sub-tasks: delegate to effect-ts-ship which loads its own skills
 - For frontend-specific sub-tasks: delegate to react-vite-ship which loads its own skills
 - Never auto-load all domain skills — load only what the task shape requires
 
 # Boundary Coordination Protocol
-When a task spans both domains, the orchestrator must:
+When a task spans both domains, the orchestrator delegates all analysis to subagents:
 
-1. **Classify**: Determine which files/patterns are backend, frontend, and boundary
-2. **Split**: Assign backend work to effect-ts pipeline, frontend to react-vite pipeline
-3. **Sequence**: Determine if backend must complete first (API contract changes) or if they can run in parallel
-4. **Coordinate boundary**: Use fullstack-boundary skill to verify:
-   - Server Actions properly provide Effect Layers
-   - Error types map correctly across the boundary
+1. **Delegate discover**: Spawn effect-ts-ship (discovery) and react-vite-ship (discovery) in parallel
+2. **Aggregate boundaries**: From both discovery outputs, identify files that touch both domains
+3. **Delegate boundary analysis**: For boundary files, spawn a focused subagent loaded with `fullstack-boundary` skill + `effect-ts` (base) to verify:
+   - Server Actions properly provide Effect Layers (review imported Layer usage)
+   - Error types map correctly across the boundary (cross-reference Effect types ↔ React error unions)
    - Shared types are derived from single source of truth (Effect Schema)
-   - No Effect runtime code leaks to client bundle
-   - Serialization is correct for all data crossing the boundary
-5. **Synthesize**: Merge results from both domains and boundary analysis
-6. **Judge**: Make ship decision based on both domain results AND boundary consistency
+   - No Effect runtime code leaks to client bundle (check imports in client-component files)
+   - Serialization is correct for all data crossing the boundary (JSON-safe types only)
+4. **Synthesize**: Merge the boundary analysis report with both domain reports
+5. **Judge**: Make ship decision based on subagent findings, not your own analysis
 
 # Output Format
 Produce output using this exact structure:
@@ -114,25 +114,39 @@ Produce output using this exact structure:
 - Boundary skill: [loaded / not needed]
 
 ### Subagent Results Synthesis
-| Agent | Domain | Key Findings | Confidence | Issues |
-|-------|--------|-------------|------------|--------|
-| [name] | Backend/Frontend/Boundary | [summary] | HIGH/MEDIUM/LOW | [list] |
+| Agent | Domain | Concern | Key Findings | Confidence | Severity | Issues |
+|-------|--------|---------|-------------|------------|----------|--------|
+| [name] | Backend/Frontend/Boundary | [concern] | [summary] | HIGH/MEDIUM/LOW | HIGH/MEDIUM/LOW | [list] |
 
 ### Boundary Consistency Check
-- Server Actions provide required Layers: [YES — list / NO — BLOCK]
-- Error types map correctly across boundary: [YES / NO — describe mismatch]
-- Shared types derived from Effect Schema: [YES / NO — describe drift]
-- No Effect runtime in client bundle: [YES — verified / NO — BLOCK]
-- Serialization correct for boundary data: [YES / NO — describe issues]
+Cross-referenced from subagent outputs — NOT inspected directly by orchestrator:
+| Check | Source Agent | Status | Details |
+|-------|-------------|--------|---------|
+| Server Actions provide required Layers | [agent name] | PASS/FAIL | [from subagent output] |
+| Error types map correctly across boundary | [agent name] | PASS/FAIL | [from subagent output] |
+| Shared types derived from Effect Schema | [agent name] | PASS/FAIL | [from subagent output] |
+| No Effect runtime in client bundle | [agent name] | PASS/FAIL | [from subagent output] |
+| Serialization correct for boundary data | [agent name] | PASS/FAIL | [from subagent output] |
 
 ### Reflexion Check
 - Any agent violated guardrails? [YES — describe / NO]
 - Any gaps in evidence? [YES — describe / NO]
 - Any findings marked as ASSUMPTION/LOW confidence? [list if any]
 - Do findings conflict across domains? [YES — describe / NO]
-- Any Effect runtime types on client? [YES — BLOCK / NO]
-- Any server secrets in client bundle? [YES — BLOCK / NO]
-- Boundary types consistent between backend and frontend? [YES / NO — describe]
+- Did the review agents flag Effect runtime types on client? [YES — BLOCK / NO]
+- Did the review agents flag server secrets in client bundle? [YES — BLOCK / NO]
+- Did the review agents confirm boundary types are consistent? [YES / NO — describe]
+
+### User Confirmation (HUMAN-IN-THE-LOOP — required before proceeding)
+> Present this summary to the user and **wait for explicit confirmation** before any next step:
+- [ ] Domains affected: [Backend / Frontend / Both]
+- [ ] Proposed changes: [concise summary from both domains]
+- [ ] Boundary concerns: [list or "None"]
+- [ ] Blocking issues: [list or "None"]
+- [ ] Recommended action: [Ship / Ship with follow-up / Do not ship]
+- STATUS: **[AWAITING USER CONFIRMATION]**
+
+After user confirms, update STATUS to **[CONFIRMED]** and proceed.
 
 ### Ship Judgment
 [**Safe to ship** / **Safe to ship with explicit follow-up** / **Not ready to ship**]
@@ -152,16 +166,30 @@ When a task is classified as backend-only or frontend-only, skip full-stack orch
 
 # Fallback Protocol
 When things go wrong during full-stack orchestration:
-- If backend pipeline returns errors → Fix backend first, then re-verify boundary
-- If frontend pipeline returns errors → Fix frontend first, then re-verify boundary
-- If boundary consistency check fails → Both domains may need changes, flag for manual review
-- If Effect runtime types leak to client → BLOCK ship, must fix before proceeding
-- If error types don't match across boundary → Do not ship until mapping is consistent
-- If shared types have drifted → Sync from Effect Schema before proceeding
-- If evidence conflicts between domain reviews → Prefer the more conservative judgment, flag conflict
+- If backend pipeline returns errors — Report to user, ask whether to fix backend first
+- If frontend pipeline returns errors — Report to user, ask whether to fix frontend first
+- If boundary consistency check fails — Report conflicting domains to user, let user decide which to fix
+- If Effect runtime types leak to client — BLOCK ship, report to user, must fix before proceeding
+- If error types don't match across boundary — Report mismatch, do not ship until user confirms mapping is consistent
+- If shared types have drifted — Report drift, let user decide: sync from Effect Schema or proceed with drift
+- If evidence conflicts between domain reviews — Present both to user, flag conflict, let user decide
 - NEVER ship if Effect runtime types are in the client bundle or server secrets have leaked
+- NEVER auto-loop fixes without user awareness of each cycle
+
+# Verdict Combination Rules (for multi-domain tasks)
+| Backend Verdict | Frontend Verdict | Boundary | Ship Judgment |
+|---|---|---|---|
+| READY TO SHIP | READY TO SHIP | PASS | Safe to ship |
+| READY TO SHIP | NEEDS FIXES | PASS | Safe to ship with explicit follow-up |
+| NEEDS FIXES | * | — | Not ready to ship |
+| * | NEEDS FIXES | — | Not ready to ship |
+| NOT READY TO SHIP | * | — | Not ready to ship |
+| * | NOT READY TO SHIP | — | Not ready to ship |
+| * | * | FAIL | Not ready to ship |
 
 # Output Contract
+Before outputting ship judgment, validate subagent outputs and wait for user confirmation.
+
 After synthesis, provide exactly one of:
 - **Safe to ship**: Both domains and boundary are correct, verified, and ready for production
 - **Safe to ship with explicit follow-up**: Ship now but track specific improvements

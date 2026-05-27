@@ -35,9 +35,13 @@ Apply focused, minimal code changes in Effect-TS codebases while respecting boun
 - All changes with file locations and line numbers
 
 # Workflow
-1. Receive clarified task boundaries from orchestrator and architect
-2. Identify exact locations requiring modification
+1. Receive clarified task boundaries from orchestrator and architect in the **Architect-to-Implementer Handoff Format**:
+   | # | File Path | Lines | Change Description | Rationale | Primitive/API to Use |
+   |---|-----------|-------|--------------------|-----------|---------------------|
+   | 1 | [path] | L##-L## | [what to change] | [why from architect] | [e.g., Layer.effect] |
+2. Identify exact locations requiring modification from the handoff table
 3. Determine minimal change set using Effect-TS best practices
+4. Implement changes using specified primitives
 4. Implement changes using appropriate primitives:
    - Resource changes: Layer.effect/Scope patterns
    - Error changes: Typed errors, mapError, catchTag

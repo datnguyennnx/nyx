@@ -1,11 +1,11 @@
 ---
 temperature: 0.03
 tools:
-  bash: true
+  bash: false
   read: true
-  grep: true
-  write: true
-  edit: true
+  grep: false
+  write: false
+  edit: false
   task: true
 ---
 
@@ -47,7 +47,7 @@ Implementation + Review → implementer first, then reviewer
 Never spawn two agents that modify the same file at the same time.
 
 ## Skill Selection Decision Tree
-Use this decision tree to select the MINIMUM necessary skills:
+Use this decision tree to select the MINIMUM necessary skills. **`mas-core` is the orchestrator OS — ALWAYS loaded first.** Select domain skills based on what the USER describes:
 1. Does the code involve actor isolation, @MainActor, or concurrency patterns? → YES → load `swift-actors`
 2. Does the code involve typed throws, Result, error propagation, or async error handling? → YES → load `swift-error-handling`
 3. Does the code involve SwiftUI state management, View decomposition, or environment injection? → YES → load `swift-swiftui-patterns`
@@ -85,20 +85,22 @@ Only after completing the thinking block, output according to the Output Structu
    - Any gaps in evidence? [YES — describe / NO]
    - Any findings marked as ASSUMPTION/LOW confidence? [list if any]
    - Do findings conflict across agents? [YES — describe / NO]
-   - Any @unchecked Sendable or nonisolated(unsafe) introduced? [YES — BLOCK / NO]
-5. Ship Judgment: **Safe to ship** / **Safe to ship with explicit follow-up** / **Not ready to ship** (exactly one of these three only)
-6. Follow-up Actions: (if applicable)
+   - Did the review agent flag @unchecked Sendable or nonisolated(unsafe)? [YES — BLOCK / NO]
+5. User Confirmation: **HUMAN-IN-THE-LOOP** — present summary. WAIT for explicit user confirmation.
+6. Ship Judgment: **Safe to ship** / **Safe to ship with explicit follow-up** / **Not ready to ship** (exactly one of these three only)
+7. Follow-up Actions: (if applicable)
 
 ## Fallback Protocol
 When things go wrong during orchestration:
 - If discovery returns insufficient evidence → Spawn additional focused discovery on specific files/patterns
 - If architect analysis is ambiguous about isolation → Default to NO CHANGE (preserve current isolation), note as assumption
 - If implementer changes exceed authorized scope → Reject changes, re-delegate with tighter scope specification
-- If review finds HIGH severity concurrency issues → Route back to implementer with specific fix list, do NOT ship
-- If evidence conflicts between agents → Prefer the more conservative judgment, flag conflict for manual review
+- If review finds HIGH severity concurrency issues → Report issues to user, ask whether to route back to implementer. Do NOT auto-route.
+- If evidence conflicts between agents → Present both to user, flag conflict, let user decide
 - If agent output is unclear or doesn't follow Output Format → Re-delegate with explicit format reminder
-- NEVER override a NOT READY verdict from review agent — if review says not ready, do not ship
-- NEVER ship if @unchecked Sendable or nonisolated(unsafe) was introduced without explicit architect sign-off
+- NEVER override a NOT READY verdict from review agent — report to user, do not ship
+- NEVER auto-loop implementer → review without user awareness of each cycle
+- NEVER ship if @unchecked Sendable or nonisolated(unsafe) is flagged without explicit user sign-off
 
 ## Final Ship Judgment
 After synthesis and reflection, output exactly one verdict from the three options above with a short rationale.

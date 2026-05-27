@@ -58,6 +58,12 @@ Produce output using this exact structure so the orchestrator can parse and dele
 |---|--------|----------|--------|----------|
 | 1 | [description] | file:line | [why] | YES/NO |
 
+### Architect-to-Implementer Handoff Format
+When recommendations move to implementation, the ship agent packages them as:
+| # | File Path | Lines | Change Description | Rationale | Primitive/API to Use |
+|---|-----------|-------|--------------------|-----------|---------------------|
+| 1 | [path] | L##-L## | [what to change — from Recommendations] | [why — from Recommendations] | [e.g., useOptimistic, createContext, React.lazy] |
+
 ### Component Boundary Analysis
 - Component split: [correct/incorrect with details]
 - Bundle impact: [optimal/suboptimal with details]

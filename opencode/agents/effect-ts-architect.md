@@ -66,6 +66,16 @@ Produce output using this exact structure so the orchestrator can parse and dele
 |---|--------|----------|--------|----------|
 | 1 | [description] | file:line | [why] | YES/NO |
 
+(Architect → Implementer Handoff: the ship agent passes recommendations to the implementer using this table. Each row maps one-to-one with implementer tasks.)
+
+### Architect-to-Implementer Handoff Format
+When recommendations move to implementation, the ship agent packages them as:
+| # | File Path | Lines | Change Description | Rationale | Primitive/API to Use |
+|---|-----------|-------|--------------------|-----------|---------------------|
+| 1 | [path] | L##-L## | [what to change — from Recommendations] | [why — from Recommendations] | [e.g., Layer.effect, Effect.catchTag, Schema.TaggedError] |
+
+The implementer consumes this table directly as its task specification.
+
 ### Dependency Analysis
 - Layer ordering: [correct/incorrect with details]
 - Service interfaces: [clean/leaking with details]
