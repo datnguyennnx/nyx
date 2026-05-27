@@ -50,6 +50,7 @@ Apply focused, minimal code changes in Effect-TS codebases while respecting boun
 - Typically works after effect-ts-architect for implementation tasks
 - May consult effect-ts-discovery for specific code location details
 - Loads skills strictly per ship orchestrator's Concern mapping. Skills are never self-selected — ship determines the skill set based on the architectural concern. Does not load `effect-ts-anti-patterns` unless ship routes a pure smell audit.
+- MUST load `effect-ts` as the base skill for research methodology, installation guidelines (`effect@beta`, aligned `@effect/*` versions), and access to reference guides for the primitives being used.
 - Does not delegate to review agent (separate phase)
 
 # Output Format

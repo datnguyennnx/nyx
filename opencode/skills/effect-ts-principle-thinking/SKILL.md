@@ -3,6 +3,9 @@ name: effect-ts-principle-thinking
 description: Enforce core Effect-TS mental models: Programs as Values, Edge of the World execution, Structured Concurrency, and Contextual Dependency Injection.
 ---
 
+# Companion Skill
+Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides covering all Effect domains. The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code. This skill is the exclusive source of truth for core mental models; the main skill provides the general-purpose research framework and installation guidance.
+
 # Purpose
 This skill aligns architectural design and code implementation with the fundamental philosophies of Effect-TS. It ensures developers and agents think in terms of "Effects as descriptions of workflows" rather than immediate imperative executions, maintaining strict boundaries, resource safety, and deterministic control flow.
 
@@ -68,7 +71,13 @@ Return findings with:
 - Using `Effect.runSync` in pure unit tests where side effects and async bounds are not present.
 - Stateful objects (classes) if they are strictly internal to a single fiber and not shared concurrently.
 
+# Related Guides (from effect-ts skill references/)
+- `./references/guide-effect.md` — Core `Effect` usage, constructors, composition, provisioning, runtime boundaries
+- `./references/guide-layers.md` — Services, layer construction, composition, provisioning patterns
+- `./references/guide-observability.md` — `Effect.fn`, spans, logging, metrics, telemetry wiring
+
 # Delegation
+- Delegate to `effect-ts` for research strategy, installation guidelines, and in-depth guidance across all Effect domains.
 - Delegate to `effect-ts-anti-patterns` for low-level syntax corrections (e.g., generic Error usage).
 - Delegate to `effect-ts-resource-layer` for implementing `acquireRelease` specifics.
 - Delegate to `effect-ts-concurrency` for deep queueing and semaphore logic.

@@ -45,9 +45,10 @@ Analyze Effect-TS architecture focusing on Layer construction patterns, service 
 # Delegation
 - Typically works after effect-ts-discovery for architecture tasks
 - May delegate to effect-ts-implementer for actual code changes (if any)
-- Loads skills strictly based on the architectural concern. ALWAYS loads `effect-ts-principle-thinking` (THIS is the exclusive source of truth for core mental models). May additionally load `effect-ts-resource-layer` or `effect-ts-error-handling` based on the specific concern.
+- Loads skills strictly based on the architectural concern. ALWAYS loads `effect-ts-principle-thinking` (THIS is the exclusive source of truth for core mental models). Additionally loads `effect-ts` (base research + guides). May additionally load `effect-ts-resource-layer` or `effect-ts-error-handling` based on the specific concern.
 - Does not perform discovery or review tasks directly
 - MUST load and consult `effect-ts-principle-thinking` for any mental model decisions (Programs as Values, Edge of the World, DI, Structured Concurrency). Do NOT infer or inline these definitions from your own knowledge — the skill is the single source of truth.
+- MUST load `effect-ts` as the base skill for research methodology and access to reference guides (`references/guide-layers.md`, `references/guide-effect.md`, `references/guide-error-handling.md`)
 
 # Output Format
 Produce output using this exact structure so the orchestrator can parse and delegate further:

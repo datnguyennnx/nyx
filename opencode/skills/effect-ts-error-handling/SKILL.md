@@ -3,6 +3,9 @@ name: effect-ts-error-handling
 description: Implement proper error handling with typed domain errors, boundary mapping, and bounded recovery strategies.
 ---
 
+# Companion Skill
+Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides (`references/guide-error-handling.md`, `references/guide-schema.md`, `references/guide-retries.md`, `references/guide-schedule.md`). The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code.
+
 # Purpose
 This skill ensures Effect-TS code uses proper error handling with typed domain errors, distinguishes expected vs unexpected errors, maps infrastructure errors to domain boundaries, and applies appropriate recovery strategies.
 
@@ -87,8 +90,15 @@ These patterns are correct usage — do not flag them as anti-patterns:
 - `Effect.either` / `Effect.option` for converting failures to values at consumption points — this IS correct error absorption
 - Infrastructure-level generic errors (database driver, HTTP client errors) at their own boundary — these ARE appropriate until mapped to domain errors
 
+# Related Guides (from effect-ts skill references/)
+- `./references/guide-error-handling.md` — Defining errors, schema-based errors, failure handling, defects
+- `./references/guide-schema.md` — Schema design, tagged errors (`Schema.TaggedErrorClass`)
+- `./references/guide-retries.md` — Retry policies, retry conditions, ExecutionPlan
+- `./references/guide-schedule.md` — Retries, backoff, schedule composition
+
 # Delegation
 Delegate to:
+- **effect-ts** for research strategy, installation guidelines, and in-depth guidance
 - effect-ts-principle-thinking for mental model violations (swallowing error channel at boundary, Errors are Data violations)
 - effect-ts-anti-patterns for generic Error detection and Promise-first code
 - effect-ts-resource-layer for error handling in resource acquisition/release patterns

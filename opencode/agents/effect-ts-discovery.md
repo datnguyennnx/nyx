@@ -47,6 +47,7 @@ Discover and map Effect-TS codebase structure including boundaries, dependencies
 - Typically works alone for discovery tasks
 - May delegate to effect-ts-architect for complex boundary interpretation
 - Loads skills strictly per ship orchestrator's Concern mapping (principle-thinking for boundary/entrypoint analysis; anti-patterns only when ship routes a pure smell audit)
+- MUST load `effect-ts` as the base skill for research methodology (local guides → codebase patterns → Effect source code) when deep investigation of a pattern is needed
 - Does not delegate implementation or review tasks
 
 # Output Format

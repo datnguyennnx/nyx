@@ -3,6 +3,9 @@ name: fullstack-boundary
 description: Manage the integration boundary between Effect-TS backend services and React 19+ / Vite 8+ frontend, ensuring type-safe API contracts, error propagation, data serialization, and Server Action wiring.
 ---
 
+# Companion Skill
+Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides covering Effect services, layers, error handling, and schema design. The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code.
+
 # Purpose
 This skill ensures the boundary between Effect-TS backend and React 19+ frontend is correctly managed — typed errors propagate cleanly, data serializes correctly, Server Actions wire to Effect services, and the API contract is consistent across domains.
 
@@ -89,8 +92,14 @@ These patterns are correct usage — do not flag them as anti-patterns:
 - Vite 8 SSR externalizing Effect packages that shouldn't bundle — this IS correct configuration
 - `useActionState` consuming typed error returns from Effect-backed Server Actions — this IS the complete pipeline
 
+# Related Guides (from effect-ts skill references/)
+- `./references/guide-error-handling.md` — Typed domain errors for API contracts
+- `./references/guide-layers.md` — Layer provisioning for Server Actions
+- `./references/guide-schema.md` — Effect Schema for type-safe API contracts
+
 # Delegation
 Delegate to:
+- **effect-ts** for research strategy, installation guidelines, and in-depth guidance on Effect patterns
 - react-vite-error-handling for Error Boundary and Suspense issues on the React side
 - effect-ts-error-handling for Effect error type design on the backend side
 - effect-ts-resource-layer for Layer provisioning issues in Server Actions

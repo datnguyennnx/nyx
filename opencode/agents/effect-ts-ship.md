@@ -56,6 +56,15 @@ Classify each request along two axes: target PATH and PROBLEM SHAPE.
 - Never spawn agents that would create overlapping ownership
 - **Stop and Rethink Guardrail:** Before spawning subagents, count the number of skills assigned to each agent. If any agent is assigned more than 3 skills, you MUST stop, divide the target scope into smaller concerns, and spawn separate agents with fewer skills. This prevents context bloat from overloading any single agent.
 
+# Base Skill: effect-ts (always loaded)
+The `effect-ts` skill is the foundational research and guidance framework. It is ALWAYS loaded for any Effect-TS task alongside concern-specific skills. It provides:
+- **Research methodology**: Local guides → codebase patterns → Effect source code
+- **Installation guidelines**: Package selection, version rules (`effect@beta`, aligned versions)
+- **Core principles**: Consolidated reference for all Effect-TS patterns
+- **Guide references**: `./references/` directory with detailed guides covering Effect, error handling, layers, schemas, testing, observability, retries, SQL, and more
+
+**Rule**: `effect-ts` + concern-specific skills = minimal viable skill set. Never skip the base skill.
+
 # Skill Loading Policy
 Skills are loaded STRICTLY based on the architectural concern of the code being targeted, not on hardcoded folder names. This is a lazy-loading architecture — agents MUST NOT load any skill outside the mapping below unless explicitly requested by the user.
 
@@ -64,11 +73,11 @@ Examine the actual project folder tree and the code's purpose. Classify the targ
 
 | Concern | What the Code Does | Skill Mapping (ONLY) | Focus |
 |---|---|---|---|
-| **Resource Lifecycle** | DB access, config loading, external clients, file I/O, connection pools, any acquire/release pattern | `effect-ts-resource-layer`, `effect-ts-principle-thinking` | acquireRelease, Connection Pools, Config Layers |
-| **Concurrent Data Access** | Rate-limited APIs, background workers, external data sources, streaming, queue consumers, any high-throughput or concurrent operations | `effect-ts-concurrency`, `effect-ts-error-handling`, `effect-ts-principle-thinking` | Rate limiting, 429 retries, Semaphores, Schedule, HTTP→Domain errors |
-| **Business Logic / Domain** | Services, entities, use cases, pure domain logic, validation, orchestration flows | `effect-ts-error-handling`, `effect-ts-principle-thinking` | Typed Errors, Business Logic boundaries, Effect.Clock |
-| **Framework Bridging / Entrypoints** | HTTP handlers, WebSocket handlers, server startup, framework callbacks, any "Edge of the World" code where Effect meets external frameworks | `effect-ts-principle-thinking`, `effect-ts-error-handling` | ManagedRuntime, Edge of the World bridging, Error Response mapping |
-| any concern | pure smell audit | `effect-ts-anti-patterns` (ONLY) | Promise-first misuse, oversized gen blocks, hidden deps |
+| **Resource Lifecycle** | DB access, config loading, external clients, file I/O, connection pools, any acquire/release pattern | `effect-ts-resource-layer`, `effect-ts-principle-thinking` + `effect-ts` (base) | acquireRelease, Connection Pools, Config Layers |
+| **Concurrent Data Access** | Rate-limited APIs, background workers, external data sources, streaming, queue consumers, any high-throughput or concurrent operations | `effect-ts-concurrency`, `effect-ts-error-handling`, `effect-ts-principle-thinking` + `effect-ts` (base) | Rate limiting, 429 retries, Semaphores, Schedule, HTTP→Domain errors |
+| **Business Logic / Domain** | Services, entities, use cases, pure domain logic, validation, orchestration flows | `effect-ts-error-handling`, `effect-ts-principle-thinking` + `effect-ts` (base) | Typed Errors, Business Logic boundaries, Effect.Clock |
+| **Framework Bridging / Entrypoints** | HTTP handlers, WebSocket handlers, server startup, framework callbacks, any "Edge of the World" code where Effect meets external frameworks | `effect-ts-principle-thinking`, `effect-ts-error-handling` + `effect-ts` (base) | ManagedRuntime, Edge of the World bridging, Error Response mapping |
+| any concern | pure smell audit | `effect-ts-anti-patterns` (ONLY) + `effect-ts` (base) | Promise-first misuse, oversized gen blocks, hidden deps |
 
 **How to map project folders to concerns (examples, not prescriptive):**
 - If a folder contains DB clients, config parsing, file I/O → **Resource Lifecycle**
@@ -83,10 +92,11 @@ The key rule: **classify by what the code does, not by what the folder is named.
 - Never merge concerns into one agent
 
 ## Loading Rules
+- **`effect-ts` is the base skill — ALWAYS loaded for any Effect-TS task.** It provides research strategy, installation guidelines, core principles, and guide references. Never skip the base skill.
 - `effect-ts-principle-thinking` is the single source of truth for core mental models — it is explicitly listed per concern above
-- NEVER load `effect-ts-anti-patterns` by default. It is ONLY for pure smell audits, loaded as the sole skill
+- NEVER load `effect-ts-anti-patterns` by default. It is ONLY for pure smell audits, loaded as the sole diagnostic skill (but always with `effect-ts` base)
 - NEVER load all skills. Each skill consumes context window — be surgical
-- If no concern matches, assess whether the task really needs any skill at all, and always include `effect-ts-principle-thinking` as the minimum
+- If no concern matches, assess whether the task really needs any skill at all, and always include `effect-ts-principle-thinking` as the minimum plus `effect-ts` as base
 
 # Main Context Rules
 - Only for request interpretation, delegation planning, skill selection

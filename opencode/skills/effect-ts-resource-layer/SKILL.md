@@ -3,6 +3,9 @@ name: effect-ts-resource-layer
 description: Manage resource lifecycle and dependency graphs using Layer construction patterns with explicit acquisition and release semantics.
 ---
 
+# Companion Skill
+Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides (`references/guide-layers.md`, `references/guide-effect.md`, `references/guide-testing.md`). The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code.
+
 # Purpose
 This skill ensures proper resource lifecycle management and dependency graph construction using Effect.Layer patterns, preventing leaks and unclear ownership by making acquisition/release explicit and scoped appropriately.
 
@@ -92,8 +95,14 @@ These patterns are correct usage — do not flag them as anti-patterns:
 - Idempotent and error-tolerant finalizers (safe to call multiple times) — this IS good practice
 - Service interfaces requiring only service tags (not implementation types) in their Context — this IS clean boundary
 
+# Related Guides (from effect-ts skill references/)
+- `./references/guide-layers.md` — Services, layer construction, composition, provisioning patterns
+- `./references/guide-effect.md` — Core `Effect` usage, scoped effects, resource management
+- `./references/guide-testing.md` — Layered test setup, test services
+
 # Delegation
 Delegate to:
+- **effect-ts** for research strategy, installation guidelines, and in-depth guidance
 - effect-ts-principle-thinking for mental model violations (per-request Layer provisioning, mid-flight execution, DI violations)
 - effect-ts-anti-patterns for unsafe resource lifecycle detection and Promise-first resource usage
 - effect-ts-error-handling for error handling in resource acquisition and release logic

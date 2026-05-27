@@ -77,6 +77,7 @@ All domain-specific sub-tasks MUST be delegated to the domain ship orchestrator 
 
 # Skill Loading Policy
 - For full-stack tasks: load `fullstack-boundary` skill as the cross-cutting lens
+- **ALWAYS load `effect-ts` as the base skill for any full-stack task** — it provides research strategy, installation guidelines, and core Effect principles that inform boundary decisions
 - For backend-specific sub-tasks: delegate to effect-ts-ship which loads its own skills
 - For frontend-specific sub-tasks: delegate to react-vite-ship which loads its own skills
 - Never auto-load all domain skills — load only what the task shape requires

@@ -53,6 +53,7 @@ Conduct mandatory review of Effect-TS code changes to verify correctness, check 
 - Typically works after effect-ts-implementer for implementation tasks
 - May consult effect-ts-discovery for broader context if needed
 - Loads skills strictly per ship orchestrator's Concern mapping. Skills are never self-selected — ship determines the skill set based on what was changed. Does not load `effect-ts-anti-patterns` unless ship routes a pure smell audit.
+- MUST load `effect-ts` as the base skill for research methodology and access to reference guides to verify correct Effect pattern usage.
 - Does not delegate to other agents during review
 
 # Output Format

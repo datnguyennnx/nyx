@@ -3,6 +3,9 @@ name: effect-ts-concurrency
 description: Manage concurrent operations with proper fiber usage, interruption handling, and bounded parallelism using Effect primitives.
 ---
 
+# Companion Skill
+Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides. The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code.
+
 # Purpose
 This skill ensures Effect-TS code uses concurrency primitives correctly with proper fiber management, interruption awareness, and bounded parallelism to prevent resource exhaustion and maintain correctness.
 
@@ -95,8 +98,14 @@ These patterns are correct usage — do not flag them as anti-patterns:
 - `Effect.scoped` wrapping concurrent operations needing deterministic cleanup — this IS proper resource safety
 - `Effect.addFinalizer` or `Effect.ensure` for fiber cleanup on interruption — this IS correct interruption handling
 
+# Related Guides (from effect-ts skill references/)
+- `./references/guide-effect.md` — Core `Effect` usage, composition, fiber management
+- `./references/guide-schedule.md` — Retries, repeats, backoff, polling, schedule composition
+- `./references/guide-retries.md` — Retry policies, retry conditions, fallback strategies
+
 # Delegation
 Delegate to:
+- **effect-ts** for research strategy, installation guidelines, and in-depth guidance
 - effect-ts-principle-thinking for mental model violations (orphaned fibers, closure state leaks, missing Structured Concurrency)
 - effect-ts-anti-patterns for Promise-first concurrency detection and unsafe resource usage
 - effect-ts-error-handling for error handling in concurrent operations (propagation vs swallowing)

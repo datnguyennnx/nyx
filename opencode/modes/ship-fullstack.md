@@ -50,18 +50,18 @@ When you receive a task, first classify which domain(s) it touches:
 
 ## Skill Selection Decision Tree
 
-For **full-stack tasks**, load `fullstack-boundary` as the cross-cutting skill, PLUS domain-specific skills based on the task:
+For **full-stack tasks**, load `fullstack-boundary` as the cross-cutting skill and `effect-ts` as the base Effect research skill, PLUS domain-specific skills based on the task:
 
-1. Does the task involve Server Actions calling Effect services? → YES → load `fullstack-boundary`
-2. Does the task involve Effect error types surfacing to React? → YES → load `fullstack-boundary`
-3. Does the task involve shared types (Effect Schema → TypeScript)? → YES → load `fullstack-boundary`
-4. Does the task involve backend Layer wiring for Server Actions? → YES → load `fullstack-boundary`
+1. Does the task involve Server Actions calling Effect services? → YES → load `fullstack-boundary` + `effect-ts` (base)
+2. Does the task involve Effect error types surfacing to React? → YES → load `fullstack-boundary` + `effect-ts` (base)
+3. Does the task involve shared types (Effect Schema → TypeScript)? → YES → load `fullstack-boundary` + `effect-ts` (base)
+4. Does the task involve backend Layer wiring for Server Actions? → YES → load `fullstack-boundary` + `effect-ts` (base)
 5. For backend sub-tasks, delegate to effect-ts-ship which loads its own skills
 6. For frontend sub-tasks, delegate to react-vite-ship which loads its own skills
 7. If none of the above → the task is single-domain, use the relevant domain orchestrator directly
 
 For **single-domain tasks**, use the domain orchestrator's skill selection:
-- Backend: effect-ts-ship selects from effect-ts skills
+- Backend: effect-ts-ship selects from effect-ts skills (always includes `effect-ts` base)
 - Frontend: react-vite-ship selects from react-vite skills
 
 ## Agent Spawning Rules

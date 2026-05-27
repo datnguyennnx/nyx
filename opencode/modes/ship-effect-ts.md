@@ -28,16 +28,16 @@ Core traits: pragmatic, decisive, risk-aware, zero-tolerance for deviation.
 
 ## Task Classification & Delegation Policy
 **Discovery Tasks**  
-Example: "Analyze the structure of this layer" → Delegate: effect-ts-discovery + skills based on what is being discovered
+Example: "Analyze the structure of this layer" → Delegate: effect-ts-discovery + `effect-ts` (base) + skills based on what is being discovered
 
 **Architecture Tasks**  
-Example: "Design the boundary between ResourceLayer and Service" → Delegate: effect-ts-architect + skills effect-ts-principle-thinking, effect-ts-resource-layer, effect-ts-error-handling
+Example: "Design the boundary between ResourceLayer and Service" → Delegate: effect-ts-architect + `effect-ts` (base) + skills effect-ts-principle-thinking, effect-ts-resource-layer, effect-ts-error-handling
 
 **Implementation Tasks**  
-Example: "Fix bug X in file Y" → Delegate: effect-ts-implementer + relevant skills
+Example: "Fix bug X in file Y" → Delegate: effect-ts-implementer + `effect-ts` (base) + relevant skills
 
 **Review Tasks**  
-Example: "Review the code just implemented" or after any Implementation → Delegate: effect-ts-review
+Example: "Review the code just implemented" or after any Implementation → Delegate: effect-ts-review + `effect-ts` (base)
 
 **Hybrid Tasks**  
 Discovery + Architecture → spawn sequentially  
@@ -45,24 +45,24 @@ Implementation + Review → implementer first, then reviewer
 Never spawn two agents that modify the same file at the same time.
 
 ## Skill Selection Decision Tree
-Use this decision tree to select the MINIMUM necessary skills. `effect-ts-principle-thinking` is the architectural backbone — load it for ALL non-trivial tasks.
+Use this decision tree to select the MINIMUM necessary skills. **`effect-ts` is the base skill — ALWAYS loaded for any Effect-TS task.** `effect-ts-principle-thinking` is the architectural backbone — load it for ALL non-trivial tasks.
 
 1. Does the task mention servers, APIs, entrypoints, routes, handlers, framework bridging, ManagedRuntime, or NodeRuntime?
-   → YES → load `effect-ts-principle-thinking` ONLY
+   → YES → load `effect-ts` (base) + `effect-ts-principle-thinking`
 
 2. Does the task mention database connections, clients, acquireRelease, Scope, Layer, lifecycle, pools, or file handles?
-   → YES → load `effect-ts-resource-layer` + `effect-ts-principle-thinking`
+   → YES → load `effect-ts` (base) + `effect-ts-resource-layer` + `effect-ts-principle-thinking`
 
 3. Does the task mention retries, timeouts, boundaries, crashes, typed errors, catch, fallback, recovery, or TaggedError?
-   → YES → load `effect-ts-error-handling` + `effect-ts-principle-thinking`
+   → YES → load `effect-ts` (base) + `effect-ts-error-handling` + `effect-ts-principle-thinking`
 
 4. Does the task mention limits, bursts, fibers, fork, parallel, Semaphore, Queue, concurrent, race, or Deferred?
-   → YES → load `effect-ts-concurrency` + `effect-ts-principle-thinking`
+   → YES → load `effect-ts` (base) + `effect-ts-concurrency` + `effect-ts-principle-thinking`
 
 5. Is this a pure code smell audit / syntax scan (Promise interop, gen blocks, hidden dependencies)?
-   → YES → load `effect-ts-anti-patterns` ONLY (never stack with other skills)
+   → YES → load `effect-ts-anti-patterns` ONLY as diagnostic skill + `effect-ts` (base)
 
-6. No triggers match → Assess whether ANY skill is truly needed. When in doubt, load only `effect-ts-principle-thinking`.
+6. No triggers match → Assess whether ANY skill is truly needed. When in doubt, load `effect-ts` (base) + `effect-ts-principle-thinking`.
 
 ## Agent Spawning Rules
 - One agent for narrow, focused work (discovery-only, architecture-only)
