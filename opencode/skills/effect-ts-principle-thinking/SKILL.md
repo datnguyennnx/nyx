@@ -72,9 +72,9 @@ Return findings with:
 - Stateful objects (classes) if they are strictly internal to a single fiber and not shared concurrently.
 
 # Related Guides (from effect-ts skill references/)
-- `./references/guide-effect.md` — Core `Effect` usage, constructors, composition, provisioning, runtime boundaries
-- `./references/guide-layers.md` — Services, layer construction, composition, provisioning patterns
-- `./references/guide-observability.md` — `Effect.fn`, spans, logging, metrics, telemetry wiring
+- `../effect-ts/references/guide-effect.md` — Core `Effect` usage, constructors, composition, provisioning, runtime boundaries
+- `../effect-ts/references/guide-layers.md` — Services, layer construction, composition, provisioning patterns
+- `../effect-ts/references/guide-observability.md` — `Effect.fn`, spans, logging, metrics, telemetry wiring
 
 # Delegation
 - Delegate to `effect-ts` for research strategy, installation guidelines, and in-depth guidance across all Effect domains.

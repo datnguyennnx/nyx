@@ -4,7 +4,7 @@ description: Manage resource lifecycle and dependency graphs using Layer constru
 ---
 
 # Companion Skill
-Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides (`references/guide-layers.md`, `references/guide-effect.md`, `references/guide-testing.md`). The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code.
+Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides (`../effect-ts/references/guide-layers.md`, `../effect-ts/references/guide-effect.md`, `../effect-ts/references/guide-testing.md`). The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code.
 
 # Purpose
 This skill ensures proper resource lifecycle management and dependency graph construction using Effect.Layer patterns, preventing leaks and unclear ownership by making acquisition/release explicit and scoped appropriately.
@@ -96,9 +96,9 @@ These patterns are correct usage — do not flag them as anti-patterns:
 - Service interfaces requiring only service tags (not implementation types) in their Context — this IS clean boundary
 
 # Related Guides (from effect-ts skill references/)
-- `./references/guide-layers.md` — Services, layer construction, composition, provisioning patterns
-- `./references/guide-effect.md` — Core `Effect` usage, scoped effects, resource management
-- `./references/guide-testing.md` — Layered test setup, test services
+- `../effect-ts/references/guide-layers.md` — Services, layer construction, composition, provisioning patterns
+- `../effect-ts/references/guide-effect.md` — Core `Effect` usage, scoped effects, resource management
+- `../effect-ts/references/guide-testing.md` — Layered test setup, test services
 
 # Delegation
 Delegate to:

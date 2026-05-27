@@ -99,9 +99,9 @@ These patterns are correct usage — do not flag them as anti-patterns:
 - `Effect.addFinalizer` or `Effect.ensure` for fiber cleanup on interruption — this IS correct interruption handling
 
 # Related Guides (from effect-ts skill references/)
-- `./references/guide-effect.md` — Core `Effect` usage, composition, fiber management
-- `./references/guide-schedule.md` — Retries, repeats, backoff, polling, schedule composition
-- `./references/guide-retries.md` — Retry policies, retry conditions, fallback strategies
+- `../effect-ts/references/guide-effect.md` — Core `Effect` usage, composition, fiber management
+- `../effect-ts/references/guide-schedule.md` — Retries, repeats, backoff, polling, schedule composition
+- `../effect-ts/references/guide-retries.md` — Retry policies, retry conditions, fallback strategies
 
 # Delegation
 Delegate to:

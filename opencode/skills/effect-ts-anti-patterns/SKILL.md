@@ -4,7 +4,7 @@ description: Detect Promise-first code, hidden service dependencies, and oversiz
 ---
 
 # Companion Skill
-Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides (`references/guide-effect.md`, `references/guide-error-handling.md`, `references/guide-layers.md`, `references/guide-schema.md`, `references/guide-testing.md`). The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code.
+Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides (`../effect-ts/references/guide-effect.md`, `../effect-ts/references/guide-error-handling.md`, `../effect-ts/references/guide-layers.md`, `../effect-ts/references/guide-schema.md`, `../effect-ts/references/guide-testing.md`). The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code.
 
 # Purpose
 This skill identifies syntax-level and code-smell anti-patterns in Effect-TS code. It does NOT cover concurrency, error handling, resource lifecycle, or mental model violations — those are delegated to their dedicated skills. This skill is a pure detection lens: it flags patterns, never prescribes fixes beyond suggesting delegation to the appropriate skill.
@@ -78,10 +78,10 @@ These patterns are correct usage — do not flag them as anti-patterns:
 - `Scope` for localized resource lifetime — delegated to `effect-ts-resource-layer`
 
 # Related Guides (from effect-ts skill references/)
-- `./references/guide-effect.md` — Core `Effect` usage, constructors, composition, provisioning
-- `./references/guide-error-handling.md` — Defining errors, schema-based errors, failure handling
-- `./references/guide-layers.md` — Services, layer construction, composition, provisioning
-- `./references/guide-testing.md` — Vitest integration, layered test setup
+- `../effect-ts/references/guide-effect.md` — Core `Effect` usage, constructors, composition, provisioning
+- `../effect-ts/references/guide-error-handling.md` — Defining errors, schema-based errors, failure handling
+- `../effect-ts/references/guide-layers.md` — Services, layer construction, composition, provisioning
+- `../effect-ts/references/guide-testing.md` — Vitest integration, layered test setup
 
 # Delegation
 This skill is a syntax-level and structural lens ONLY. For deeper analysis, delegate to:

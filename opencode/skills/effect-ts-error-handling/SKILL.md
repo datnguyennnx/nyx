@@ -4,7 +4,7 @@ description: Implement proper error handling with typed domain errors, boundary 
 ---
 
 # Companion Skill
-Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides (`references/guide-error-handling.md`, `references/guide-schema.md`, `references/guide-retries.md`, `references/guide-schedule.md`). The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code.
+Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides (`../effect-ts/references/guide-error-handling.md`, `../effect-ts/references/guide-schema.md`, `../effect-ts/references/guide-retries.md`, `../effect-ts/references/guide-schedule.md`). The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code.
 
 # Purpose
 This skill ensures Effect-TS code uses proper error handling with typed domain errors, distinguishes expected vs unexpected errors, maps infrastructure errors to domain boundaries, and applies appropriate recovery strategies.
@@ -91,10 +91,10 @@ These patterns are correct usage — do not flag them as anti-patterns:
 - Infrastructure-level generic errors (database driver, HTTP client errors) at their own boundary — these ARE appropriate until mapped to domain errors
 
 # Related Guides (from effect-ts skill references/)
-- `./references/guide-error-handling.md` — Defining errors, schema-based errors, failure handling, defects
-- `./references/guide-schema.md` — Schema design, tagged errors (`Schema.TaggedErrorClass`)
-- `./references/guide-retries.md` — Retry policies, retry conditions, ExecutionPlan
-- `./references/guide-schedule.md` — Retries, backoff, schedule composition
+- `../effect-ts/references/guide-error-handling.md` — Defining errors, schema-based errors, failure handling, defects
+- `../effect-ts/references/guide-schema.md` — Schema design, tagged errors (`Schema.TaggedErrorClass`)
+- `../effect-ts/references/guide-retries.md` — Retry policies, retry conditions, ExecutionPlan
+- `../effect-ts/references/guide-schedule.md` — Retries, backoff, schedule composition
 
 # Delegation
 Delegate to:

@@ -93,9 +93,9 @@ These patterns are correct usage — do not flag them as anti-patterns:
 - `useActionState` consuming typed error returns from Effect-backed Server Actions — this IS the complete pipeline
 
 # Related Guides (from effect-ts skill references/)
-- `./references/guide-error-handling.md` — Typed domain errors for API contracts
-- `./references/guide-layers.md` — Layer provisioning for Server Actions
-- `./references/guide-schema.md` — Effect Schema for type-safe API contracts
+- `../effect-ts/references/guide-error-handling.md` — Typed domain errors for API contracts
+- `../effect-ts/references/guide-layers.md` — Layer provisioning for Server Actions
+- `../effect-ts/references/guide-schema.md` — Effect Schema for type-safe API contracts
 
 # Delegation
 Delegate to:
