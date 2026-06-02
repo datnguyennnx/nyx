@@ -1,6 +1,8 @@
 # Error Handling Guide
 
-This guide is based on the vendored Effect source in `./.repos/effect`.
+This guide is based on the vendored Effect v4 source in `./.repos/effect`.
+
+> **v4 changes:** `catchAll` → `catch`, `catchAllCause` → `catchCause`, `catchSome` → `catchFilter`, `catchSomeCause` → `catchCauseFilter`. New APIs: `catchReason` / `catchReasons` for nested error reasons, `catchEager` for synchronous recovery. See `migration/error-handling.md` and `migration/v3-to-v4.md` in the project root.
 
 Key source files:
 
@@ -518,6 +520,57 @@ Use `catchCause`, `matchCause`, or `sandbox` when you must distinguish:
 - interrupts
 
 Otherwise prefer the simpler typed error operators.
+
+## v4-Only Error Handling Patterns
+
+### `Effect.catchFilter` (replaces `catchSome`)
+
+Use `catchFilter` with a `Filter` predicate for conditional catch logic.
+
+```ts
+import { Effect, Filter } from "effect"
+
+const recovered = program.pipe(
+  Effect.catchFilter(
+    Filter.fromPredicate((error: number) => error === 42),
+    (error) => Effect.succeed("caught")
+  )
+)
+```
+
+### `Effect.catchReason` and `Effect.catchReasons`
+
+Use `catchReason` to catch a specific `reason` within a tagged error without removing the parent error type.
+
+```ts
+import { Effect } from "effect"
+
+const recovered = program.pipe(
+  Effect.catchReason("AiError", "RateLimited", (error) =>
+    Effect.succeed("rate limited"))
+)
+```
+
+Use `catchReasons` for multiple reason tags at once:
+
+```ts
+const recovered = program.pipe(
+  Effect.catchReasons("AiError", {
+    RateLimited: () => Effect.succeed("limited"),
+    QuotaExceeded: () => Effect.succeed("quota hit")
+  })
+)
+```
+
+### `Effect.catchEager`
+
+Use `catchEager` when the recovery effect is synchronous, as an optimization over `catch`.
+
+```ts
+const recovered = program.pipe(
+  Effect.catchEager((error) => Effect.succeed("recovered"))
+)
+```
 
 ## Anti-Patterns
 

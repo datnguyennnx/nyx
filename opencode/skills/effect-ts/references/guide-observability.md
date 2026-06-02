@@ -1,6 +1,8 @@
 # Observability Guide
 
-This guide is based on the vendored Effect source in `./.repos/effect`.
+This guide is based on the vendored Effect v4 source in `./.repos/effect`.
+
+> **v4 changes:** `@effect/opentelemetry` is now at `effect/unstable/observability/*` for the OTLP modules. The `NodeSdk`, `Logger`, `Metrics`, `Tracer` modules remain under `@effect/opentelemetry`. Effect tracing, logging, and metrics APIs are unchanged.
 
 Key source files:
 

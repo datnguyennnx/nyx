@@ -94,34 +94,45 @@ Apply these core principles when writing Effect code.
 
 When installing Effect packages in a user repository:
 
-- use `effect@beta`
+- use `effect@latest`
 - keep all `@effect/*` packages on aligned versions
 - install only the packages needed for the user's runtime and actual task
 
 ### Version Rules
 
-- `effect` should be installed as `effect@beta`
-- if you install any `@effect/*` package, make sure all `@effect/*` packages use matching versions
+- `effect` should be installed as the latest stable version
+- all `@effect/*` packages must use the **same version number** as `effect` (v4 uses unified versioning)
 - do not mix unrelated `@effect/*` versions in the same project
+
+### Unified Versioning (v4)
+
+In v4, all Effect ecosystem packages share a **single version number**. If you install `effect@4.x.y`, the matching runtime and integration packages are `@effect/platform-node@4.x.y`, `@effect/vitest@4.x.y`, etc.
+
+Previously separate packages have been consolidated into `effect`:
+- `@effect/platform`, `@effect/rpc`, `@effect/cli`, `@effect/experimental`, `@effect/typeclass` → merged into `effect`
+- Their modules now live under `effect/unstable/*` import paths
+- See `migration/v3-to-v4.md` in the project for the full import map
 
 ### Package Selection
 
 Choose packages based on the runtime and the work being done.
 
-- core library: `effect@beta`
-- Node.js runtime needs: install the matching `@effect/platform-node`
-- browser runtime needs: install the matching `@effect/platform-browser`
-- Bun runtime needs: install the matching `@effect/platform-bun`
-- Vitest integration needs: install the matching `@effect/vitest`
-- OpenTelemetry integration needs: install the matching `@effect/opentelemetry`
+- core library: `effect@latest`
+- Node.js runtime needs: `@effect/platform-node`
+- browser runtime needs: `@effect/platform-browser`
+- Bun runtime needs: `@effect/platform-bun`
+- Vitest integration needs: `@effect/vitest`
+- OpenTelemetry integration needs: `@effect/opentelemetry`
+- SQL driver needs: `@effect/sql-pg`, `@effect/sql-sqlite-node`, etc.
+- AI provider needs: `@effect/ai-openai`, `@effect/ai-anthropic`, etc.
 
 Install additional `@effect/*` packages only when the user task actually needs them.
 
 ### Practical Rule
 
-- start with `effect@beta`
+- start with `effect@latest`
 - add `@effect/*` packages as needed by runtime and features
-- keep the full installed Effect package set version-aligned
+- keep versions aligned across all `@effect/*` packages
 
 ### Error Handling
 
@@ -129,12 +140,17 @@ Install additional `@effect/*` packages only when the user task actually needs t
 - Define descriptive error types with proper error propagation.
 - Prefer `Schema.TaggedErrorClass` when the error can be schema-defined.
 - Use `Effect.fail`, `Effect.catchTag`, and `Effect.catch` for error control flow.
+- In v4: `catchAll` → `catch`, `catchAllCause` → `catchCause`, `catchAllDefect` → `catchDefect`, `catchSome` → `catchFilter`, `catchSomeCause` → `catchCauseFilter`.
+- New in v4: `catchReason` / `catchReasons` for nested error reasons, `catchEager` for sync recovery.
+- Stream renames: `catchAll` → `catch`, `catchSome` → `catchIf`, `either` → `result`, `fromChunk` → `fromArray`, `mapChunks` → `mapArray`.
 
 ### Dependency Injection
 
 - Implement dependency injection using services and layers.
-- Define services with `Context.Tag`.
-- Compose layers with `Layer.merge` and `Layer.provide`.
+- In v4, define services with `Context.Service` (replaces `Context.Tag`, `Effect.Tag`, `Effect.Service`).
+- Use `Context.Service` class syntax or the function syntax with `use` / `make`.
+- Fiber-local state now uses `Context.Reference` (replaces `FiberRef`), exported from `References`.
+- Compose layers with `Layer.mergeAll` and `Layer.provide`.
 - Use `Effect.provide` to inject dependencies at the edge, avoid providing locally.
 - Keep services encapsulated; avoid exporting trivial accessor wrappers that only forward to one service method.
 
@@ -144,6 +160,9 @@ Install additional `@effect/*` packages only when the user task actually needs t
 - Use appropriate constructors such as `Effect.succeed`, `Effect.fail`, `Effect.tryPromise`, `Effect.try`, and `Effect.sync`.
 - Apply proper resource management with scoped effects.
 - Chain operations with `Effect.flatMap`, `Effect.map`, and `Effect.tap`.
+- In v4: `zipRight` → `andThen`, `zipLeft` → `tap`, `Either` → `Result`, `Effect.either` → `Effect.result`.
+- `fork` → `forkChild`, `forkDaemon` → `forkDetach`.
+- Ref/Deferred/Fiber are no longer Effect subtypes — use `Ref.get`, `Deferred.await`, `Fiber.join` explicitly.
 
 ### Business Logic Functions
 
@@ -152,6 +171,12 @@ Install additional `@effect/*` packages only when the user task actually needs t
 - If you do not want an explicit named span, use `Effect.fn` without a span name.
 - Do not use `Effect.fnUntraced` as the default.
 - Use `Effect.fnUntraced` only for edge cases with a concrete low-level reason, such as measured hot-path overhead.
+
+### Time and Clock
+
+- Use `Clock` / `TestClock` for all time-based operations, never `Date.now()` or `new Date()`.
+- Use `Effect.sleep` instead of `setTimeout`.
+- This preserves referential transparency, testability with `TestClock`, and deterministic execution.
 
 ### TypeScript Preferences
 
@@ -170,7 +195,8 @@ Install additional `@effect/*` packages only when the user task actually needs t
 - Use `Effect.gen` for readable sequential code.
 - Implement proper testing patterns using Effect testing utilities.
 - Prefer existing Effect primitives before introducing custom helpers.
-- Prefer `Schema.Class` / `Schema.TaggedClass` variants over plain `Schema.Struct` for named reusable schemas when possible.
+- Prefer `Schema.Class` / `Schema.TaggedClass` / `Schema.TaggedErrorClass` variants over plain `Schema.Struct` for named reusable schemas when possible.
+- In v4: `Union(A, B)` → `Union([A, B])`, `Tuple(A, B)` → `Tuple([A, B])`, `filter` → `check(makeFilter(...))`, `*FromSelf` → drop suffix (e.g. `BigIntFromSelf` → `BigInt`).
 
 ### Explaining Solutions
 

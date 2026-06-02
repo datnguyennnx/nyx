@@ -23,57 +23,43 @@
     "ship-effect-ts": {
       "prompt": "{file:./modes/ship-effect-ts.md}",
       "tools": {
-        "read": true,
-        "write": true,
-        "edit": true,
-        "grep": true,
-        "glob": true,
-        "list": true,
-        "bash": true,
+        "read": false,
         "task": true,
-        "patch": true
-      }
-    },
-    "ship-swift-macos": {
-    "prompt": "{file:./modes/ship-swift-macos.md}",
-    "tools": {
-        "read": true,
-        "write": true,
-        "edit": true,
-        "grep": true,
-        "glob": true,
-        "list": true,
-        "bash": true,
-        "task": true,
-        "patch": true
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "grep": false,
+        "glob": false,
+        "list": false,
+        "patch": false
       }
     },
     "ship-react-vite": {
       "prompt": "{file:./modes/ship-react-vite.md}",
       "tools": {
-        "read": true,
-        "write": true,
-        "edit": true,
-        "grep": true,
-        "glob": true,
-        "list": true,
-        "bash": true,
+        "read": false,
         "task": true,
-        "patch": true
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "grep": false,
+        "glob": false,
+        "list": false,
+        "patch": false
       }
     },
     "ship-fullstack": {
       "prompt": "{file:./modes/ship-fullstack.md}",
       "tools": {
-        "read": true,
-        "write": true,
-        "edit": true,
-        "grep": true,
-        "glob": true,
-        "list": true,
-        "bash": true,
+        "read": false,
         "task": true,
-        "patch": true
+        "write": false,
+        "edit": false,
+        "bash": false,
+        "grep": false,
+        "glob": false,
+        "list": false,
+        "patch": false
       }
     }
   }

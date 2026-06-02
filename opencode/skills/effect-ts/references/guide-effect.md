@@ -1,6 +1,8 @@
 # Effect Guide
 
-This guide is based on common usage patterns in the vendored repo at `./.repos/effect`.
+This guide is based on the vendored Effect v4 source at `./.repos/effect`.
+
+> **v4 changes:** `zipRight` → `andThen`, `zipLeft` → `tap`, `Effect.either` → `Effect.result`, `Either` → `Result`, `Effect.async` → `Effect.callback`, `Layer.scoped` → `Layer.effect`, `Scope.extend` → `Scope.provide`. Use `Effect.gen({ self: this }, fn)` instead of `Effect.gen(this, fn)` for class-bound generators. See `migration/v3-to-v4.md` in the project root for the complete migration map.
 
 Key source areas:
 
@@ -98,6 +100,19 @@ Use this rule:
 
 - reusable operation: `Effect.fn`
 - inline workflow block: `Effect.gen`
+
+### v4: `Effect.gen` with `self`
+
+In v4, if you need to pass `this` to `Effect.gen`, wrap it in `{ self: this }`:
+
+```ts
+class MyService {
+  readonly local = 1
+  compute = Effect.gen({ self: this }, function*() {
+    return yield* Effect.succeed(this.local + 1)
+  })
+}
+```
 
 Good split:
 

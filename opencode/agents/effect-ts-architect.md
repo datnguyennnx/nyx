@@ -2,7 +2,7 @@
 name: effect-ts-architect
 description: Specialized agent for Effect-TS architecture judgment, Layer/Context/service boundary reasoning, and dependency analysis.
 mode: subagent
-model: opencode/deepseek-v4-flash
+model: opencode-go/deepseek-v4-flash
 hidden: true
 ---
 

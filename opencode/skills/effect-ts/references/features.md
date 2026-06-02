@@ -1,6 +1,10 @@
-# Features
+# Features (Effect v4)
 
 Public package and module surface area to be aware of when researching or implementing a solution. Each module entry includes its vendored repo path so it can be located quickly.
+
+> **v4 note:** Many previously separate packages (`@effect/platform`, `@effect/rpc`, `@effect/cli`, `@effect/experimental`, `@effect/typeclass`) have been consolidated into `effect`. Their modules live under `effect/unstable/*`. The core modules under `effect/` (e.g. `effect/Array`, `effect/Effect`) are unchanged.
+>
+> Platform runtime packages (`@effect/platform-node`, `@effect/platform-browser`, `@effect/platform-bun`) and integrations (`@effect/vitest`, `@effect/opentelemetry`, `@effect/sql-*`, `@effect/ai-*`) remain separate.
 
 ## `effect` Package
 

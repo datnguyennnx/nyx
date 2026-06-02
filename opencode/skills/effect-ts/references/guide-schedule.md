@@ -1,6 +1,8 @@
 # Schedule Guide
 
-This guide is based on the vendored `Schedule` module and its usage across `./.repos/effect`.
+This guide is based on the vendored Effect v4 `Schedule` module and its usage across `./.repos/effect`.
+
+> **v4 changes:** Schedule APIs are largely unchanged. The consolidations from `@effect/platform` into `effect/unstable/*` affect import paths for schedule-using code (e.g. HTTP clients use `effect/unstable/http/*`).
 
 Key source files:
 

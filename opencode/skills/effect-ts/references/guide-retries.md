@@ -1,6 +1,8 @@
 # Retries Guide
 
-This guide is based on retry patterns and `ExecutionPlan` usage in the vendored Effect repo.
+This guide is based on retry patterns and `ExecutionPlan` usage in the vendored Effect v4 repo.
+
+> **v4 changes:** Retry and Schedule APIs are largely unchanged. Note that `Effect.fork` → `Effect.forkChild` in v4 if you fork effects in retry logic.
 
 Key source files:
 

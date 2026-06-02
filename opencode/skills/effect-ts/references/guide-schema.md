@@ -1,6 +1,8 @@
 # Schema Guide
 
-This guide is based on the vendored Schema module and common repo usage in `./.repos/effect`.
+This guide is based on the vendored Effect v4 Schema module and common repo usage in `./.repos/effect`.
+
+> **v4 changes:** `Union(A, B)` → `Union([A, B])`, `Tuple(A, B)` → `Tuple([A, B])`, `filter` → `check(makeFilter(...))`, `*FromSelf` → drop suffix (e.g. `BigIntFromSelf` → `BigInt`). `TaggedError` → `TaggedErrorClass`. `decodeUnknown` → `decodeUnknownEffect`. `ParseResult` → `SchemaIssue`. New modules: `SchemaTransformation`, `SchemaGetter`, `SchemaRepresentation`. See `migration/schema.md` in the project root.
 
 Key source files:
 

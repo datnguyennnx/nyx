@@ -1,6 +1,8 @@
 # Testing Guide
 
-This guide is based on the vendored `@effect/vitest` package in `./.repos/effect`.
+This guide is based on the vendored Effect v4 `@effect/vitest` package in `./.repos/effect`.
+
+> **v4 changes:** Testing APIs are largely unchanged. `Context.Service` replaces `Context.Tag` / `Effect.Tag` in test services. Use `FastCheck` from `effect/testing` (not `effect/FastCheck`).
 
 Key source files:
 

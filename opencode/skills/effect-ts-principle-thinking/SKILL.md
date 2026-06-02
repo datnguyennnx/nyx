@@ -26,23 +26,23 @@ This skill aligns architectural design and code implementation with the fundamen
 - **Programs as Values:** `Effect` instances are lazy descriptions of workflows. They do nothing until explicitly executed by a Runtime.
 - **The Edge of the World:** Execution (`Effect.runPromise`, `NodeRuntime.runMain`) must be pushed to the absolute outer boundary of the application.
 - **Managed Framework Bridging:** When interfacing with external callback-based or Promise-based frameworks (like MCP, Express), use `ManagedRuntime` to share a single initialized dependency graph rather than running effects in isolation.
-- **Structured Concurrency:** No fiber should ever be orphaned. All background tasks must be tied to a `Scope` (e.g., via `Effect.forkScoped` or `Effect.forkDaemon` within a Layer).
-- **Explicit Dependencies (DI):** Dependencies, configurations, and state must be passed through `Context.Tag` and resolved via `Layer`s, never through closures, singletons, or global variables.
+- **Structured Concurrency:** No fiber should ever be orphaned. All background tasks must be tied to a `Scope` (e.g., via `Effect.forkScoped` or `Effect.forkDetach` within a Layer).
+- **Explicit Dependencies (DI):** Dependencies, configurations, and state must be passed through `Context.Service` and resolved via `Layer`s, never through closures, singletons, or global variables.
 - **Errors are Data:** Expected failures are part of the type signature (`Effect<Success, Error, Requirements>`). Only truly unrecoverable issues should result in Defects/Die.
 - **Time is Monotonic (Clock, not Date):** All time-based operations must use `Effect.Clock` and `Schedule`, never `Date.now()`, `new Date()`, or `setTimeout`. Using wall-clock time breaks referential transparency, testability, and determinism — core tenets of Programs as Values.
 
 # Preferred patterns
 - **Entry Points:** Use `NodeRuntime.runMain` or `BunRuntime.runMain` at the top level to handle graceful shutdown and UNIX signals automatically.
 - **Framework Bridging:** Instantiate `const runtime = ManagedRuntime.make(AppLayer)` once globally, then use `runtime.runPromise(effect)` inside framework route handlers.
-- **State Management:** Use `Ref` or `Ref.Synchronized` wrapped in a `Context.Tag` to manage mutable state across fibers safely.
-- **Resource Lifecycles:** Use `Effect.acquireRelease` to model setup/teardown (e.g., DB connections, WebSockets, Servers) and wrap them in `Layer.scoped`.
+- **State Management:** Use `Ref` or `Ref.Synchronized` wrapped in a `Context.Service` to manage mutable state across fibers safely.
+- **Resource Lifecycles:** Use `Effect.acquireRelease` to model setup/teardown (e.g., DB connections, WebSockets, Servers) and wrap them in `Layer.effect`.
 - **Throttling/Coordination:** Use Effect-native primitives (`Semaphore`, `Queue`, `Deferred`) injected via Context instead of relying on external state or raw Promises.
 
 # Anti-patterns (Mental Model Violations)
 - **Mid-flight Execution:** Calling `Effect.runPromise` or `Effect.runSync` inside domain logic, services, or mapping functions (breaks supervision and DI).
 - **Per-Request Layer Provisioning:** Calling `Effect.provide(effect, AppLayer)` inside a hot path route handler (causes massive memory leaks and performance drops due to re-initializing the entire app per request).
 - **Closure State Leaks:** Using `let` or `const` variables outside an Effect block to share state between fibers, bypassing Effect's concurrency safety.
-- **Orphaned Background Loops:** Using `setInterval` or recursive `setTimeout` inside an Effect wrapper instead of using `Effect.schedule` + `Effect.forkDaemon`.
+- **Orphaned Background Loops:** Using `setInterval` or recursive `setTimeout` inside an Effect wrapper instead of using `Effect.schedule` + `Effect.forkDetach`.
 - **Wall-Clock Time Usage:** Using `Date.now()` or `new Date()` for time measurements or time-based decisions instead of `Effect.clock` with `Clock.currentTimeMillis` or `Clock.currentTimeNanos` — breaks referential transparency, testability, and determinism (Programs as Values violation).
 - **Swallowing the Error Channel:** Using `.catch()` on Promises at the boundary without converting them into standard protocol responses (e.g., mapping Effect errors to JSON-RPC errors before returning from `ManagedRuntime`).
 

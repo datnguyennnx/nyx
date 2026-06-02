@@ -19,7 +19,7 @@ Reviewing Effect-TS code to:
 - Distribute work appropriately across available resources (parallel vs sequential considerations)
 
 # Inputs
-- Effect.fork, Effect.forkAll, Effect.forkDaemon usage
+- Effect.forkChild, Effect.forkScoped, Effect.forkDetach usage (note: `forkAll` removed in v4 — use individual `forkChild` or `Effect.forEach`)
 - Concurrent collections (Effect.forEach, Effect.parallel, Effect.partition etc.)
 - Queue, Deferred, Semaphore, Ref, PubSub usage and creation patterns
 - Effect.race and Effect.firstSuccessOf usage patterns
@@ -38,7 +38,7 @@ Reviewing Effect-TS code to:
 - Ensure proper error propagation in concurrent contexts (don't swallow errors from fibers)
 
 # Preferred patterns
-- Use Effect.forEach with { concurrency: n } instead of Effect.forkAll for bounded parallelism
+- Use Effect.forEach with { concurrency: n } for bounded parallelism (replaces the removed `forkAll`)
 - Apply Effect.retry or Effect.timeout to individual concurrent operations when appropriate
 - Use Semaphore to limit concurrent resource acquisition (database connections, file handles, etc.)
 - Use Queue for producer/consumer patterns where producers may outpace consumers
@@ -49,19 +49,19 @@ Reviewing Effect-TS code to:
 - Use Effect.scoped with concurrent operations when resources need deterministic cleanup
 
 # Anti-patterns
-- Unbounded concurrency: Effect.forkAll on large collections without Semaphore or concurrency limits
+- Unbounded concurrency: forking many fibers at once on large collections without Semaphore or concurrency limits
 - Ignoring interruption: not cleaning up resources when fibers are interrupted (missing finalizers)
 - Misusing primitives: using Queue when simple Ref or effect suffices for state sharing
 - Lost updates: concurrent Ref modification without atomic operations (use Effect.update/modify)
 - Unbounded Queues: Queue.unbounded without backpressure considerations in producer/consumer
-- Fire-and-forget: Effect.forkDaemon without supervision strategy or error handling
+- Fire-and-forget: Effect.forkDetach without supervision strategy or error handling
 - Missing error handling: concurrent operations that swallow errors instead of propagating or logging
 - Over-coordination: using Semaphore or Queue when simple parallelism with bounds suffices
 - Race conditions: checking-then-acting on shared state without atomic operations
 - Blocking operations in fibers: using synchronous blocking calls that prevent fiber yielding
 
 # Workflow
-1. Identify all fork/forkAll/forkDaemon usage and assess if bounding is needed
+1. Identify all forkChild/forkDetach/forkScoped usage and assess if bounding is needed
 2. Check for bounded parallelism in concurrent collections (look for concurrency option)
 3. Review Queue, Deferred, Semaphore, Ref usage for correctness (match primitive to problem)
 4. Verify interruption handling in long-running fibers (look for Effect.ensure/addFinalizer)
@@ -89,7 +89,7 @@ When assigning risk levels, use these definitions:
 # Acceptable Patterns (do NOT flag)
 These patterns are correct usage — do not flag them as anti-patterns:
 - `Effect.forEach` with `{ concurrency: n }` — this IS bounded parallelism
-- `Effect.fork` with proper supervision and `Effect.join` — this IS correct fiber usage
+- `Effect.forkChild` with proper supervision and `Fiber.join` — this IS correct fiber usage
 - `Queue.bounded` or `Queue.sliding` with explicit capacity — this IS proper backpressure
 - `Semaphore` with explicit permit count limiting resource access — this IS proper bounding
 - `Effect.race` with cancellation of loser — this IS correct competitive racing

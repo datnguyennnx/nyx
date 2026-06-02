@@ -1,6 +1,8 @@
 # Layers Guide
 
-This guide is based on the vendored Effect source in `./.repos/effect`.
+This guide is based on the vendored Effect v4 source in `./.repos/effect`.
+
+> **v4 changes:** `Layer.scoped` → `Layer.effect`, `Layer.scopedDiscard` → `Layer.effectDiscard`, `Context.Tag` / `Effect.Tag` / `Effect.Service` → all `Context.Service`. Layers are now memoized across `Effect.provide` calls (shared by default). Use `Effect.provide(layer, { local: true })` for isolated instances. See `migration/services.md` and `migration/layer-memoization.md` in the project root.
 
 Key source files:
 
@@ -986,6 +988,47 @@ const program = Effect.gen(function*() {
   return yield* repo.getById("u_123")
 }).pipe(
   Effect.provide(AppLayer)
+)
+```
+
+## v4: Shared Layer Memoization
+
+In v4, layers are automatically memoized across `Effect.provide` calls. The same layer value is only constructed once, even if provided to separate effects. This prevents the v3 footgun of accidentally rebuilding layers across multiple provide calls.
+
+Prefer composing layers once and providing once:
+
+```ts
+const main = program.pipe(Effect.provide(AppLayer))
+```
+
+Use `Effect.provide(layer, { local: true })` for isolated instances (avoids the shared cache):
+
+```ts
+const main = program.pipe(
+  Effect.provide(DatabaseLayer, { local: true })
+)
+```
+
+Use `Layer.fresh(layer)` for fine-grained opt-out.
+
+## v4: `Context.Reference` for Fiber-Local State
+
+`FiberRef` is removed in v4. Fiber-local state uses `Context.Reference`:
+
+```ts
+import { Context, Effect, References } from "effect"
+
+// Read a reference
+const program = Effect.gen(function*() {
+  const level = yield* References.CurrentLogLevel
+  console.log(level)
+})
+
+// Scope a value
+const scoped = Effect.provideService(
+  myEffect,
+  References.CurrentLogLevel,
+  "Debug"
 )
 ```
 

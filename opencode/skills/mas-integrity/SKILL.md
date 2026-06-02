@@ -1,193 +1,194 @@
 ---
 name: mas-integrity
-description: Anti-hallucination and state persistence protocol. Prevents context fragmentation, enforces citation-grounded claims, manages session state across turns, and warns on context budget exhaustion. Loaded by all ship orchestrator agents.
----
-
-# MAS Integrity Protocol
-
-This skill prevents the two failure modes that break multi-agent systems: **hallucination cascades** (subagent invents findings → orchestrator trusts them) and **context fragmentation** (session state lost between turns → agents work blind).
-
+description: Citation enforcement (≥60% file:line). Session state persistence (.opencode/session-state.md). Dehydrate-Hydrate protocol. 4K token sandbox per worker. Strict output format (no filler). Anti-hallucination checks. Context budget warnings. Cross-session continuity.
 ---
 
 ## 1. Citation Requirement
 
-### Rule: No Evidence = No Trust
+All agent claims about code MUST include `file:line` evidence.
 
-Every subagent claim about code MUST include a verifiable citation. The orchestrator must never trust an uncited claim.
-
-| Claim Type | Required Citation |
+| Claim | Required |
 |---|---|
-| "X exists in the codebase" | `file:line` |
-| "Y uses pattern Z" | `file:line` showing the pattern |
-| "N files are affected" | List of `file:line` for each |
-| "This will cause a memory leak" | `file:line` showing the leak path |
-| "Architecture uses pattern X" | `file:line` evidence from discovery |
+| "X exists" | `file:line` |
+| "Y uses pattern Z" | `file:line` showing pattern |
+| "N files affected" | `file:line` per file |
+| "Leak/crash" | `file:line` showing path |
+| "Architecture pattern" | `file:line` from discovery |
 
-### Output Examples
+**WRONG**: "Service uses Layer.provide for DI"
+**RIGHT**: "Service uses Layer.provide at `src/services/user.ts:45-48`: `const userLive = Layer.provide(...)`"
 
-**WRONG** (will hallucinate under context compression):
-```
-The service uses Layer.provide for dependency injection.
-```
-
-**RIGHT** (verifiable, survives context loss):
-```
-The service uses Layer.provide at `src/services/user.ts:45-48`:
-  const userLive = Layer.provide(UserService.Live, DatabaseLayer)
-```
-
-### Orchestrator Citation Check
-
-Before trusting any subagent output, the orchestrator MUST:
-
-1. Count citations in the output
-2. Spot-check 2-3 random citations to confirm they reference real patterns
-3. If NO citations → REJECT output, re-delegate with: "All claims must include file:line evidence."
-4. If citations seem fabricated (e.g., all point to same line, or lines don't exist in known files) → REJECT, escalate to user
-
-**Sufficiency threshold**: At least 60% of findings must have file:line citations. If below → re-delegate.
+### Orchestrator Check
+1. Count citations. ≥60% of findings must have `file:line`. Below → re-delegate.
+2. Spot-check 2-3 random citations for real file existence.
+3. No citations → REJECT. "All claims must include file:line evidence."
+4. All citations same line, or cite non-existent files → REJECT → escalate user.
 
 ---
 
-## 2. Session State Protocol
+## 2. Session State
 
-### What Gets Lost Between Sessions
+Orchestrator writes `.opencode/session-state.md` after EVERY turn.
 
-The orchestrator's context window is the only state store. When context is compressed or a new session starts:
-- Previous subagent outputs evaporate
-- File paths, line numbers, patterns disappear
-- The orchestrator can't verify claims against past work
-
-### State File: `.opencode/session-state.md`
-
-The orchestrator writes a state file after EVERY turn. This file is the durable truth — it survives context compression.
-
-**State file format:**
-
-```markdown
-# MAS Session State | [timestamp]
-
+```
+# MAS Session State | [ts]
 ## Task
-- Original request: [user's request, verbatim]
-- Current phase: [discover / architect / implement / review / decide]
-- Status: [in_progress / awaiting_user / complete]
+- Original: [verbatim]
+- Phase: [discover/architect/implement/review/decide]
+- Status: [in_progress/awaiting_user/complete]
 
-## Discovery Findings (verifiable)
-| # | Finding | Citation | Confidence |
-|---|---------|----------|------------|
-| 1 | [what was found] | file:line | HIGH/MEDIUM/LOW |
-
-## Architecture Decisions
-| # | Decision | Rationale | Citation Source |
-|---|----------|-----------|-----------------|
-| 1 | [what was decided] | [why] | [from discovery finding #N] |
-
-## Implementation Changes
-| # | File | Lines | What Changed | Status |
-|---|------|-------|-------------|--------|
-| 1 | [path] | L##-L## | [change] | applied / pending |
-
-## Review Findings
-| # | Issue | Location | Severity | Blocking? |
-|---|-------|----------|----------|-----------|
-| 1 | [issue] | file:line | HIGH/MEDIUM/LOW | YES/NO |
-
-## Decision Log
-| # | Decision | User Confirmed? |
-|---|----------|-----------------|
-| 1 | [what was decided] | YES (turn #) / PENDING |
-
-## Pending Actions
-- [ ] [action awaiting user or next subagent]
-
-## Context Health
-- Sessions in pipeline: [count]
-- Approximate context used: [estimate from conversation length]
-- Warnings: [none / approaching limit / compressed — citations may be stale]
+## Discovery | #|Finding|Citation|Confidence |
+## Architecture Decisions | #|Decision|Rationale|Citation Source |
+## Implementation Changes | #|File|Lines|Change|Status |
+## Review Findings | #|Issue|Location|Severity|Blocking? |
+## Decision Log | #|Decision|User Confirmed? |
+## Pending Actions | - [ ] action
+## Context Health | sessions:N, context:% | Warnings
 ```
 
 ### State File Usage
-
-- **On session start**: Orchestrator reads state file FIRST, before doing anything else
-- **After every subagent output**: Orchestrator updates relevant sections
-- **After user confirmation**: Orchestrator logs decision
-- **Before spawning a new subagent**: Orchestrator provides relevant state sections as task context
+- Session start: read FIRST
+- After subagent output: update relevant sections
+- Before spawning subagent: provide relevant sections as context
+- After user confirmation: log decision
 
 ---
 
-## 3. Context Budget Management
+## 3. Context Budget
 
-### Warning Thresholds
-
-| Condition | Action |
+| Remaining | Action |
 |---|---|
-| <70% context remaining | Continue normally |
-| 70-85% context used | Add warning to state file. Prefer narrower subagent scopes. |
-| 85-95% context used | ALERT user: "Context nearing limit. Key findings saved to session-state.md. Consider starting a fresh session or splitting the task." |
-| >95% context used | BLOCK further subagent spawning. Read state file, present summary to user, ask: "Context nearly exhausted. Continue in a new session?" |
+| <30% used | Normal |
+| 70-85% used | Warn state file. Prefer narrower scopes. |
+| 85-95% used | ALERT user. Suggest new session or split. |
+| >95% used | BLOCK spawning. Read state file, ask user. |
 
-### What Gets Compressed
-
-When context compresses, these are the casualties:
-1. Subagent output details (findings tables, line numbers)
-2. Conversation history (earlier turns)
-3. Skill content (less-used skills dropped)
-
-### What Survives Compression
-
-1. **Session state file** (explicitly written to disk)
-2. **File changes** (committed to working tree)
-3. **Citation chains** (if grounded in state file, not context memory)
+**Compressed**: subagent details, conversation history, skill content
+**Survives**: session state file, committed file changes, citation chains (if grounded in state file)
 
 ---
 
-## 4. Anti-Hallucination Verification
-
-### Pre-Aggregation Check (run before synthesizing any subagent output)
+## 4. Anti-Hallucination (Pre-Aggregation Check)
 
 ```
 FOR each subagent output:
-  ├── Count citations (file:line references)
-  │   └── < threshold? → REJECT → re-delegate
+  ├── Count citations (file:line)
+  │   └── <60%? → REJECT → re-delegate
   ├── Spot check 2-3 random citations
-  │   └── Do cited files exist? → NO → REJECT → escalate to user
+  │   └── File exists? → NO → REJECT → escalate
   ├── Cross-reference with session state
-  │   └── Contradicts previous findings? → FLAG conflict
-  └── Check severity claims
-      └── "HIGH severity" but no concrete impact described? → DOWNGRADE confidence
+  │   └── Contradicts previous? → FLAG conflict
+  └── Check severity claims ("HIGH" without impact → downgrade)
 ```
 
-### Hallucination Indicators (red flags)
-
-| Indicator | Meaning | Action |
-|---|---|---|
-| Generic findings without citations | LLM generated patterns, not observations | REJECT |
-| Citations all point to the same line | LLM anchored to one real line, extrapolated | REJECT uncited claims |
-| Citations reference files NOT in discovery report | LLM invented files | REJECT → escalate |
-| Output format matches but content is vague | LLM formatted correctly but didn't actually analyze | REJECT |
-| Findings contradict state file without explanation | LLM forgot earlier session outputs | FLAG conflict → escalate |
+| Indicator | Action |
+|---|---|
+| Generic findings, no citations | REJECT |
+| All citations same line | REJECT uncited claims |
+| Citations reference files not in discovery | REJECT → escalate |
+| Formatted but vague | REJECT |
+| Contradicts state file w/o explanation | FLAG conflict → escalate |
 
 ---
 
 ## 5. Cross-Session Continuity
 
-### When the User Returns (new session)
+1. Read `.opencode/session-state.md` first
+2. Present state to user
+3. Ask: continue or fresh start?
+4. If continue: resume from `Current phase`
+5. If fresh: archive old state, create new
 
-1. **Read state file first**: Open `.opencode/session-state.md`
-2. **Present state to user**: "Last session was [task], at [phase]. Discovery found [key findings]. You were about to [pending action]."
-3. **Ask**: "Continue from here or start fresh?"
-4. **If continue**: Resume from `Current phase` in state file. Provide state file sections as context to the next subagent.
-5. **If start fresh**: Archive old state file, create new one.
+**Locations**: `~/.config/opencode/session-state.md` (global) | `.opencode/session-state.md` (project priority)
 
-### State File Location
+---
 
-- Global: `~/.config/opencode/session-state.md`
-- Per-project: `.opencode/session-state.md` (project takes priority)
+## 6. Dehydrate-Hydrate Protocol
+
+### Dehydration (before spawning worker)
+
+MUST strip: all comments, non-target function bodies (→ signature only), code outside target scope, conversational prose, task history, previous agent outputs.
+
+KEEP only: function/class/type signatures in scope, immediate imports, interface contracts target code touches, one-sentence `mutation_instructions`.
+
+### Checklist
+```
+[ ] All comments removed
+[ ] Non-target bodies → signature only
+[ ] Imports: direct deps only
+[ ] No conversation history or prior agent outputs
+[ ] Total < 2,000 tokens (half sandbox)
+```
+
+### Hydration Rule
+Workers receive ONLY dehydrated context. NEVER: full file contents outside scope, other worker outputs, conversation history, orchestrator rationale.
+
+### Transaction Log (Orchestrator State = JSON, NOT code)
+```
+{"lane_id":"L-001","target_file":"src/svc.ts","target_scope":"Svc.create","mutation_summary":"Added DI","lines_changed":"L45-L48","edge_judge_verdict":"APPROVED","timestamp":"2026-06-02T10:00:00Z"}
+```
+
+---
+
+## 7. Token Sandbox (4,000 Hard Cap)
+
+**No worker spawned with >4,000 tokens.**
+
+### Budget
+| Component | Max Tokens |
+|---|---|
+| System prompt + skills | ~800 |
+| Dehydrated context (signatures, interfaces) | ~2,000 |
+| Instructions + scope | ~300 |
+| Domain rules/patterns | ~400 |
+| Buffer (tool outputs) | ~500 |
+| **TOTAL** | **4,000** |
+
+### Enforcement
+- Pre-spawn: estimate token count. >4,000 → decompose or strip further.
+- Tool output (read, bash) counts against 4K. ~500 buffer for this.
+- Worker receiving >4K → report `TOKEN_OVERFLOW`, request narrower scope.
+
+| Worker Budget | Action |
+|---|---|
+| <2,500 | Normal |
+| 2,500-3,500 | Prefer narrower scopes |
+| 3,500-3,900 | WARN, write state, minimal context |
+| >3,900 | BLOCK. Decompose or split. |
+
+---
+
+## 8. Strict Output Format
+
+### Per-role Format
+| Role | Output | Forbidden |
+|---|---|---|
+| Implementer | Unified diff / AST patch | Prose, comments, markdown |
+| Verifier | Issues table + verdict + confidence | Re-implementation, extrapolation |
+| Fixer | Fixes table + corrected impl | New features, scope expansion |
+| Edge Judge | JSON verdict + fault_vector | Subjective "maybe" qualifiers |
+| AST Aggregator | JSON merge status + patch | Manual code edits |
+| Global Judge | JSON integrity + remediation | Implementation suggestions |
+| Orchestrator | Delegation + HITL | Code analysis, file writes |
+
+### NO Conversational Filler
+Workers NEVER output "I think...", "Let me explain...", "Here's what I did...", or any markdown prose outside structured format. Only text allowed outside format is a `file:line` citation.
+
+### Validation
+1. Check required JSON structure or table format
+2. Scan for prose sentences not in tables/JSON
+3. If filler → REJECT: "Output format violation. Use prescribed format ONLY. No prose."
 
 ---
 
 ## Integration
 
-Load `mas-integrity` alongside `mas-aggregation`, `mas-decision`, and `mas-feedback` in every ship orchestrator.
+Loaded with: `mas-aggregation` `mas-decision` `mas-feedback` `mas-workflow`
 
-**Rule**: Before trusting any subagent output, verify citations. Before starting any new turn, read state file. Before spawning when context is tight, warn.
+### Rules
+1. Before trusting output → verify citations (§1)
+2. Before starting turn → read state file (§2)
+3. Before spawning worker → apply Dehydrate (§6)
+4. Before spawning worker → verify ≤4K tokens (§7)
+5. After subagent output → validate strict format (§8)
+6. When context budget warns → follow §3 + §7 thresholds

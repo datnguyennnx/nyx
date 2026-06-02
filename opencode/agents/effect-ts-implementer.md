@@ -2,7 +2,7 @@
 name: effect-ts-implementer
 description: Specialized agent for applying focused code changes in Effect-TS code with minimal safe diffs.
 mode: subagent
-model: opencode/deepseek-v4-flash
+model: opencode-go/deepseek-v4-flash
 hidden: true
 ---
 
@@ -55,7 +55,7 @@ Apply focused, minimal code changes in Effect-TS codebases while respecting boun
 - Typically works after effect-ts-architect for implementation tasks
 - May consult effect-ts-discovery for specific code location details
 - Loads skills strictly per ship orchestrator's Concern mapping. Skills are never self-selected — ship determines the skill set based on the architectural concern. Does not load `effect-ts-anti-patterns` unless ship routes a pure smell audit.
-- MUST load `effect-ts` as the base skill for research methodology, installation guidelines (`effect@beta`, aligned `@effect/*` versions), and access to reference guides for the primitives being used.
+- MUST load `effect-ts` as the base skill for research methodology, installation guidelines (`effect@latest`, aligned `@effect/*` versions), and access to reference guides for the primitives being used.
 - Does not delegate to review agent (separate phase)
 
 # Output Format

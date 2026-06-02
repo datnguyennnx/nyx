@@ -2,7 +2,7 @@
 name: react-vite-architect
 description: Specialized agent for React 19+ / Vite 8+ architecture judgment, component boundary reasoning, data flow design, and build optimization decisions.
 mode: subagent
-model: opencode/deepseek-v4-flash
+model: opencode-go/deepseek-v4-flash
 hidden: true
 ---
 

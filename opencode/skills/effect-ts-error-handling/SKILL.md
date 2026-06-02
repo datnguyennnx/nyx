@@ -11,7 +11,7 @@ This skill ensures Effect-TS code uses proper error handling with typed domain e
 
 # Use when
 Reviewing Effect-TS code to:
-- Replace generic Error handling with typed domain errors using Effect.TaggedError
+- Replace generic Error handling with typed domain errors using `Schema.TaggedErrorClass` (v4) or `Data.TaggedError`
 - Establish clear expected/unexpected error separation at type level
 - Map infrastructure errors (HTTP, database) to domain errors at system boundaries
 - Apply retry, timeout, and fallback policies with proper bounds and conditions
@@ -20,7 +20,7 @@ Reviewing Effect-TS code to:
 # Inputs
 - Effect-TS source files (.ts, .tsx)
 - Error type definitions and usage
-- Catch/error handling blocks (Effect.catchAll, Effect.catchTag, etc.)
+- Catch/error handling blocks (Effect.catch, Effect.catchAll (v3), Effect.catchTag, etc.)
 - Retry and timeout configurations (Effect.retry, Effect.timeout, Effect.schedule*)
 - Infrastructure boundary code (HTTP clients, database access, file systems, etc.)
 - Error transformation patterns (Effect.mapError, Effect.mapLeft)
@@ -28,34 +28,32 @@ Reviewing Effect-TS code to:
 # Core principles
 - Expected errors belong in the error channel as typed values (Effect<A, E, R> where E ≠ never)
 - Unexpected errors (defects) should be logged and cause termination unless at execution boundaries
-- Domain errors should be modeled as tagged errors extending Effect.TaggedError for pattern matching
+- Domain errors should be modeled as tagged errors using `Schema.TaggedErrorClass` (v4) or `Data.TaggedError` for pattern matching
 - Infrastructure errors should be mapped to domain errors at system boundaries, not allowed to leak outward
 - Recovery strategies (retry, timeout, fallback) must be policy-based, bounded, and appropriate to the operation
 - Error information should be preserved when transformation is needed for debugging/context
 
 # Preferred patterns
-- Create domain error classes: class NotFoundError extends Effect.TaggedError<NotFoundError>('NotFoundError')<{ id: string }>{}
+- Create domain error classes: `class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("NotFoundError", { id: Schema.String }) {}` (v4) or `class NotFoundError extends Data.TaggedError("NotFoundError")<{ readonly id: string }> {}` (lightweight)
 - Use Effect.mapError/Effect.mapLeft for error transformation at boundaries: effect.pipe(Effect.mapError(mapHttpToDomainError))
 - Apply Effect.retry with specific schedules: Effect.retry({ schedule: Schedule.exponential({ base: '100ms', maxRetries: 3 }) })
 - Use Effect.timeout with appropriate durations: Effect.timeout('5 seconds') or Effect.timeoutFail
 - Implement fallback with Effect.orElse or Effect.orElseSucceed for safe defaults
 - Use Effect.sandbox to preserve defect information when logging unexpected errors at boundaries
-- Leverage Effect.catchAll only at top-level boundaries (main, workers) for logging before termination
+- Leverage Effect.catch (v4) / Effect.catchAll (v3) only at top-level boundaries (main, workers) for logging before termination
 - Use Effect.catchTag/catchTags for specific error handling: effect.pipe(Effect.catchTag('NotFoundError', handleNotFound))
 
 # Anti-patterns
-- Generic Error catches: catch (error) => ... or Effect.catchAll(() => recover) without rethrowing defects
-- Throwing unknown Error: throw new Error("message") instead of typed domain errors
-- Catch-all without defect preservation: Effect.catchAll(() => recoverableEffect) that hides bugs
-- Unbounded retry: Effect.retry(*) without schedule limits or maxRetries
-- Ignoring unexpected errors: swallowing defects with Effect.catchAll(() => Effect.void) without logging
+- Generic Error catches: catch (error) => ... or Effect.catch(() => recover) without rethrowing defects
+- Catch-all without defect preservation: Effect.catch(() => recoverableEffect) that hides bugs
+- Ignoring unexpected errors: swallowing defects with Effect.catch(() => Effect.void) without logging
 - Losing error information: mapping all infrastructure errors to single generic domain error losing debugging value
 - Retrying non-idempotent operations: applying retry to POST/PUT/DELETE without checking idempotency
 - Using retry as a substitute for proper error handling: retrying instead of fixing root causes or using timeouts
 
 # Workflow
-1. Identify all error handling blocks (catch, try/catch, Effect.catchAll/Effect.catchTag)
-2. Check for generic Error usage and recommend Effect.TaggedError alternatives with proper fields
+1. Identify all error handling blocks (catch, try/catch, Effect.catch/Effect.catchTag)
+2. Check for generic Error usage and recommend `Schema.TaggedErrorClass` (v4) or `Data.TaggedError` alternatives with proper fields
 3. Verify expected vs unexpected error separation by examining Effect<A, E, R> types in signatures
 4. Examine infrastructure boundaries (HTTP clients, etc.) for proper error mapping to domain errors
 5. Review retry/timeout configurations for bounding (max attempts, duration limits) and policy suitability
@@ -81,13 +79,13 @@ When assigning risk levels, use these definitions:
 # Acceptable Patterns (do NOT flag)
 These patterns are correct usage — do not flag them as anti-patterns:
 - `Effect.catchTag` / `Effect.catchTags` for specific typed error handling — this IS the preferred pattern
-- `Effect.catchAll` at process entry points (main, workers) combined with defect logging — this IS appropriate boundary handling
+- `Effect.catch` (v4) / `Effect.catchAll` (v3) at process entry points (main, workers) combined with defect logging — this IS appropriate boundary handling
 - `Effect.mapError` for error transformation at domain boundaries — this IS proper error mapping
 - `Effect.sandbox` / `Effect.unsandbox` for preserving defect information — this IS correct defect handling
 - `Effect.retry` with bounded `Schedule` (exponential with maxRetries, spaced with maxRecurs) — this IS bounded retry
 - `Effect.timeout` with explicit duration — this IS proper timeout bounding
 - `Effect.orElse` / `Effect.orElseSucceed` for safe fallback strategies — this IS proper recovery
-- `Effect.either` / `Effect.option` for converting failures to values at consumption points — this IS correct error absorption
+- `Effect.result` (v4) / `Effect.either` (v3) for converting failures to values at consumption points — this IS correct error absorption
 - Infrastructure-level generic errors (database driver, HTTP client errors) at their own boundary — these ARE appropriate until mapped to domain errors
 
 # Related Guides (from effect-ts skill references/)

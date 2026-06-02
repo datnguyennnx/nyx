@@ -1,6 +1,8 @@
 # SQL Guide
 
-This guide is based on the vendored Effect SQL modules in `./.repos/effect`.
+This guide is based on the vendored Effect v4 SQL modules in `./.repos/effect`.
+
+> **v4 changes:** SQL modules are now at `effect/unstable/sql/*`. Runtime-specific packages remain separate (`@effect/sql-pg`, `@effect/sql-sqlite-node`, etc.). Import paths should use `effect/unstable/sql/SqlClient` etc.
 
 Key source files:
 

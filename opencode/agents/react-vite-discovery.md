@@ -2,7 +2,7 @@
 name: react-vite-discovery
 description: Specialized agent for repository scanning, component boundary discovery, and architecture analysis in React 19+ / Vite 8+ codebases.
 mode: subagent
-model: opencode/deepseek-v4-flash
+model: opencode-go/deepseek-v4-flash
 hidden: true
 ---
 

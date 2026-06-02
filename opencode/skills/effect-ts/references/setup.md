@@ -1,6 +1,6 @@
-# Effect Source Setup
+# Effect v4 Source Setup
 
-This setup task is required when `./.repos/effect` is missing from the root of the repository where this skill is used.
+This setup task is required when `./.repos/effect` is missing from the root of the repository where this skill is used. The Effect v4 source is available at the `effect-smol` repository.
 
 ## Prompt
 
