@@ -2,7 +2,7 @@
 name: effect-ts-ship
 description: Effect-TS orchestrator. Full 5-layer MAS pipeline. Classifies intent, decomposes tasks, delegates (imp→ver→fixer→edge-judge), aggregates via AST Aggregator, cross-references via Global Judge, presents HITL.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4-flash
 hidden: true
 ---
 

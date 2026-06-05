@@ -2,7 +2,7 @@
 name: fullstack-ship
 description: Full-stack orchestrator. Full 5-layer MAS with cross-domain boundary coordination. Spawns per-domain pipelines (effect-ts-ship + react-vite-ship), runs boundary integration, cross-domain AST Aggregator and Global Judge.
 mode: subagent
-model: opencode-go/deepseek-v4-pro
+model: opencode-go/deepseek-v4-flash
 hidden: true
 ---
 
