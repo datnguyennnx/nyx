@@ -42,9 +42,9 @@ Reviewing Effect-TS code to:
 - Compose layers using Layer.merge (parallel) and Layer.provide (sequential dependency)
 - Use Scope for localized resource lifetime when Layer sharing isn't appropriate
 - Make cleanup logic idempotent and error-tolerant to handle double-release safely
-- Use Layer.memoize for expensive, shareable resource construction that should be cached
+- Layers are automatically memoized across multiple Effect.provide calls by default; for opt-out use Effect.provide(layer, { local: true }). Use Layer.memoize only when explicit sharing control is needed.
 - Keep service interfaces independent of resource details by requiring only the service tag
-- Handle partial failures in resource acquisition gracefully with Effect.either or Effect.optional
+- Handle partial failures in resource acquisition gracefully with Effect.result or Effect.optional
 
 # Anti-patterns
 - Manual resource management without Scope or Layer (direct open/close in service methods)
@@ -90,7 +90,7 @@ These patterns are correct usage — do not flag them as anti-patterns:
 - `Layer.effect` with `Effect.acquireRelease` for effectful resource construction — this IS the preferred pattern
 - `Layer.merge` (parallel) and `Layer.provide` (sequential) composition — this IS proper dependency wiring
 - `Scope` for localized resource lifetime when Layer sharing isn't appropriate — this IS correct
-- `Layer.memoize` for genuinely expensive, shareable resources — this IS appropriate caching
+- Layer auto-memoization is default; `Layer.memoize` remains valid for explicit sharing control — this IS appropriate caching
 - `Effect.scoped` for short-lived resources within a single effect — this IS correct local scoping
 - Idempotent and error-tolerant finalizers (safe to call multiple times) — this IS good practice
 - Service interfaces requiring only service tags (not implementation types) in their Context — this IS clean boundary

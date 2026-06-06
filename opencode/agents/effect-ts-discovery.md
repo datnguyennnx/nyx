@@ -107,3 +107,4 @@ Before finalizing output, perform these checks on every finding:
 - Report only what the code does — never prescribe changes or recommend redesigns
 - Keep focus on raw observation, not judgment or prescription
 - Flag mental model violations as observed patterns, not as prescriptive findings
+- **API verification:** Verify every API exists in `packages/effect/src/*.ts` before including in findings — beta APIs shift between releases.

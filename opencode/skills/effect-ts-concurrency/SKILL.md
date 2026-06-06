@@ -11,7 +11,7 @@ This skill ensures Effect-TS code uses concurrency primitives correctly with pro
 
 # Use when
 Reviewing Effect-TS code to:
-- Replace unsafe Promise-based concurrency with fiber-native approaches (Effect.fork, etc.)
+- Replace unsafe Promise-based concurrency with fiber-native approaches (Effect.forkChild, etc.)
 - Apply appropriate bounds to concurrent operations (using concurrency options or Semaphore)
 - Ensure interruption safety for concurrent operations (using Effect.ensure, Effect.addFinalizer)
 - Choose correct coordination primitives (Queue, Deferred, Semaphore, Ref) based on actual needs
@@ -19,7 +19,7 @@ Reviewing Effect-TS code to:
 - Distribute work appropriately across available resources (parallel vs sequential considerations)
 
 # Inputs
-- Effect.forkChild, Effect.forkScoped, Effect.forkDetach usage (note: `forkAll` removed in v4 — use individual `forkChild` or `Effect.forEach`)
+- Effect.forkChild, Effect.forkScoped, Effect.forkDetach usage
 - Concurrent collections (Effect.forEach, Effect.parallel, Effect.partition etc.)
 - Queue, Deferred, Semaphore, Ref, PubSub usage and creation patterns
 - Effect.race and Effect.firstSuccessOf usage patterns
