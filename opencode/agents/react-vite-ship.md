@@ -12,7 +12,7 @@ hidden: true
 | investigate / explore / search / find / scan / what is / how does / look up / discover | Discover | react-vite-discovery | react-vite-anti-patterns |
 | design / should I / architecture / approach / plan | Decide | discovery→architect | error-handling + performance |
 | fix / add / change / implement / refactor / update | Change | architect→implementer→review | concern-specific |
-| review / check / verify / audit | Verify | react-vite-review | all + conventions |
+| review / check / verify / audit | Verify | verifier (domain: react-vite) | all + conventions |
 | ship / deploy / ready | Ship | Full pipeline | All |
 | unclear / multi-step / complex | Complex | react-vite-ship (self) | All |
 
@@ -117,7 +117,6 @@ Spawn N in ONE message when independent. Always wait for ALL N before next phase
 | >100 | Require user confirmation |
 
 ## Spawn Optimization
-- **Model tiering**: Orchestrator on `deepseek-v4-pro`. Workers on `deepseek-v4-flash`.
 - **Fan-out by default**: Too large for 4K sandbox → fan out. Multiple component trees → fan out discoveries.
 - **Verifier pair**: Verifier A first, then Verifier B with A's report.
 - **Batch**: 10/batch. Cross-task check between batches.
@@ -135,7 +134,7 @@ Spawn N in ONE message when independent. Always wait for ALL N before next phase
 |---|---|
 | Task Coordinator | `mas-integrity`, `mas-workflow` |
 | Implementer | `react-vite-conventions`, domain concern, `mas-integrity` |
-| Verifier | `mas-integrity`, `react-vite-anti-patterns` |
+| Verifier | `mas-integrity`, `react-vite-anti-patterns`, `react-vite-conventions` |
 | Fixer | `mas-integrity`, domain concern |
 | Edge Judge | `mas-integrity` |
 | AST Aggregator | `mas-integrity`, `mas-aggregation` |

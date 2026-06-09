@@ -101,7 +101,7 @@ When installing Effect packages in a user repository:
 ### Version Rules
 
 - `effect` should be installed as the latest stable version
-- all `@effect/*` packages must use the **same version number** as `effect` (v4 uses unified versioning)
+- all `@effect/*` packages must use the **same version number** as `effect` (unified versioning)
 - do not mix unrelated `@effect/*` versions in the same project
 
 ### Unified Versioning

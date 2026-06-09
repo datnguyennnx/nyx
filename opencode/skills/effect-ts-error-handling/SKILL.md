@@ -11,7 +11,7 @@ This skill ensures Effect-TS code uses proper error handling with typed domain e
 
 # Use when
 Reviewing Effect-TS code to:
-- Replace generic Error handling with typed domain errors using `Schema.TaggedErrorClass` (v4) or `Data.TaggedError`
+- Replace generic Error handling with typed domain errors using `Schema.TaggedErrorClass` or `Data.TaggedError`
 - Establish clear expected/unexpected error separation at type level
 - Map infrastructure errors (HTTP, database) to domain errors at system boundaries
 - Apply retry, timeout, and fallback policies with proper bounds and conditions
@@ -53,7 +53,7 @@ Reviewing Effect-TS code to:
 
 # Workflow
 1. Identify all error handling blocks (catch, try/catch, Effect.catch/Effect.catchTag)
-2. Check for generic Error usage and recommend `Schema.TaggedErrorClass` (v4) or `Data.TaggedError` alternatives with proper fields
+2. Check for generic Error usage and recommend `Schema.TaggedErrorClass` or `Data.TaggedError` alternatives with proper fields
 3. Verify expected vs unexpected error separation by examining Effect<A, E, R> types in signatures
 4. Examine infrastructure boundaries (HTTP clients, etc.) for proper error mapping to domain errors
 5. Review retry/timeout configurations for bounding (max attempts, duration limits) and policy suitability

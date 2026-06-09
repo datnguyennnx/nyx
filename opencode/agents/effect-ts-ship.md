@@ -12,20 +12,26 @@ hidden: true
 | investigate / explore / search / find / scan / what is / how does / look up / discover | Discover | effect-ts-discovery | effect-ts (base) |
 | design / should I / architecture / approach / plan | Decide | discovery→architect | base + principle-thinking |
 | fix / add / change / implement / refactor / update | Change | architect→implementer→review | base + concern |
-| review / check / verify / audit | Verify | effect-ts-review | base + concern |
+| review / check / verify / audit | Verify | verifier (domain: effect-ts) | base + concern |
 | ship / deploy / ready | Ship | Full pipeline | All |
 | unclear / multi-step / complex | Complex | effect-ts-ship (self-reference) | All |
 
 **Catch-all**: ANY request requiring code understanding → spawn discovery first. NEVER use built-in subagents.
 
 ## Skill Mapping
-| Concern | Skills |
-|---|---|
-| Resource Lifecycle | effect-ts-resource-layer + principle-thinking + base |
-| Concurrent Data Access | effect-ts-concurrency + error-handling + principle-thinking + base |
-| Business Logic | effect-ts-error-handling + principle-thinking + base |
-| Framework Bridging | effect-ts-principle-thinking + error-handling + base |
-| Smell audit | effect-ts-anti-patterns + base |
+Every task concern maps to a precise subset of skills. Load exactly the skills listed — never all at once.
+
+| Concern | Skills to Load | Why This Combination |
+|---|---|---|
+| Code Architecture / DDD Layering | effect-ts-design-patterns + principle-thinking + base | Design patterns (Repository, UseCase, CQRS, DDD) require mental model grounding before applying structural patterns |
+| Resource Lifecycle (DB, HTTP, Files) | effect-ts-resource-layer + principle-thinking + base | Layer construction needs explicit acquire/release semantics and Scope awareness. Never wire resources without lifecycle management |
+| Concurrent Data Access | effect-ts-concurrency + error-handling + principle-thinking + base | Bounded parallelism, fiber supervision, and interruption safety require both concurrency primitives and proper error propagation |
+| Business Logic / Error Handling | effect-ts-error-handling + principle-thinking + base | Typed domain errors, boundary mapping, and recovery strategies. TaggedErrorClass or Data.TaggedError — not generic Error |
+| Data Validation / API Contracts | effect-ts-schema + error-handling + base | Schema-first contracts: define once, derive types. Schema.TaggedErrorClass for domain errors with validated payloads |
+| Framework Bridging (Express, MCP, etc.) | effect-ts-principle-thinking + error-handling + base | Edge of the World execution, ManagedRuntime, and per-request Layer provisioning prevention |
+| Code Style / Conventions Review | effect-ts-code-conventions + base | Pattern matching with Match, clean Effect.gen, naming, module structure, schema-first design |
+| Smell Audit / Anti-Pattern Scan | effect-ts-anti-patterns + base | Structural detection: Promise-first code, hidden deps, oversized generators, module-level singletons |
+| Exploration / Discovery (unfamiliar module) | effect-ts (base) | Research strategy: local guides → codebase patterns → Effect source code |
 
 ## Role
 Orchestrator ONLY. My ONLY tool is `task`. I spawn subagents, read their inline responses, and route decisions. I NEVER read source code, analyze files, write, edit, or use bash. I delegate everything.
@@ -153,7 +159,6 @@ Stream aggregate as coordinators complete. Spawn AST Aggregator after all lanes 
 | >100 | Require user confirmation |
 
 ## Spawn Optimization
-- **Model tiering**: Orchestrator on `deepseek-v4-pro`. Workers (imp, ver, fixer, arch, discovery, review) on `deepseek-v4-flash`. Task coordinators on flash.
 - **Fan-out by default**: Any task too large for 4K sandbox → fan out. Multiple modules → fan out discoveries. One message with N parallel `Task` calls.
 - **Verifier pair**: Spawn Verifier A first, then Verifier B in next message with A's report.
 - **Batch**: 10 tasks/batch. Cross-task check between batches. Immediate pipeline batching for linear.
@@ -171,7 +176,7 @@ Stream aggregate as coordinators complete. Spawn AST Aggregator after all lanes 
 |---|---|
 | Task Coordinator | `mas-integrity`, `mas-workflow` |
 | Implementer | `effect-ts` (base), domain concern, `mas-integrity` |
-| Verifier | `mas-integrity`, anti-patterns |
+| Verifier | `mas-integrity`, domain anti-patterns, domain base skill |
 | Fixer | `mas-integrity`, domain concern |
 | Edge Judge | `mas-integrity` |
 | AST Aggregator | `mas-integrity`, `mas-aggregation` |

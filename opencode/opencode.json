@@ -1,5 +1,9 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "instructions": [
+    "Read ./AGENTS.md for repository architecture and MAS rules.",
+    "Read ./agents/context-manager.md to enforce context tiers before routing agents."
+  ],
   "permission": {
     "read": {
       "*": "allow",
@@ -9,7 +13,7 @@
       ".env.example": "allow",
       "*.env.example": "allow"
     },
-    "write": {
+    "edit": {
       "*": "allow",
       ".env": "deny",
       "*.env": "deny",
@@ -19,26 +23,19 @@
     },
     "bash": {
       "*": "ask",
-      "*git*": "deny",
-      "git add*": "deny",
-      "git commit*": "deny",
-      "git diff*": "allow",
-      "git status*": "allow",
-      "git log*": "allow",
-      "git show*": "allow",
-      "git branch*": "allow",
-
+      "git*": "deny",
+      "git diff *": "allow",
+      "git status *": "allow",
+      "git log *": "allow",
+      "git show *": "allow",
+      "git branch *": "allow",
       "cat .env*": "deny",
       "cat */.env*": "deny",
-      "grep * .env*": "deny",
-      "sed * .env*": "deny",
-      "awk * .env*": "deny",
-      "less .env*": "deny",
-      "head .env*": "deny",
-      "tail .env*": "deny",
       "printenv*": "deny",
-      "env*": "deny"
-    }
+      "env": "deny"
+    },
+    "external_directory": "ask",
+    "skill": "allow"
   },
   "mcp": {
     "sequential-thinking": {
@@ -50,44 +47,41 @@
   "mode": {
     "ship-effect-ts": {
       "prompt": "{file:./modes/ship-effect-ts.md}",
-      "tools": {
-        "read": false,
-        "task": true,
-        "write": false,
-        "edit": false,
-        "bash": false,
-        "grep": false,
-        "glob": false,
-        "list": false,
-        "patch": false
+      "permission": {
+        "task": "allow",
+        "skill": "allow",
+        "read": "deny",
+        "edit": "deny",
+        "bash": "deny",
+        "glob": "deny",
+        "grep": "deny",
+        "webfetch": "deny"
       }
     },
     "ship-react-vite": {
       "prompt": "{file:./modes/ship-react-vite.md}",
-      "tools": {
-        "read": false,
-        "task": true,
-        "write": false,
-        "edit": false,
-        "bash": false,
-        "grep": false,
-        "glob": false,
-        "list": false,
-        "patch": false
+      "permission": {
+        "task": "allow",
+        "skill": "allow",
+        "read": "deny",
+        "edit": "deny",
+        "bash": "deny",
+        "glob": "deny",
+        "grep": "deny",
+        "webfetch": "deny"
       }
     },
     "ship-fullstack": {
       "prompt": "{file:./modes/ship-fullstack.md}",
-      "tools": {
-        "read": false,
-        "task": true,
-        "write": false,
-        "edit": false,
-        "bash": false,
-        "grep": false,
-        "glob": false,
-        "list": false,
-        "patch": false
+      "permission": {
+        "task": "allow",
+        "skill": "allow",
+        "read": "deny",
+        "edit": "deny",
+        "bash": "deny",
+        "glob": "deny",
+        "grep": "deny",
+        "webfetch": "deny"
       }
     }
   }
