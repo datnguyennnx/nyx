@@ -1,37 +1,66 @@
 ---
 name: react-vite-conventions
-description: Enforce strict naming conventions, detect typos, and maintain code consistency in React 19+ / Vite 8+ codebases.
+description: Naming conventions, file structure, and code consistency rules for React 19+ / Vite 8+ codebases.
 ---
 
-# Purpose
-Detect naming convention violations, typos in variables/components, and structural inconsistencies to maintain a clean codebase.
+## React 19 Conventions
 
-# Use when
-Reviewing any code changes or scanning the repository to ensure:
-- Variables, functions, and components follow standard casing conventions.
-- No spelling mistakes or typos exist in exports, props, or function names.
-- File naming matches component naming.
+| Rule | Enforce |
+|---|---|
+| Component naming | PascalCase (`UserProfile`, `SubmitButton`) |
+| Hook naming | camelCase, `use` prefix (`useUserData`, `useFormSubmit`) |
+| File naming | kebab-case or PascalCase matching primary export (`user-profile.tsx`) |
+| Ref prop | `ref` as direct prop, never `forwardRef` |
+| Context provider | `<Context value={...}>` directly, never `<Context.Provider>` |
+| Form actions | `<form action={actionFn}>` with `useActionState`/`useFormStatus` |
+| Data fetching | `use(promise)` with `<Suspense>`, never `useEffect` for fetch |
+| Error boundaries | Granular per-section, never monolithic app-wide |
+| Metadata | `<title>`, `<meta>`, `<link>` natively in component body |
+| Resource hints | `preload`/`preinit`/`preconnect`/`prefetchDNS` from `react-dom` |
 
-# Core Principles
-- **Components**: PascalCase (e.g., `UserProfile.tsx`, `function UserProfile`)
-- **Hooks**: camelCase starting with `use` (e.g., `useAuth`)
-- **Functions/Variables**: camelCase (e.g., `fetchData`, `userData`)
-- **Constants**: UPPER_SNAKE_CASE for global constants (e.g., `MAX_RETRY_COUNT`)
-- **Types/Interfaces**: PascalCase, no `I` prefix (e.g., `UserData`, not `IUserData`)
-- **Files**:
-  - Component files: PascalCase (`Button.tsx`)
-  - Utility/Hook files: camelCase (`useFetch.ts`, `formatDate.ts`)
+## File Structure
 
-# Anti-patterns
-- **Typo in Props/State**: e.g., `setUesrData` instead of `setUserData`, `isLodaing` instead of `isLoading`.
-- **Mismatch File/Component Name**: File `userProfile.tsx` exporting component `UserProfile`.
-- **Prefixing Types**: Using `IUser` or `TUser` instead of `User`.
-- **Boolean Naming**: Booleans not starting with `is`, `has`, `should`, or `can` (e.g., `loading` instead of `isLoading`).
-- **Handler Naming**: Event handlers not using `handle` prefix (e.g., `submitForm` instead of `handleSubmit`).
+```
+src/components/
+  user-profile.tsx         # Component
+  user-profile.test.tsx    # Co-located test
+  user-profile.module.css  # Co-located styles
 
-# Output Contract
-Return findings with:
-- File location and line numbers
-- Specific violation (Typo / Naming Convention)
-- Recommended fix
-- Risk level (Always LOW for conventions, unless it breaks an export)
+src/hooks/
+  use-user-data.ts         # Shared hook
+
+src/lib/
+  api.ts                   # API client
+  types.ts                 # Shared types
+```
+
+- One component per file
+- Co-locate tests and styles with component
+- Shared hooks in `hooks/`, not component directories
+- Barrel files (`index.ts`) ONLY for public API surface — never re-export everything
+
+## Naming Table
+
+| Element | Convention | Example |
+|---|---|---|
+| Component | PascalCase noun | `UserProfile` |
+| Hook | camelCase, `use` prefix | `useUserData` |
+| Context | PascalCase + `Context` | `ThemeContext` |
+| Event handler | camelCase, `handle` prefix | `handleSubmit` |
+| Prop type | PascalCase + `Props` | `UserProfileProps` |
+| File (component) | PascalCase or kebab-case | `UserProfile.tsx` |
+| File (hook) | camelCase, `use` prefix | `useUserData.ts` |
+
+## Anti-patterns
+
+| Pattern | Fix |
+|---|---|
+| `forwardRef` | `ref` as direct prop |
+| `<Context.Provider>` | `<Context>` directly |
+| `useEffect` for data fetch | `use(promise)` + Suspense |
+| `useState` for async loading | `useTransition` |
+| Barrel export-all `index.ts` | Named exports only |
+| `any` in props/state | Proper TypeScript types |
+| Component >200 lines | Split by responsibility |
+| Multiple components per file | One component per file |
+| `index.tsx` as component file | Named file matching component |

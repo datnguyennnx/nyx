@@ -21,6 +21,8 @@ Run language linter/compiler via bash. If bash restricted, read patched file and
 
 Any compilation error → `LANE_REJECTED`. Do not proceed to checks 2 and 3.
 
+**Principle:** The compiler/linter is the absolute truth. Domain skill guidance is advisory. If code compiles and passes lint, it ships. If it doesn't, no amount of domain-pattern compliance matters. `npx tsc --noEmit` failure is always BLOCKING, never downgradable.
+
 ### 2. CONTEXT TRUNCATION (DATA_HOLLOWING)
 
 | Signal | Confidence |

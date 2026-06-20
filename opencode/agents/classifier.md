@@ -21,6 +21,7 @@ Scheduling and dependency classification agent. Receives a flat task decompositi
 | `mas-routing` | DAG construction pseudocode, spawn decision table, false-independence anti-patterns |
 | `mas-architecture` | 5-layer topology, execution graph JSON schema, atomic split rules |
 | `mas-integrity` | Citation enforcement, Dehydrate-Hydrate protocol, strict output format |
+| `mas-complexity-scoring` | Fast Lane threshold τ = 0.25, entropy model (H_norm, D_JS, I_norm), user intent override |
 
 # Input Format
 Receives flat task decomposition from orchestrator:
@@ -40,11 +41,43 @@ Receives flat task decomposition from orchestrator:
       "effect_layers": ["LayerName"],
       "context_tier": 1 | 2 | 3
     }
-  ]
+  ],
+  "user_message": "string | null"
 }
 ```
 
 # Classification Algorithm
+
+## Step 0: Complexity Pre-Scoring
+
+Before building the DAG, score the incoming task set for Fast Lane eligibility.
+
+**Build/Lint gate:** If any task's verifier or edge-judge reports `npx tsc --noEmit` failure or `npx eslint` failure, the lane is BLOCKING regardless of domain verdict. Route to fixer immediately. Build success overrides all scoring.
+
+1. Compute the composite complexity score C(T) using the entropy model from
+   `mas-complexity-scoring`:
+   - Build file-change distribution from `output_files` and `mutation` fields
+   - Compute H_norm (normalized Shannon entropy of file-change distribution)
+   - If cross-domain (≥2 domains present): compute D_JS (Jensen-Shannon divergence)
+   - If multi-task (|task_set| > 1): compute I_norm (max mutual information)
+   - Composite: C(T) = (H_norm + D_JS + I_norm) / k, where k = count of active components
+   - Use `user_message` (if present) for `!quick` intent signal detection
+
+2. Fast Lane gate — ALL three conditions must hold:
+   a. C(T) < τ (0.25)
+   b. Exactly 1 task in the task list
+   c. That task targets ≤ 2 files (total unique `output_files` ≤ 2)
+
+   OR: `user_message` starts with `!quick` (overrides all conditions, sets C(T) = 0)
+
+3. If Fast Lane gate passes:
+   → Set `routing_decision: "fast_lane"` in output metadata
+   → Do NOT proceed to Steps 1–4
+   → Return the Fast Lane output format (see Fast Lane Output Format section below)
+
+4. If Fast Lane gate does not pass:
+   → Set `routing_decision: "full_dag"` in output metadata
+   → Proceed to Step 1 as normal
 
 ## Step 1: Build Nodes
 For each task in the input, create a DAG node:
@@ -149,6 +182,32 @@ Output JSON ONLY. No prose, no explanation, no markdown outside the JSON block.
     "total_levels": 2,
     "max_width": 2,
     "collapsed_nodes": []
+  }
+}
+```
+
+## Fast Lane Output Format
+
+When `routing_decision = "fast_lane"`, output this schema INSTEAD of the full DAG schema.
+Do not include `dag`, `spawn_plan`, or `pre_nodes` fields.
+
+```json
+{
+  "routing_decision": "fast_lane",
+  "fast_lane_task": {
+    "id": "string",
+    "scope": "string (from task.scope)",
+    "domain": "effect-ts | react-vite | shared",
+    "target_files": ["path/to/file.ts"],
+    "mutation": "what change to make (from task.mutation)",
+    "context_tier": 1
+  },
+  "complexity_score": 0.15,
+  "user_intent_signal": true,
+  "metadata": {
+    "total_nodes": 1,
+    "routing_decision": "fast_lane",
+    "escalation_policy": "If Lite Verifier BLOCKING → re-route to full_dag with original task input"
   }
 }
 ```

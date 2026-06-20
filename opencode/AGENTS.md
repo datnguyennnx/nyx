@@ -75,14 +75,18 @@ Files: `modes/ship-effect-ts.md`, `modes/ship-fullstack.md`, `modes/ship-react-v
 Mode files are the entrypoints. They define workflow behavior, HITL policy,
 and which orchestrator/agents to invoke first.
 
-### Tier 1 — Orchestration
-File: `agents/fullstack-ship.md`
+### Tier 1 — Decomposition
+File: `agents/task-decomposer.md`
 
 Receives user tasks, decomposes into atomic subtasks, delegates scheduling
 to classifier. Never performs verification or judgment itself.
 
 For single-domain simple changes, mode files may skip Tier 1 and delegate
-directly to Tier 2 or Tier 3 agents.
+directly to Tier 2 or Tier 3 agents. Low-complexity tasks (C(T) < 0.25)
+are routed through the Fast Lane, skipping most of the full pipeline.
+
+Build/lint (`npx tsc --noEmit` + `npx eslint`) is the absolute truth —
+the compiler overrides all domain pattern guidance.
 
 ### Tier 2 — Scheduling and Execution Control
 Files: `agents/classifier.md`, `agents/task-coordinator.md`, `agents/context-manager.md`
@@ -156,8 +160,12 @@ threshold.
 ### Verification is Centralized
 The `verifier.md` agent is the single active verification logic. It loads
 domain skills dynamically based on the `domain` field in task metadata.
-`effect-ts-review.md` and `react-vite-review.md` are domain-specific verification agents
-that route to verifier.
+`effect-ts-review.md` and `react-vite-review.md` are **removed** — the
+unified `verifier` handles all domains.
+
+Verifier runs in a dual-verification pair: Verifier A produces initial
+findings, Verifier B reviews A's report for agreement. Both must agree
+on blocking issues before forwarding to fixer.
 
 ### Context Tiering is Enforced
 The `context-manager.md` agent enforces context tiers centrally:
@@ -169,16 +177,30 @@ The `context-manager.md` agent enforces context tiers centrally:
 Verifier and edge-judge are hard-refused Tier 3 access.
 
 ### Decomposition and Scheduling are Separate
-Tier 1 (fullstack-ship) decomposes. Tier 2 (classifier) schedules. Tier 2
-(task-coordinator) executes. These three concerns never mix.
+Tier 1 (task-decomposer) decomposes. Tier 2 (classifier) schedules (including
+complexity pre-scoring for Fast Lane routing). Tier 2 (task-coordinator)
+executes. These three concerns never mix.
+
+### Build/Lint is Absolute Truth
+`npx tsc --noEmit` and `npx eslint` define correctness. Domain skills and
+patterns are advisory. Code that compiles and passes lint ships; non-compiling
+code never ships. Build/lint failure is always BLOCKING, never downgradable.
+Edge-judge runs build/lint as P0 gate before any domain checks.
+
+### Fast Lane Routing
+Tasks with composite complexity C(T) < 0.25 (1 task, ≤ 2 files) take a
+reduced pipeline: `hotpatch-implementer → lite-verifier → apply`. Skips
+discovery, architect, verifier-pair, fixer loop, edge-judge, aggregation,
+and global-judge. Lite Verifier only checks syntax, scope, and citations.
+BLOCKING verdict escalates to full DAG immediately.
 
 ## Agent Routing
 
 | Task Domain | Verification Agent |
 |---|---|
-| effect-ts | `effect-ts-review` or `verifier` with domain=effect-ts |
-| react-vite | `react-vite-review` or `verifier` with domain=react-vite |
-| shared | `verifier` with domain=shared |
+| effect-ts | `verifier` with domain=effect-ts → loads `effect-ts` + `effect-ts-anti-patterns` |
+| react-vite | `verifier` with domain=react-vite → loads `react-vite-conventions` + `react-vite-anti-patterns` |
+| shared | `verifier` with domain=shared → loads `fullstack-boundary` |
 
 ## Integration Notes
 

@@ -1,57 +1,51 @@
 ---
 name: mas-decision
-description: Ship judgment framework. Maps subagent evidence to ship decisions using a decision matrix with confidence levels and verdict combination rules. Loaded by all ship orchestrator agents.
----
-
-# MAS Decision Framework
-
-This skill defines HOW an orchestrator converts aggregated subagent evidence into a ship judgment. It does NOT aggregate — that's `mas-aggregation`. It does NOT classify tasks or delegate — that's the ship agent's responsibility.
-
+description: Ship judgment framework. Decision matrix from subagent evidence, multi-domain
+verdict combination, formal confidence formula. Loaded by all ship orchestrators.
 ---
 
 ## Decision Matrix
 
-Map review agent verdicts to ship judgments:
-
 | Review Verdict | Condition | Ship Judgment |
 |---|---|---|
-| READY TO SHIP | All agents: format VALID, no gaps, no conflicts | **Safe to ship** |
-| READY TO SHIP | Minor gaps (LOW confidence findings) exist but no blocking issues | **Safe to ship with explicit follow-up** |
-| NEEDS FIXES | Blocking issues flagged by review (Blocking? = YES) | **Not ready to ship** |
-| NEEDS FIXES | Non-blocking issues only (Blocking? = NO for all) | **Safe to ship with explicit follow-up** |
-| NEEDS FIXES | Ambiguous — can't tell if issues are blocking | **Not ready to ship** — escalate to user |
-| NOT READY TO SHIP | Any reason | **Not ready to ship** — ALWAYS |
-
----
+| READY TO SHIP | All agents VALID, no gaps, no conflicts | Safe to ship |
+| READY TO SHIP | Minor gaps, no blocking | Safe to ship with follow-up |
+| NEEDS FIXES | Blocking issues (Blocking? = YES) | Not ready to ship |
+| NEEDS FIXES | Non-blocking only | Safe to ship with follow-up |
+| NEEDS FIXES | Ambiguous | Not ready to ship |
+| NOT READY TO SHIP | Any reason | Not ready to ship |
 
 ## Multi-Domain Verdict Combination
 
-When coordinating multiple domains (fullstack-ship), combine verdicts:
-
-| Backend Verdict | Frontend Verdict | Boundary | Ship Judgment |
+| Backend | Frontend | Boundary | Ship Judgment |
 |---|---|---|---|
 | READY TO SHIP | READY TO SHIP | PASS | Safe to ship |
-| READY TO SHIP | NEEDS FIXES | PASS | Safe to ship with explicit follow-up |
+| READY TO SHIP | NEEDS FIXES | PASS | Safe to ship with follow-up |
 | NEEDS FIXES | * | — | Not ready to ship |
 | * | NEEDS FIXES | — | Not ready to ship |
 | NOT READY TO SHIP | * | — | Not ready to ship |
 | * | NOT READY TO SHIP | — | Not ready to ship |
 | * | * | FAIL | Not ready to ship |
 
----
+## Confidence Formula
 
-## Decision Confidence
+```
+C = α·C_cit + β·C_ver + γ·C_gj
+α = β = γ = 1/3
+```
 
-Every ship judgment includes a confidence level:
+| Component | Source | Formula |
+|---|---|---|
+| C_cit | verifier | `cited_changes / total_changes` |
+| C_ver | verifiers | 1.0 both PASS, 0.5 mixed, 0.0 both FAIL |
+| C_gj | global-judge | `integrity_score / 100` |
 
-| Confidence | Condition |
-|---|---|
-| **HIGH** | All agent outputs validated, HIGH confidence findings, no gaps, no conflicts |
-| **MEDIUM** | Minor gaps (LOW confidence findings, non-blocking issues) |
-| **LOW** | Significant gaps, conflicts, or LOW confidence + HIGH severity findings → escalate to user with explicit low-confidence warning |
+Unavailable component → redistribute its weight equally: `w_i = 1/k`.
 
----
+### Level Mapping
 
-## Integration
-
-Load alongside `mas-aggregation` and `mas-feedback` in every ship orchestrator. This skill handles decisions only.
+| C Range | Level | Action |
+|---|---|---|
+| C ≥ 0.80 | HIGH | Safe to ship |
+| 0.50 ≤ C < 0.80 | MEDIUM | Ship with caveats |
+| C < 0.50 | LOW | Escalate — do not auto-ship |

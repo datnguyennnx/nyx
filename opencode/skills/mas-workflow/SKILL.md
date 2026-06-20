@@ -1,198 +1,112 @@
 ---
 name: mas-workflow
-description: Dynamic workflow patterns. Fan-out task decomposition, per-task pipeline (implementer→verifiers→fixer→edge-judge), fan-in AST aggregation, global integrity judgment, dynamic re-spin protocol (max 2/lane). Confidence scoring. Loaded by orchestrators and task coordinators.
----
-
-## Architecture
-
-```
-Orchestrator(ship) → kicks off N tasks → N×TaskCoordinator
-  Each: Imp → VerA + VerB → Fixer → Edge Judge (APPROVED|REJECTED→re-spin)
-  All N APPROVED → AST Aggregator → Global Judge → mas-decision → HITL
-```
-
+description: Dynamic workflow patterns — entropy-driven decomposition, per-task pipeline
+(implementer→verifiers→fixer→edge-judge), fan-in aggregation, re-spin (max 2/lane),
+formal confidence scoring. Loaded by orchestrators and task coordinators.
 ---
 
 ## Pattern 1: Task Decomposition (Fan-Out)
 
-### When to Decompose
-| Condition | By | Example |
-|---|---|---|
-| >10 files | File cluster | "domain layer, infra layer" |
-| Multiple independent concerns | Concern | "error handling, concurrency" |
-| Multiple services/modules | Service boundary | "UserService, OrderService" |
-| Refactoring across codebase | Directory/package | "src/auth, src/billing" |
-| Multiple UI components | Component tree | "Header+Nav, Forms" |
+### Trigger (entropy-driven, per `mas-complexity-scoring`)
 
-### Rules
-- **Independence**: Tasks MUST NOT modify same files. If overlap → merge or split by line ranges.
-- **Granularity**: 1-5 files ideal, max 10 per task.
-- **Ordering**: If B depends on A → sequential (A→wait→B), not parallel.
+| Condition | Action |
+|---|---|
+| H_norm > 0.70 | Decompose by file cluster |
+| \|task_set\| > 1 | Pre-decomposed — honor it |
+| I_norm > 0 | Isolate at service boundary |
+| D_JS > 0.15 | Split by domain |
 
-### Task Definition
+### Granularity
+
 ```
-| task_id | scope | objective | constraints | dependencies | expected_output |
+n_max = ⌈2^{H_norm}⌉ + 1 files per task
 ```
 
----
+| H_norm | n_max |
+|---|---|
+| 0 | 2 |
+| 0.5 | 3 |
+| 1.0 | 4 |
+
+### Independence
+
+Tasks MUST NOT share files. Overlap → compute I(U_j; U_k). I > 0 → sequential. I = 0 → parallel.
 
 ## Pattern 2: Per-Task Pipeline
 
-### Stage 1: Implementer
-Minimal changes within scope. Include `file:line` citations for every change. Output → verifiers.
+### Implementer → Verifiers (×2) → Fixer → Edge Judge
 
-### Stage 2: Verifiers (×2)
-| Check | What |
+| Stage | Checks |
 |---|---|
-| Correctness | Solves the task? Right place? Breaks existing behavior? |
-| Boundaries | Limited to task scope? Files outside untouched? |
-| Citations | Every file:line claim exists and matches described change? |
-| Quality | Domain conventions? Anti-patterns? |
-| Minimality | Smallest change that solves the task? |
+| Implementer | Minimal changes, `file:line` citations, output to verifiers |
+| Verifier ×2 | Correctness, boundaries, citations, quality, minimality |
+| Fixer | Fix all BLOCKING. Non-blocking if safe. Never expand scope. |
+| Edge Judge | SYNTAX_ERROR, SCOPE_ESCAPE, DATA_HOLLOWING |
 
-Output:
-```
-## Verification Report | [task_id]
-### Issues Found | #|Issue|Location|Severity|Confidence|Blocking?|
-### Positive Findings | #|Finding|Confidence|
-### Verdict | NEEDS_FIXES / LOOKS_GOOD / UNCERTAIN | Confidence: HIGH/MED/LOW
-```
+Verifier output: issues table + verdict (NEEDS_FIXES/LOOKS_GOOD/UNCERTAIN).
 
-### Stage 3: Fixer
-Receives: implementer output + both verifier reports + task definition. Fixes all BLOCKING issues. Address non-blocking if safe. Never silently expand scope.
+Fixer output: fixes applied, disagreements resolved, scope compliance, corrected implementation.
 
-Output:
-```
-## Fixer Report | [task_id]
-### Fixes Applied | #|Issue|Verifier|Fix|Location|
-### Disagreements Resolved | #|V1|V2|Resolution|
-### Scope Compliance | YES/NO
-### Final Output | [corrected implementation]
+Edge Judge output (JSON):
+```json
+{"verdict":"APPROVED|REJECTED","early_abort_triggered":true|false,"fault_vector":{"severity":"NONE|LOW|CRITICAL","anomaly_type":"NONE|SYNTAX_ERROR|SCOPE_ESCAPE|DATA_HOLLOWING","description":"..."},"checks_run":{"syntax_compliance":"PASS|FAIL","data_hollowing":"PASS|FAIL","scope_escape":"PASS|FAIL"}}
 ```
 
-If fixer made significant changes → re-verify with ≥1 verifier before proceeding.
+### Re-spin
 
-### Stage 4: Edge Judge (Layer 2)
-After fixer produces output, spawn `edge-judge`. Checks: SYNTAX_ERROR, SCOPE_ESCAPE, DATA_HOLLOWING.
+`early_abort_triggered: true` → discard, pass fault_vector to fresh fixer. Max 2 per lane. 3rd → escalate.
 
-Output (JSON):
-```
-{"verdict":"APPROVED|REJECTED","early_abort_triggered":true|false,"fault_vector":{"severity":"NONE|LOW|CRITICAL","anomaly_type":"NONE|SYNTAX_ERROR|SCOPE_ESCAPE|DATA_HOLLOWING","description":"feedback for re-spin"},"checks_run":{"syntax_compliance":"PASS|FAIL","data_hollowing":"PASS|FAIL","scope_escape":"PASS|FAIL"}}
-```
-
-#### Dynamic Re-Spin
-`early_abort_triggered: true` → discard lane, pass `fault_vector.description` as hard constraint to fresh fixer, new lane_id. Other lanes unaffected. **Max 2 re-spins per lane**. 3rd → escalate orchestrator.
-
-Only APPROVED patches flow to AST Aggregator.
-
----
+Only APPROVED → AST Aggregator.
 
 ## Pattern 3: Fan-In (Aggregation + Judgment)
 
-### Stage 1: Collect APPROVED
-Orchestrator collects all Edge-Judge-APPROVED patches from all N coordinators.
+1. Collect all Edge-Judge-APPROVED patches
+2. AST Aggregator: dependency matrix, collision detection → consolidated patch
+3. Global Judge: cross-reference requirements → integrity score → APPROVED/APPROVED_WITH_NOTES/NEEDS_REMEDIATION
+4. Only APPROVED/APPROVED_WITH_NOTES → `mas-decision`
 
-### Stage 2: AST Aggregator (Layer 3)
-Spawn `ast-aggregator` with N approved patches. Builds dependency matrix, detects collisions (LINE_OVERLAP, VARIABLE_COLLISION, IMPORT_CONFLICT, SIGNATURE_DIVERGENCE, PATTERN_INCONSISTENCY, ORDERING_VIOLATION), resolves by interface integrity priority.
-
-If unresolvable → ISOLATES conflicting branches, returns PARTIAL_CONFLICT → orchestrator spawns conflict-resolution worker.
-
-### Stage 3: Global Judge (Layer 4)
-Spawn `global-judge` with consolidated patch + original instruction set. Cross-references every requirement to a mutation. Computes integrity score.
-
-Output:
-```
+Global Judge output:
+```json
 {"verdict":"APPROVED|APPROVED_WITH_NOTES|NEEDS_REMEDIATION","integrity_score":0-100,"integrity_level":"FULL_INTEGRITY|MINOR_GAPS|SIGNIFICANT_GAPS|CORRUPTED","coverage":{"total":N,"covered":N,"missing":0},"mutations":{"total":N,"justified":N,"derived":N,"unplanned":0},"regression_vectors":[],"remediation":{"blocking_issues":[],"non_blocking_issues":[],"recommended_action":""}}
 ```
 
-Only APPROVED/APPROVED_WITH_NOTES → mas-decision.
+### Cross-Task Conflict Detection
 
-### Stage 4: Cross-Task Conflict Detection
 | Type | Resolution |
 |---|---|
-| Same file by 2+ tasks | ESCALATE (violates independence) |
-| Inconsistent patterns | FLAG architect review |
+| Same file by 2+ tasks | ESCALATE |
+| Inconsistent patterns | FLAG architect |
 | Missing integration | GAP → follow-up task |
 | Boundary drift | ESCALATE |
 
-### Aggregation Table
+## Confidence Scoring
+
 ```
-| Task | Status | Edge Judge | AST Merge | Global Judge | Confidence | Cross-Task Issues |
+C = α·C_cit + β·C_ver + γ·C_edge + δ·C_gj
+α = β = γ = δ = 0.25
 ```
 
-### Confidence Scoring
-| Condition | Score |
+| Signal | Source | Formula | Range |
+|---|---|---|---|
+| C_cit | verifier | `cited_changes / total_changes` | [0,1] |
+| C_ver | verifiers | 1.0 both PASS, 0.5 mixed, 0.0 both FAIL | [0,1] |
+| C_edge | edge-judge | 1.0 first pass, 0.5 1 re-spin, 0.0 2 re-spins | [0,1] |
+| C_gj | global-judge | `integrity_score / 100` | [0,1] |
+
+Inapplicable component → `w_i = 1/k` where k = active components.
+
+| C Range | Level |
 |---|---|
-| Implementer citations valid | +1 |
-| Both verifiers agree (positive) | +2 |
-| Both verifiers agree (negative fixed) | +1 |
-| Edge Judge APPROVED first pass | +2 |
-| Edge Judge APPROVED after 1 re-spin | +0 |
-| Edge Judge APPROVED after 2 re-spins | -1 |
-| AST Aggregator MERGED no conflict | +2 |
-| AST Aggregator MERGED with auto-resolve | +0 |
-| Global Judge FULL_INTEGRITY | +3 |
-| Global Judge APPROVED_WITH_NOTES | -1 |
-| Verifiers disagree | -1 |
-| Fixer scope expansion | -2 |
+| ≥ 0.80 | HIGH |
+| 0.50 – 0.80 | MEDIUM |
+| < 0.50 | LOW → escalate |
 
-High ≥6 | Medium 3-5 | Low ≤2 → ESCALATE
+## Pipeline Mode Selection
 
----
+Determined by C(T) from `mas-complexity-scoring`:
 
-## Pattern 4: Task Coordinator (N > 10)
-
-Manages subset of tasks. Runs per-task pipeline (implementer→verifiers→fixer→edge judge) for each. Aggregates subset. Reports to orchestrator.
-
-Use when: N > 10, multi-domain, or context budget concerns.
-
----
-
-## Context Budget
-
-| Agents Spawned | Action |
+| C(T) | Mode |
 |---|---|
-| <20 | Normal |
-| 20-50 | Prefer coordinators. Write per-task state. |
-| 50-100 | Batch max 10 parallel. Warn user. |
-| >100 | Require user confirmation |
-
-| Strategy | Implementation |
-|---|---|
-| Task isolation | Each agent sees only its task definition |
-| Checkpointing | `.opencode/tasks/[task_id].md` |
-| Streaming | Aggregate as tasks complete |
-| Batched fan-out | Batch of 10 → aggregate → next batch |
-| Early termination | Systemic issue → abort remaining |
-
----
-
-## Decision: Linear vs Dynamic
-
-| Use Linear | Use Dynamic |
-|---|---|
-| <5 files | >10 files or multiple modules |
-| Single concern | Multiple independent concerns |
-| High coupling | Changes isolatable by boundary |
-| Context tight | Context healthy |
-
-2+ right-column conditions → dynamic.
-
----
-
-## Anti-Patterns
-
-| Mistake | Fix |
-|---|---|
-| Decompose tightly-coupled change | Keep linear |
-| 1 verifier | Always 2 |
-| Fixer silently expands scope | Flag scope expansion |
-| No cross-task checks | Run conflict detection |
-| Spawn 100+ at once | Batch 10, use coordinators |
-| No per-task checkpoint | Write `.opencode/tasks/[id].md` |
-| Skip Edge Judge | Run after fixer before aggregation |
-| Proceed with REJECTED Edge Judge | Enforce AUTO-ABORT |
-| Manual diff concat without AST Aggregator | Use AST Aggregator |
-| Skip Global Judge | Cross-reference instruction set |
-| >2 re-spins per lane | Cap at 2, escalate 3rd |
-| Worker >4K tokens | Dehydrate before spawn |
+| < 0.25 | Linear |
+| 0.25 – 0.60 | Hybrid |
+| ≥ 0.60 | Dynamic |

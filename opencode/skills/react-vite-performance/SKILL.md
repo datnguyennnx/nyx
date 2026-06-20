@@ -1,123 +1,76 @@
 ---
 name: react-vite-performance
-description: Diagnose and fix render performance, bundle optimization, Vite 8+ build configuration, and React 19+ rendering efficiency issues.
+description: Render performance, bundle optimization, Vite 8+ build configuration with Rolldown, React 19+ rendering efficiency, and resource preloading.
 ---
 
-# Purpose
-This skill ensures React 19+ / Vite 8+ applications achieve optimal runtime render performance, bundle size, and build configuration by leveraging modern APIs and Rolldown optimization.
+## Vite 8 Build Architecture
 
-# Use when
-Reviewing React 19+ / Vite 8+ code to:
-- Optimize component re-render behavior (unnecessary re-renders, memoization, state locality)
-- Configure Vite 8 build optimization (Rolldown chunk splitting, code splitting, tree-shaking)
-- Leverage React 19 rendering APIs (useTransition, useDeferredValue, Suspense streaming)
-- Optimize data fetching patterns (parallel fetching, streaming SSR, progressive loading)
-- Configure resource loading (preload, preinit, prefetchDNS, preconnect)
-- Reduce client bundle size (dynamic imports, code splitting)
-- Identify and fix hydration performance issues
+| Setting | Vite 8 Reality |
+|---|---|
+| Default bundler | **Rolldown** (Rust-powered, unified dev+prod pipeline) |
+| Parser/transformer | **Oxc** for parsing, transforming, minifying |
+| Plugin compatibility | Rollup-compatible plugin API. Rolldown natively supports existing Rollup plugins. |
+| Legacy fallback | `builder: 'rollup'` for projects not yet migrated. Use `rollupOptions` only when Rollup builder is active. |
+| React plugin | `@vitejs/plugin-react` v6 or `@vitejs/plugin-react-swc`. Oxc transforms, `jsxRuntime: 'automatic'`. |
+| Path aliases | `resolve.tsconfigPaths: true` instead of manual alias config |
 
-# Inputs
-- React component files with render patterns (re-renders, memoization usage)
-- Vite configuration files (vite.config.ts)
-- Bundle analysis reports (Rolldown visualizer, chunk sizes)
-- Network waterfall data (sequential vs parallel fetching)
-- Component tree depth and composition patterns
-- Dynamic import patterns and code splitting configuration
-- Resource loading strategy (fonts, images, scripts, stylesheets)
-- SSR streaming configuration
+## React 19 Performance APIs
 
-# Core principles
-- React 19 useTransition handles pending state and re-render prioritization automatically — don't reinvent manually
-- Re-render optimization starts with state locality — push state down to the components that need it
-- Memoization (React.memo, useMemo, useCallback) is a last resort after state locality and composition
-- Rolldown tree-shaking requires proper module boundaries — avoid barrel files that re-export everything
-- Code splitting should be at route boundaries by default, lazy-loaded for below-fold content
-- Resource loading should use Vite 8 preload APIs (preinit, preload) for critical resources
-- Streaming SSR with Suspense boundaries provides progressive page load
+| API | Use for |
+|---|---|
+| `useTransition` | Non-urgent state updates — keeps UI responsive during async work |
+| `useDeferredValue(value, initialValue)` | Deferred search/filter inputs. `initialValue` for first render. |
+| `use(promise)` + Suspense | Data loading with streaming. Promise must be cached/stable — never created in render. |
+| `useOptimistic` | Instant UI feedback with automatic error rollback |
+| `React.memo` | ONLY after profiling confirms unnecessary re-renders |
+| `prefetchDNS`, `preconnect`, `preload`, `preinit` (from `react-dom`) | Resource hints for fonts, scripts, stylesheets, API origins |
 
-# Preferred patterns
-- Use `useTransition` for non-urgent state updates to keep UI responsive
-- Use `useDeferredValue` with initial value for search/filter inputs
-- Use `React.memo` only after profiling confirms unnecessary re-renders
-- Push state down to leaf components to minimize re-render scope
-- Use dynamic `import()` for route-level code splitting and below-fold content
-- Configure Rolldown `output.manualChunks` for vendor splitting
-- Use `preload` and `preinit` from `react-dom` for critical resource hints
-- Use `<link rel="stylesheet" precedence="...">` for stylesheet ordering
-- Use Suspense boundaries for streaming progressive content
-- Use Vite 8 `resolve.tsconfigPaths` instead of manual alias configuration
-- Use `@vitejs/plugin-react` v6 with Oxc for fast React Refresh transforms
-- Use Rolldown-compatible plugin API (existing Rollup plugins work natively)
+## Detection Table
 
-# Anti-patterns
-- **Premature memoization**: Adding `React.memo`, `useMemo`, `useCallback` without profiling evidence of render performance issues
-- **State in ancestor components**: Placing state high in the tree when only leaf components need it, causing broad re-renders
-- **Inline reference creation**: Creating new object/function references in render that trigger child re-renders (inline styles, callbacks without stable reference)
-- **Missing code splitting**: Importing entire heavy libraries (charting, editors) at the top level instead of lazy-loading
-- **Waterfall data fetching**: Sequential `await` calls in async components that could be parallelized with `Promise.all`
-- **No Suspense boundaries**: Monolithic Suspense boundaries or none at all, preventing streaming content
-- **Over-bundling**: Single large chunk instead of vendor splitting for framework, UI library, and app code
-- **Barrel file tree-shaking break**: Large index.ts files that re-export everything, preventing Rolldown from eliminating unused code
-- **Synchronous rendering block**: Heavy computation in render path without `useTransition` or `useDeferredValue` deferral
-- **Unoptimized resource loading**: No preload/preinit hints for critical fonts, scripts, or stylesheets
-- **Client-side data fetching for SSR content**: Using client-side fetch for data available at request time on the server
-- **Missing key warnings**: Using index keys on dynamic lists causing reconciliation issues
+| Anti-pattern | Detect | Severity |
+|---|---|---|
+| Premature memoization | `React.memo`/`useMemo`/`useCallback` without profiling evidence | LOW |
+| State in ancestor | State high in tree when only leaves need it → broad re-renders | MEDIUM |
+| Inline reference creation | New objects/functions in render triggering child re-renders | MEDIUM |
+| Missing code splitting | Heavy libs (>50KB, charting, editors) imported at top level | HIGH |
+| Waterfall data fetching | Sequential `await` chains that could be `Promise.all` | HIGH |
+| No Suspense boundaries | Monolithic or absent boundaries preventing streaming SSR | MEDIUM |
+| Over-bundling | Single large chunk instead of vendor/app splitting | HIGH |
+| Barrel file tree-shaking break | Re-export-all `index.ts` files preventing Rolldown tree-shaking | MEDIUM |
+| Sync rendering block | Heavy compute in render path without `useTransition`/`useDeferredValue` | MEDIUM |
+| Unoptimized resource loading | No `preload`/`preinit` hints for critical fonts, scripts, styles | MEDIUM |
+| Client-side fetch for SSR data | Client `fetch` for data available at request time on server | HIGH |
+| Index keys on dynamic lists | Array index keys on reorderable lists causing reconciliation issues | LOW |
+| Stale Vite config | `esbuild`/`rollupOptions` without checking builder | LOW |
 
-# Workflow
-1. Profile component re-render behavior — identify components re-rendering unnecessarily
-2. Check state placement — is state at the lowest possible level in the tree?
-3. Identify components with `React.memo`, `useMemo`, `useCallback` — verify with profiling data, flag premature memoization
-4. Analyze bundle composition — check for missing code splitting, over-bundling, barrel file issues
-5. Review data fetching patterns — sequential awaits that could be parallelized, client-side fetching for SSR-available data
-6. Check Suspense boundary placement — are there granular boundaries for streaming?
-7. Verify resource loading strategy — preload/preinit hints for critical resources
-8. Review Vite config — Rolldown configuration, plugin compatibility, tsconfig paths, optimization settings
-9. Check dynamic import patterns — route-level splitting and below-fold lazy loading
-10. Document each finding with location, performance impact, and recommended optimization
+## Metrics
 
-# Output contract
-Return findings with:
-- File location and line numbers
-- Specific performance issue (from anti-patterns list above)
-- Explanation of performance impact (render cost, bundle size, network waterfall, hydration delay)
+| Threshold | Severity |
+|---|---|
+| Initial bundle >500KB uncompressed | HIGH |
+| Visible rendering lag >100ms | HIGH |
+| Sequential fetching adding >1s LCP | HIGH |
+| Unnecessary re-renders across multiple components | MEDIUM |
+| Missing code splitting for >50KB dependencies | MEDIUM |
+
+## Severity
+
+| Level | Criteria |
+|---|---|
+| HIGH | Measurable performance regression (bundle, LCP, rendering lag) |
+| MEDIUM | Performance degradation under load, missing optimization |
+| LOW | Premature optimization, suboptimal but functional |
+
+## Output per finding
+- File:line location
+- Performance issue
+- Estimated impact with metric
 - Recommended optimization with code example
-- Estimated impact (low/medium/high based on profiling data or heuristic)
-- Whether it requires code changes, config changes, or both
+- Requires: code change / config change / both
 
-# Severity Criteria
-When assigning risk levels, use these definitions:
-- **HIGH**: Bundle size >500KB uncompressed for initial load, visible rendering lag >100ms, sequential data fetching adding >1s LCP — measurable performance regression
-- **MEDIUM**: Unnecessary re-renders affecting multiple components, missing code splitting for heavy dependencies, barrel files preventing tree-shaking — performance degradation under load
-- **LOW**: Premature memoization that doesn't hurt yet, suboptimal chunk splitting, missing resource hints — works but doesn't follow best practices
-
-# Acceptable Patterns (do NOT flag)
-These patterns are correct usage — do not flag them as anti-patterns:
-- `React.memo` on components that profiling confirms re-render unnecessarily — this IS justified memoization
-- `useMemo` for expensive computations that profiling confirms are costly — this IS correct
-- `useCallback` for callbacks passed to memoized children — this IS correct when children are memoized
-- `useTransition` for non-urgent state updates — this IS correct prioritization
-- `useDeferredValue` with initial value for search inputs — this IS correct deferral
-- Dynamic `import()` for route-level code splitting — this IS recommended
-- Suspense boundaries around async content — this IS required for streaming
-- Vite 8 Rolldown `output.manualChunks` for vendor splitting — this IS recommended
-- `preload`/`preinit` for critical resources — this IS recommended resource loading
-
-# Related Skills
-Orchestrator may load these based on task shape — skills do not delegate directly:
-- react-vite-anti-patterns: legacy API detection, tree-shaking issues
-- react-vite-performance: render performance, bundle optimization
-- react-vite-error-handling: Error Boundary and Suspense coverage
-
-# Vite 8 Build Context
-- Default builder: Rollup (Vite 8 default — Rolldown is opt-in)
-- Rolldown opt-in: explicit `builder: 'rolldown'` in vite.config.ts required
-- When Rolldown active: use `rolldownOptions` (not `rollupOptions`)
-- When Rolldown NOT active: use `rollupOptions` as before
-- `@vitejs/plugin-react` v6 with Oxc: requires `jsxRuntime: 'automatic'`
-
-# Guardrails
-- Never suggest memoization without profiling evidence or clear heuristic justification
-- Do not suggest code splitting for components that render above the fold on initial load
-- Avoid over-splitting chunks — too many small chunks creates network overhead
-- Preserve existing Suspense boundary placements unless they are missing or monolithic
-- Do not suggest removing barrel files without verifying the module boundary patterns are preserved
+## Guardrails
+- Never suggest memoization without profiling evidence or clear heuristic (>5 re-renders/sec).
+- Do not code-split above-fold content.
+- Avoid over-splitting — many tiny chunks create network overhead.
+- Preserve Suspense boundaries unless missing or monolithic.
+- Verify builder (Rolldown vs Rollup) before suggesting `rolldownOptions` vs `rollupOptions`.

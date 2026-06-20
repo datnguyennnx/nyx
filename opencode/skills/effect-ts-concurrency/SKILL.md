@@ -1,120 +1,75 @@
 ---
 name: effect-ts-concurrency
-description: Manage concurrent operations with proper fiber usage, interruption handling, and bounded parallelism using Effect primitives.
+description: Concurrent operations in Effect-TS v4 — fiber management, interruption handling, bounded parallelism using Effect primitives.
 ---
 
-# Companion Skill
-Load `effect-ts` alongside this skill for research strategy, installation guidelines, and access to detailed reference guides. The main `effect-ts` skill provides the canonical research methodology: local guides first → codebase patterns → Effect source code.
+## v4 Renames
 
-# Purpose
-This skill ensures Effect-TS code uses concurrency primitives correctly with proper fiber management, interruption awareness, and bounded parallelism to prevent resource exhaustion and maintain correctness.
+| v3 | v4 |
+|---|---|
+| `fork` | `forkChild` |
+| `forkDaemon` | `forkDetach` |
+| `forkAll` | DELETED → use `Effect.forEach` with `forkChild` per element |
+| `forkWithErrorHandler` | DELETED |
 
-# Use when
-Reviewing Effect-TS code to:
-- Replace unsafe Promise-based concurrency with fiber-native approaches (Effect.forkChild, etc.)
-- Apply appropriate bounds to concurrent operations (using concurrency options or Semaphore)
-- Ensure interruption safety for concurrent operations (using Effect.ensure, Effect.addFinalizer)
-- Choose correct coordination primitives (Queue, Deferred, Semaphore, Ref) based on actual needs
-- Detect runaway fan-out and missing backpressure (unbounded concurrent operations)
-- Distribute work appropriately across available resources (parallel vs sequential considerations)
+## Core Principles
 
-# Inputs
-- Effect.forkChild, Effect.forkScoped, Effect.forkDetach usage
-- Concurrent collections (Effect.forEach, Effect.parallel, Effect.partition etc.)
-- Queue, Deferred, Semaphore, Ref, PubSub usage and creation patterns
-- Effect.race and Effect.firstSuccessOf usage patterns
-- Fiber interruption handling (Effect.interrupt, Effect.onInterrupt)
-- Resource usage in concurrent contexts (database connections, file handles, etc.)
-- Effect.schedule usage for retry/timing in concurrent operations
+- Concurrency must be intentional and bounded to prevent resource exhaustion
+- Fibers are lightweight but not free — avoid unbounded creation
+- Interruption must be handled properly for resource safety (finalizers must run)
+- Choose coordination primitives based on actual coordination needs — don't over-coordinate
+- Prefer collection concurrency (`Effect.forEach`) with bounds over manual fork management
+- `Semaphore` for resource limiting, `Queue` for producer/consumer with backpressure
+- `Deferred` for one-time synchronization between fibers, `Ref` for coordinated state updates
+- Proper error propagation in concurrent contexts — don't swallow errors from fibers
 
-# Core principles
-- Concurrency must be intentional and bounded where appropriate to prevent resource exhaustion
-- Fibers are lightweight but not free - avoid unbounded creation that can lead to memory issues
-- Interruption must be handled properly for resource safety (finalizers must run on interruption)
-- Choose coordination primitives based on actual coordination needs (don't over-coordinate)
-- Prefer collection concurrency (Effect.forEach) with bounds over manual fork management
-- Use Semaphore for resource limiting, Queue for producer/consumer patterns with backpressure
-- Use Deferred for one-time synchronization between fibers, Ref for coordinated state updates
-- Ensure proper error propagation in concurrent contexts (don't swallow errors from fibers)
+## Preferred Primitives (v4)
 
-# Preferred patterns
-- Use Effect.forEach with { concurrency: n } for bounded parallelism (replaces the removed `forkAll`)
-- Apply Effect.retry or Effect.timeout to individual concurrent operations when appropriate
-- Use Semaphore to limit concurrent resource acquisition (database connections, file handles, etc.)
-- Use Queue for producer/consumer patterns where producers may outpace consumers
-- Use Deferred for one-time event signaling between fibers (not for repeated coordination)
-- Use Ref for shared state that needs atomic updates (Effect.update, Effect.modify)
-- Use Effect.race with cancellation awareness (race winners should cancel losers when appropriate)
-- Handle fiber interruption with Effect.addFinalizer or Effect.ensure for resource cleanup
-- Use Effect.scoped with concurrent operations when resources need deterministic cleanup
+| Primitive | Use for |
+|---|---|
+| `Effect.forEach` + concurrency | Bounded parallelism over collections (replaces deleted `forkAll`) |
+| `Effect.forkChild` | Supervised child fiber — tied to parent Scope |
+| `Effect.forkDetach` | Detached fiber with explicit supervision strategy |
+| `Semaphore` | Resource limiting (DB connections, file handles) |
+| `Queue` (bounded/sliding) | Producer/consumer with backpressure |
+| `Deferred` | One-time synchronization between fibers |
+| `Ref` + atomic ops | Shared state with `Effect.update` / `Effect.modify` |
+| `Effect.race` + cancellation | Competitive execution with loser cleanup |
+| `Effect.addFinalizer` / `ensure` | Resource cleanup on fiber interruption |
+| `Effect.scoped` | Deterministic cleanup for concurrent resources |
 
-# Anti-patterns
-- Unbounded concurrency: forking many fibers at once on large collections without Semaphore or concurrency limits
-- Ignoring interruption: not cleaning up resources when fibers are interrupted (missing finalizers)
-- Misusing primitives: using Queue when simple Ref or effect suffices for state sharing
-- Lost updates: concurrent Ref modification without atomic operations (use Effect.update/modify)
-- Unbounded Queues: Queue.unbounded without backpressure considerations in producer/consumer
-- Fire-and-forget: Effect.forkDetach without supervision strategy or error handling
-- Missing error handling: concurrent operations that swallow errors instead of propagating or logging
-- Over-coordination: using Semaphore or Queue when simple parallelism with bounds suffices
-- Race conditions: checking-then-acting on shared state without atomic operations
-- Blocking operations in fibers: using synchronous blocking calls that prevent fiber yielding
+## Anti-patterns
 
-# Workflow
-1. Identify all forkChild/forkDetach/forkScoped usage and assess if bounding is needed
-2. Check for bounded parallelism in concurrent collections (look for concurrency option)
-3. Review Queue, Deferred, Semaphore, Ref usage for correctness (match primitive to problem)
-4. Verify interruption handling in long-running fibers (look for Effect.ensure/addFinalizer)
-5. Look for runaway fan-out patterns (unbounded concurrent operations without limits)
-6. Ensure proper error propagation in concurrent contexts (errors should not be silently swallowed)
-7. Validate coordination primitives match actual coordination needs (is coordination really needed?)
-8. Check for blocking operations in fibers that would prevent yielding and cause starvation
-9. Document each finding with location, problem explanation, and fix recommendation using Effect primitives
+| Pattern | Detect | Severity |
+|---|---|---|
+| v3 API usage | `fork`, `forkDaemon`, `forkAll`, `forkWithErrorHandler` | HIGH |
+| Unbounded concurrency | Many fibers without Semaphore or concurrency limits | HIGH |
+| Ignoring interruption | No finalizers/cleanup on fiber interruption | HIGH |
+| Lost updates | Concurrent Ref modification without atomic ops (`Effect.update`/`modify`) | HIGH |
+| Fire-and-forget | `Effect.forkDetach` without supervision or error handling | HIGH |
+| Missing error propagation | Concurrent ops swallowing errors | HIGH |
+| Blocking in fibers | Sync blocking calls preventing fiber yielding | HIGH |
+| Unbounded Queues | `Queue.unbounded` without backpressure consideration | MEDIUM |
+| Race conditions | Check-then-act on shared state without atomic ops | MEDIUM |
+| Misusing primitives | Queue for simple state sharing (use Ref), Deferred for repeated signaling (use Queue) | LOW |
+| Over-coordination | Semaphore/Queue when simple parallelism with bounds suffices | LOW |
 
-# Output contract
-Return findings with:
-- File location and line numbers
-- Specific concurrency issue (from anti-patterns list above)
-- Explanation of why it risks resource exhaustion or correctness problems (memory leaks, deadlocks, etc.)
-- Recommended fiber-native or bounded alternative with code example
-- Risk level (low/medium/high)
-- Verification notes for any Effect-TS claims made regarding concurrency
+## Severity
 
-# Severity Criteria
-When assigning risk levels, use these definitions:
-- **HIGH**: Resource exhaustion, memory leak, deadlock, data corruption — will cause failures under real-world concurrency
-- **MEDIUM**: Unbounded behavior that degrades under load, missing interruption handling that causes stuck fibers, incorrect coordination that may cause race conditions — not always crashing but unreliable
-- **LOW**: Over-coordination where simple parallelism suffices, suboptimal primitive choice that works but isn't idiomatic — functionally correct but not best practice
+| Level | Criteria |
+|---|---|
+| HIGH | Resource exhaustion, memory leak, deadlock, data corruption, v3 API won't compile |
+| MEDIUM | Degradation under load, stuck fibers, potential race conditions |
+| LOW | Over-coordination, suboptimal primitive choice — correct but not idiomatic |
 
-# Acceptable Patterns (do NOT flag)
-These patterns are correct usage — do not flag them as anti-patterns:
-- `Effect.forEach` with `{ concurrency: n }` — this IS bounded parallelism
-- `Effect.forkChild` with proper supervision and `Fiber.join` — this IS correct fiber usage
-- `Queue.bounded` or `Queue.sliding` with explicit capacity — this IS proper backpressure
-- `Semaphore` with explicit permit count limiting resource access — this IS proper bounding
-- `Effect.race` with cancellation of loser — this IS correct competitive racing
-- `Ref` with `Effect.update` / `Effect.modify` for atomic state — this IS safe concurrent state
-- `Deferred` for one-time synchronization between fibers — this IS correct usage
-- `Effect.scoped` wrapping concurrent operations needing deterministic cleanup — this IS proper resource safety
-- `Effect.addFinalizer` or `Effect.ensure` for fiber cleanup on interruption — this IS correct interruption handling
+## Output per finding
+- File:line location
+- Concurrency issue (from table)
+- Recommended bounded/safe alternative with v4 API
+- Risk level
 
-# Related Guides (from effect-ts skill references/)
-- `../effect-ts/references/guide-effect.md` — Core `Effect` usage, composition, fiber management
-- `../effect-ts/references/guide-schedule.md` — Retries, repeats, backoff, polling, schedule composition
-- `../effect-ts/references/guide-retries.md` — Retry policies, retry conditions, fallback strategies
-
-# Delegation
-Delegate to:
-- **effect-ts** for research strategy, installation guidelines, and in-depth guidance
-- effect-ts-principle-thinking for mental model violations (orphaned fibers, closure state leaks, missing Structured Concurrency)
-- effect-ts-anti-patterns for Promise-first concurrency detection and unsafe resource usage
-- effect-ts-error-handling for error handling in concurrent operations (propagation vs swallowing)
-- effect-ts-resource-layer for resource usage in concurrent operations (acquisition/release safety)
-
-# Guardrails
-- Never suggest removing interruption handling or finalizers for resource safety
-- Preserve original concurrency semantics when bounding (don't change behavior, just add safety)
-- Avoid suggesting coordination primitives where simple parallelism with bounds suffices
-- Don't bound operations that genuinely need unlimited concurrency (monitoring, event processing)
-- Prevent over-coordinating simple data transformation pipelines (map/filter operations)
-- Do not suggest eliminating necessary concurrency; instead recommend proper bounding and safety
+## Guardrails
+- Never remove interruption handling or finalizers.
+- Preserve original concurrency semantics when bounding.
+- Avoid coordination primitives where simple bounded parallelism suffices.
+- Do not eliminate necessary concurrency — bound and supervise instead.

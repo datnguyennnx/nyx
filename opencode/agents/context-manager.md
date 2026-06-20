@@ -28,7 +28,7 @@ Content: function/class/type names, their signatures (parameters and return type
 Format: stripped of all implementation bodies, comments, and prose.
 
 Used by:
-- `fullstack-ship.md` (orchestrator)
+- `task-decomposer.md` (orchestrator)
 - `classifier.md` (scheduling)
 - Any domain ship orchestrator
 
@@ -80,7 +80,7 @@ IF `fixer.md` requests more than diff-only + implementer output:
 2. Log the request as a context budget note (not a violation, but tracked).
 
 ## Rule 4: Orchestrator Code Access
-IF any orchestrator agent (fullstack-ship, effect-ts-ship, react-vite-ship) requests file content:
+IF any orchestrator agent (task-decomposer, effect-ts-ship, react-vite-ship) requests file content:
 1. REFUSE. Orchestrators NEVER read code.
 2. Serve task decomposition input instead.
 3. Log violation.

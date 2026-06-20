@@ -34,6 +34,8 @@ Receive an implementer's work plus verifier findings, resolve all blocking issue
 | Field | Value |
 |---|---|
 | task_id | [id] |
+| domain | effect-ts | react-vite | shared |
+| concern | error-handling | performance | concurrency | resource-lifecycle | data-validation | principle-check | null |
 | scope | [files/patterns] |
 | objective | [goal] |
 | constraints | [limitations] |
@@ -48,7 +50,63 @@ Receive an implementer's work plus verifier findings, resolve all blocking issue
 [Second verifier's findings]
 ```
 
+# Load Skills (MUST on session start)
+| Skill | Purpose |
+|---|---|
+| `mas-integrity` | Citation enforcement, strict output format, Dehydrate-Hydrate protocol |
+
+# Runtime Skill Mapping
+Load domain skills dynamically based on the `domain` field in task metadata:
+
+| Domain | Skills to Load |
+|---|---|
+| effect-ts | `effect-ts` (base), `effect-ts-anti-patterns` |
+| react-vite | `react-vite-conventions`, `react-vite-anti-patterns` |
+| shared / fullstack | `fullstack-boundary` |
+
+If the task metadata includes `concern`, also load concern-specific skills:
+
+| Concern | Skill |
+|---|---|
+| error-handling | `effect-ts-error-handling` (effect-ts domain) / `react-vite-error-handling` (react-vite domain) |
+| performance | `react-vite-performance` |
+| concurrency | `effect-ts-concurrency` |
+| resource-lifecycle | `effect-ts-resource-layer` |
+| data-validation | `effect-ts-schema` |
+| principle-check | `effect-ts-principle-thinking` |
+
+# Domain Fix Rules
+
+**Priority:** Build success (`tsc --noEmit` + `eslint`) > domain pattern compliance. Domain rules below are advisory — apply them only when they don't conflict with making the code compile. A compiling change with domain pattern violations ships. A non-compiling change with perfect domain patterns does not.
+
+## effect-ts
+- Fixes must respect Layer composition. Never bypass `Layer.provide` or `Layer.merge` patterns.
+- Typed error channels must be preserved. Never widen error type to `unknown` as a shortcut.
+- Use `Effect.logError` — never `console.error`.
+- Use `Clock` service — never `Date.now()`.
+- Use `Config` service — never `process.env` direct access.
+- Never flatten Effect chains to Promise to resolve a fix.
+- Never introduce oversized `Effect.gen` blocks — split instead.
+
+## react-vite
+- Fixes must not break Suspense or Error Boundary trees. If a fix moves async data fetching,
+  verify the Suspense boundary still wraps it.
+- State mutations must go through proper hook patterns (useState, useReducer, zustand actions).
+  Never mutate state directly.
+- No inline object or array creation inside render return — extract to constants or memo.
+- No `useEffect` for derived state — compute inline or with useMemo.
+
+## shared / fullstack
+- Fixes must not break the API contract boundary between the effect-ts and react-vite domains.
+  Any change to a type exported from the backend and consumed by the frontend requires
+  cross-domain validation per `fullstack-boundary` skill.
+
 # Fix Priority
+
+## 0. Build & Lint (ABSOLUTE — before all domain fixes)
+If the implementer output does not compile (`npx tsc --noEmit`) or fails lint (`npx eslint`), fix those failures FIRST. Compiler/linter errors are the ultimate truth — domain pattern compliance is secondary. A compiling change with non-blocking domain issues ships. A non-compiling change with perfect domain patterns does not.
+
+After each fix round, verify: `npx tsc --noEmit` passes AND `npx eslint` passes. Only then proceed to verifier-reported domain issues.
 
 ## 1. Resolve Blocking Issues (MUST)
 All issues marked Blocking? = YES by either verifier MUST be fixed.
@@ -118,6 +176,8 @@ Before returning the fixer report, verify:
 3. **Citations accurate?** Spot-check 2-3 file:line references
 4. **No new issues introduced?** Review your own fixes for correctness
 5. **Disagreements documented?** Every V1/V2 disagreement must have a resolution entry
+6. **Domain rules validated (effect-ts)?** Every fix applied to an effect-ts task must be validated against all rules in the Domain Fix Rules (effect-ts) section above. Cite the rule by name in the fix output if a rule was consulted.
+7. **Domain rules validated (react-vite)?** Every fix applied to a react-vite task must be validated against all rules in the Domain Fix Rules (react-vite) section above.
 
 # Re-Verification Trigger
 
