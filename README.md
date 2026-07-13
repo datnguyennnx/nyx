@@ -1,17 +1,17 @@
 # nyx
 
-Defining the latent capabilities of an invisible agent through structured, verifiable pipelines.
+A deterministic TypeScript engine orchestrates generic LLM agents through a declared manifest contract. Mechanical gates enforce correctness before any write reaches your codebase. The LLM is the semantic periphery; the control flow is pure TypeScript.
 
 ## Myths & Reality
 
 | Myth | Reality |
 |---|---|
-| "It's just autocomplete." | 5 tiers gate every line before it hits your codebase. DAG schedule -> domain verify -> syntax gate -> conflict-free merge -> requirement cross-reference -> human confirm. No unchecked writes. |
-| "It's just hallucinating with style." | Every agent outputs structured JSON with `file:line` citations. Every mutation traces to a requirement. Claims without evidence get rejected. Period. |
-| "More agents = more failure modes." | DAG guarantees ordering: independent lanes parallel, dependent lanes wait. Atomic split = zero overlap. Collisions caught at AST Aggregator. Re-spins capped at 2. More gates, not more chaos. |
-| "You still have to babysit it." | HITL at the final gate. Feedback routes to the right stage automatically - implementer for wrong logic, architect for wrong structure, verifier for edge cases. Max 3 loops, then it pauses. You direct, not babysit. |
-| "I'm not letting AI touch my codebase." | No single agent writes unchecked. Every change passes verification layers before reaching your files. Verifier + Edge Judge + Global Judge are dedicated quality gates. Read-only until approved. |
-| "It's just a code generator." | It's a full engineering pipeline: discovery (map unknown codebases), architecture (design with tradeoffs), verification (pattern-based review), and fixing (targeted resolution from verifier findings). Code generation is the last step, not the only step. |
+| "It's just autocomplete." | The TS Engine is the control layer — pure TypeScript. It validates the manifest (AJV + 8 cross-document constraints), dehydrates context, dispatches agents via `Promise.all` per topological level, then runs mechanical gates (`tsc --noEmit` + `eslint`, AST merge, coverage map) before HITL. LLM never touches control flow. |
+| "It hallucinates with style." | All 5 generic agents have `skill: deny` and `bash: deny` — they hold NO intrinsic domain knowledge. Skills are injected mechanically via the Engine Payload. Verifier output is parsed as JSON; `citation_coverage < 60%` → verdict FAIL. |
+| "More agents = more failure." | The decomposer declares the DAG; the engine executes verbatim. 3 of 5 gates are pure TypeScript (`edge-judge`, `ast-aggregator`, `global-judge`), not LLM. Re-spins capped at 2; on exhaustion → `UNRESOLVABLE_ANOMALY`. |
+| "You still have to babysit it." | HITL at the final gate. Feedback classified per `mas-feedback` → `reentry_routing` (architect / implement / verify / redecompose). Max 3 loops; geometric decay (`δ₄ < 0.07·δ₀`); pause on 4th. |
+| "AI touching my codebase." | Only `verifier` is an LLM gate. `edge-judge`, `ast-aggregator`, `global-judge` are pure TypeScript. Agents are read-only until the engine approves the consolidated patch. |
+| "It's just a code generator." | Full pipeline per node: `discover → architect → implement → verify → fix → gate`. Generation is the last step, not the only one. |
 
 ---
 
@@ -19,177 +19,155 @@ Defining the latent capabilities of an invisible agent through structured, verif
 
 ### Scheduling
 $$G = (V, E) \qquad L_k = \{\, v \in V \mid \max_{u \to v \in E} \text{depth}(u) = k \,\}$$
-$$\text{DAG is acyclic by construction (P1–P7). Every dependency resolved before consumer.}$$
+$$\text{DAG acyclic by construction (P1–P7). Engine runs Promise.all per level.}$$
 
 ### Merge
 $$\forall\, L_i, L_j \in \text{level}_k : \text{files}(L_i) \cap \text{files}(L_j) = \varnothing$$
-$$\text{Disjoint targets → zero merge conflicts. Coupled → pre-node (P7).}$$
+$$\text{Disjoint targets → zero merge conflicts. Coupled → pre-node (P2) or type-contract edge (P5).}$$
 
 ### Termination
-$$\text{re\_spins} \leq 2,\quad \text{fix\_cycles} \leq 2,\quad \max = 4 \implies \text{UNRESOLVABLE\_ANOMALY}$$
-$$\text{Fast Lane: } 0 \text{ re-spins. Every lane terminates in } \leq 4 \text{ rounds.}$$
+$$\text{re-spins} \leq 2 \text{ (full\_dag)},\ 0 \text{ (fast\_lane)} \implies \text{exhaustion} \to \text{UNRESOLVABLE\_ANOMALY}$$
+$$\text{HITL loops} \leq 3;\ \delta_4 < 0.07\,\delta_0 \implies \text{pause at 4th}$$
 
 ### Complexity Routing
-$$\Delta_i \in \{0.5, 1.0, 2.0, 3.0\} \qquad p_i = \frac{\Delta_i}{\sum \Delta_j}$$
-$$H(T) = -\sum p_i \log_2 p_i \qquad H_{\text{norm}} = \frac{H(T)}{\log_2 n}$$
-$$D_{\text{JS}} = \tfrac{1}{2} D_{\text{KL}}(P_A \parallel M) + \tfrac{1}{2} D_{\text{KL}}(P_B \parallel M) \qquad I_{\max} = \max_{j \neq k} I(U_j; U_k)$$
+$$\Delta_i \in \{0.5, 1.0, 2.0, 3.0\} \qquad p_i = \frac{\Delta_i}{\sum \Delta_j} \qquad H_{\text{norm}} = \frac{-\sum p_i \log_2 p_i}{\log_2 n}$$
+$$D_{\text{JS}} = \tfrac{1}{2} D_{\text{KL}}(P_A \parallel M) + \tfrac{1}{2} D_{\text{KL}}(P_B \parallel M) \qquad I_{\text{norm}} = \frac{\max_{j \neq k} I(U_j; U_k)}{H(T)}$$
 $$C(T) = \tfrac{1}{3} H_{\text{norm}} + \tfrac{1}{3} D_{\text{JS}} + \tfrac{1}{3} I_{\text{norm}}$$
 $$\text{Fast Lane: } C(T) < \tau = 0.25 \;\land\; |T| = 1 \;\land\; |\text{files}| \leq 2 \quad (\texttt{!quick} \implies C(T) = 0)$$
 
 ### Ship Confidence
-$$C_{\text{cit}} = \frac{\text{cited}}{\text{total}} \qquad C_{\text{ver}} \in \{1.0, 0.5, 0.0\} \qquad C_{\text{gj}} = \frac{\text{integrity}}{100}$$
-$$C = \tfrac{1}{3} C_{\text{cit}} + \tfrac{1}{3} C_{\text{ver}} + \tfrac{1}{3} C_{\text{gj}}$$
-$$\text{Decision: } \begin{cases} C \geq 0.80 & \text{Ship} \\ 0.50 \leq C < 0.80 & \text{Ship with caveats} \\ C < 0.50 & \text{Escalate} \end{cases} \qquad \text{Missing component } \implies w_i = 1/k$$
-
-### Workflow Rollup
-$$C_{\text{workflow}} = \frac{1}{N} \sum_{i=1}^{N} C_i$$
-$$\text{Classification: } \begin{cases} C_{\text{wf}} \geq 0.80 & \text{HIGH} \\ 0.50 \leq C_{\text{wf}} < 0.80 & \text{MEDIUM} \\ C_{\text{wf}} < 0.50 & \text{LOW} \\ \text{Any FAILED or file overlap} & \text{BLOCKED} \end{cases}$$
+$$C = \tfrac{1}{3} C_{\text{cit}} + \tfrac{1}{3} C_{\text{ver}} + \tfrac{1}{3} C_{\text{gj}} \qquad C_{\text{cit}} = \tfrac{\text{cited}}{\text{total}},\ C_{\text{ver}} \in \{1, 0.5, 0\},\ C_{\text{gj}} = \tfrac{\text{integrity}}{100}$$
+$$\text{Decision: } \begin{cases} C \geq 0.80 & \text{Ship} \\ 0.50 \leq C < 0.80 & \text{Caveats} \\ C < 0.50 & \text{Escalate} \end{cases} \quad C_{\text{wf}} = \tfrac{1}{N}\sum C_i \to \text{HIGH / MEDIUM / LOW / BLOCKED}$$
 
 ---
 
 ## How It Works
 
-### Architecture: 5 Tiers
+### Control Flow
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant SM as ship-mas (L0)
+    participant TD as task-decomposer (L1)
+    participant M as spawn_manifest.json (L2)
+    participant ENG as TS Engine (L4)
+    participant A as Generic Agents (L3)
+
+    U->>SM: request
+    SM->>SM: classify intent
+    SM->>TD: task spawn
+    TD->>TD: scan codebase + compute C(T)
+    TD->>M: write manifest (nodes, edges, levels, phase_chains)
+    TD-->>SM: manifest path
+    SM->>ENG: run_manifest(path)
+    ENG->>ENG: validate (schema + 8 constraints)
+    loop per topological level
+        par Promise.all across lanes
+            ENG->>A: Engine Payload (task + dehydrated ctx + injected skills)
+            A-->>ENG: structured output + diffs
+        end
+        ENG->>ENG: edge-judge (tsc + eslint) per node
+        ENG->>ENG: ast-aggregator (merge + collision detect)
+    end
+    ENG->>ENG: global-judge (requirements ↔ satisfies)
+    ENG-->>SM: EngineResult + HITL payload
+    SM->>U: present HITL
+    U->>SM: approve | feedback → reentry_routing
+```
+
+The engine is a **dumb pipe**: it executes exactly what the manifest declares — no LLM routing, no LLM classification, no LLM context management. The decomposer **declares** (nodes, edges, levels, phase chains, skills, budgets); the engine **executes verbatim**.
+
+### Per-Node Phase Chain
 
 ```mermaid
 flowchart LR
-    subgraph T0["Tier 0 · Entry"]
-        direction TB
-        SE[ship-effect-ts]
-        SR[ship-react-vite]
-        SF[ship-fullstack]
-    end
-    subgraph T1["Tier 1 · Decomposition"]
-        TD[task-decomposer]
-    end
-    subgraph T2["Tier 2 · Scheduling"]
-        CL[classifier]
-        CM[context-manager]
-        TC[task-coordinator]
-    end
-    subgraph T3["Tier 3 · Execution"]
-        direction TB
-        DI[discovery] --> AR[architect]
-        AR --> IM[implementer]
-        IM --> VE[verifier]
-        VE --> FI[fixer]
-    end
-    subgraph T4["Tier 4 · Quality Gates"]
-        EJ[edge-judge]
-        AA[ast-aggregator]
-        GJ[global-judge]
-    end
-    T0 --> T1 --> T2 --> T3 --> T4
+    D[discover] --> A[architect]
+    A --> I[implement]
+    I --> V[verify]
+    V -->|FAIL| F[fix]
+    V -->|PASS| G[edge-judge]
+    F --> G
+    G -->|REJECT · re-spin ≤ 2| F
+    G -->|PASS| N[aggregate per level]
 ```
 
-### Width: DAG Scheduling
+Fast Lane trims to `implement → edge-judge` (`max_respins: 0`).
+
+### DAG Levels
 
 ```mermaid
 flowchart TB
-    subgraph Planner
-        TD[Task Decomposer] --> CL[Classifier: build DAG + score]
-        CL -->|"score < 0.25"| FL[Fast Lane]
-        CL -->|"score >= 0.25"| DAG[Full DAG]
-    end
-    subgraph Exec["Task Coordinator: execute levels"]
-        direction TB
-        L1["Level 1 · N independent lanes"] --> L2["Level 2 · M dependent lanes"]
-    end
-    subgraph Gates
-        AA[AST Aggregator] --> GJ[Global Judge]
-    end
-    Planner --> Exec --> Gates
+    L0["Level 0 · Promise.all · N lanes"] --> EJ1["edge-judge × N"]
+    EJ1 --> AA1["ast-aggregator"]
+    AA1 --> L1["Level 1 · Promise.all · M lanes"]
+    L1 --> EJ2["edge-judge × M"]
+    EJ2 --> AA2["ast-aggregator"]
+    AA2 --> GJ["global-judge (terminal)"]
+    GJ --> HITL{{HITL}}
+    HITL -->|approve| SH[▼ SHIP]
+    HITL -->|feedback| RE["↩ re-enter ≤ 3"]
 ```
 
-### Depth: Per-Lane Pipeline
-
-```mermaid
-flowchart LR
-    I[1. Implement] --> V[2. Verify]
-    V -->|BLOCKING| F[3. Fix] --> V
-    V -->|PASS| EJ[4. Edge Judge]
-    EJ -->|REJECT| F
-    EJ -->|PASS| O[5. AST Aggregator]
-```
-
-### End-to-End Flow
-
-```mermaid
-flowchart LR
-    U[User] --> CL{Complexity}
-    CL -->|Low| FL[Fast Lane]
-    CL -->|Normal| S[Schedule]
-    S --> L[DAG Levels]
-    L --> L0["Level 1 · N lanes"]
-    L0 --> LC{All pass?}
-    LC -->|yes| L1["Level 2 · M lanes"]
-    LC -->|no| RS[Re-spin ≤2]
-    RS --> L0
-    L1 --> M[Aggregate + Judge]
-    FL --> M
-    M --> H{HITL}
-    H -->|Approve| SH[▼ SHIP]
-    H -->|Feedback| RE[↩ Re-enter]
-```
+---
 
 ## Key Design Properties
 
-### Scheduling & Structure
 | Property | Description |
 |---|---|
-| **DAG-driven scheduling** | No file-count thresholds. Classifier builds dependency graph from flat decomposition. Task Coordinator executes level by level, parallelizing independent lanes. |
-| **Fast Lane routing** | Complexity pre-scoring (entropy model, τ = 0.25). Simple single-file tasks skip discovery, architect, verifier-pair, edge-judge, aggregation, and global-judge. Auto-apply for diffs ≤ 10 lines. |
-| **Context tiering** | Read access graduated by agent role - Tier 1 (signatures, ≤1K), Tier 2 (types + imports, ≤2K), Tier 3 (full files, ≤4K), Diff-only (verifier, fixer, edge-judge). |
-| **Atomic split** | Each lane targets one file cluster, one scope, zero overlap. Dehydrated context (signatures only, ≤2K tokens) keeps workers focused. |
+| **DAG-driven scheduling** | Decomposer declares `nodes[]`, `edges[]`, `levels[]`; engine executes verbatim via `Promise.all()` per topological level. No file-count thresholds. |
+| **Fast Lane** | `C(T) < 0.25 ∧ 1 task ∧ ≤ 2 files` (or `!quick`) → 2-phase chain, `max_respins: 0`. Auto-apply when diff ≤ 10 lines and no new exports. |
+| **Context tiering** | Dehydrator graduates read access by phase — Tier 1 (signatures), Tier 2 (types + imports), Tier 3 (full ≤ 4K), Diff-only (verifier, fixer). Enforced via `context_budget.max_tokens`. |
+| **Atomic split** | One node = one file cluster, one scope, zero overlap. Coupled → synthetic pre-node (P2) or `type_contract_dependency` edge (P5). |
+| **Build/Lint is absolute truth** | `edge-judge` runs `tsc --noEmit` + `eslint` mechanically. Domain skill guidance is advisory (NON_BLOCKING). Non-compiling code never ships. |
+| **Re-spin protocol** | Edge-judge REJECT → fixer re-spin. `max_respins = 2` (full_dag), `0` (fast_lane). Exhaustion → `UNRESOLVABLE_ANOMALY`. |
+| **4K token sandbox** | `context_budget.max_tokens` enforced per phase by the Dehydrator. |
+| **Citation enforcement** | `citation_coverage.meets_threshold` requires ≥ 60% `file:line` evidence. Below → verifier FAIL. |
+| **Workspace isolation** | Global `~/.config/opencode/` is read-only (agents, schemas, skills, plugins). Local `./.opencode/` is read-write (`manifests/`, `runs/`). Strict project isolation. |
+| **Mechanical gates** | `edge-judge` (per node), `ast-aggregator` (per level), `global-judge` (terminal) — all pure TypeScript, no LLM involvement in gating. |
 
-### Quality & Safety
-| Property | Description |
+---
+
+## Layers
+
+| Layer | Role | Components |
+|---|---|---|
+| **L0 — Human Interface** | Classify intent, spawn decomposer, invoke engine, present HITL | `ship-mas` mode (only `task` + `run_manifest` tools) |
+| **L1 — Manifest Producer** | Decompose, score complexity, build DAG, write manifest (STRICTLY JSON) | `task-decomposer` (sole non-deterministic seam) |
+| **L2 — The Contract** | Declare routing, phase chains, skill injections, budgets | `spawn_manifest.json` (validates against `spawn-manifest.schema.json`) |
+| **L3 — Semantic Periphery** | Generic LLM agents — no intrinsic domain knowledge; skills injected via Engine Payload | `discovery`, `architect`, `implementer`, `verifier`, `fixer` |
+| **L4 — Mechanical Core** | Validate, dehydrate, dispatch per level, run gates — pure TypeScript | TS Engine: `Validator`, `Dehydrator`, `Spawn Bridge`, `edge-judge`, `ast-aggregator`, `global-judge` |
+
+## Domains & Skills
+
+A domain is a **node property** (`node.domain`), not a separate mode. The engine injects skills declared in each node's `phase_chain[].skills[]` at runtime — the 5 generic agents serve all domains.
+
+| Domain | Base skills injected |
 |---|---|
-| **Build/Lint is absolute truth** | `npx tsc --noEmit` and `npx eslint` define correctness. Domain skill guidance is advisory. Code that compiles and passes lint ships; non-compiling code never ships. |
-| **Lane pipeline** | `Implement -> Verify ⇄ Fix -> Edge Judge -> (PASS -> aggregate)`. Verifier flags correctness/boundary/citation issues; Fixer resolves them. Edge Judge gates syntax, scope, data-hollowing, and build/lint. |
-| **Re-spin protocol** | Verifier BLOCKING -> Fixer re-runs. Edge Judge REJECT -> Fixer re-spin. Max 2 per lane. Max 2 fix cycles total. 3rd = UNRESOLVABLE_ANOMALY. Fast Lane has 0 re-spins. |
-| **4K token sandbox** | Every worker receives ≤4,000 tokens. Prevents context drift and hallucination. |
-| **Citation enforcement** | ≥60% of claims must include `file:line` evidence. Below = automatic rejection. |
+| `effect-ts` | `effect-ts-code-conventions`, `effect-ts-anti-patterns` |
+| `react-vite` | `react-vite-conventions`, `react-vite-anti-patterns` |
+| `shared` | both bases + `fullstack-boundary` |
 
-### Traceability & Control
-| Property | Description |
+Concern-driven layering by the decomposer:
+
+| Concern | Additional skills |
 |---|---|
-| **Session persistence** | State written to `.opencode/session-state_<YYYY-MM-DD>_<task-slug>.json` - tracks DAG progress, tier violations, HITL feedback, and final verdict. |
-| **HITL with smart re-entry** | Mandatory human decision at the final gate. Feedback routes to the correct stage via routing tables. Max 3 loops; geometric decay model tracks stability. |
-| **Formal confidence scoring** | Decision confidence computed as C = ⅓·C_cit + ⅓·C_ver + ⅓·C_gj. C ≥ 0.80 = HIGH (ship). C < 0.50 = LOW (escalate). |
-| **Streaming aggregation** | Task coordinator aggregates as lanes complete. Cross-task conflict checks between batches of 10. |
+| error-handling | `effect-ts-error-handling` / `react-vite-error-handling` |
+| performance | `react-vite-performance` |
+| concurrency | `effect-ts-concurrency` |
+| resource-lifecycle | `effect-ts-resource-layer` |
+| data-validation | `effect-ts-schema` |
+| principle-check | `effect-ts-principle-thinking` |
+| architecture / DDD | `effect-ts-design-patterns` + `effect-ts-principle-thinking` |
 
-## Tiers
+`mas-*` conceptual skills (`mas-architecture`, `mas-routing`, `mas-workflow`, `mas-complexity-scoring`, `mas-fast-path`, `mas-integrity`, `mas-aggregation`, `mas-decision`, `mas-feedback`, `mas-interrupts`) define topology, routing, scoring, and HITL rules for the decomposer and ship-mas mode.
 
-| Tier | Responsibility | Agents |
-|---|---|---|
-| 0 - Entry | Workflow entrypoints | `ship-effect-ts`, `ship-react-vite`, `ship-fullstack` |
-| 1 - Decomposition | Task decomposition, domain routing, HITL | `task-decomposer` |
-| 2 - Scheduling | DAG construction, complexity scoring, context enforcement, execution | `classifier`, `context-manager`, `task-coordinator` |
-| 3 - Execution | Discovery, architecture, implementation, verification, fixing | `effect-ts-*`, `react-vite-*`, `verifier`, `fixer` |
-| 4 - Quality Gates | Syntax/scope gate, merge, cross-reference | `edge-judge`, `ast-aggregator`, `global-judge` |
+## Gates
 
-## Domains
-
-| Mode | Scope | Verification |
-|---|---|---|
-| `ship-effect-ts` | Backend (Effect-TS) | `verifier` with `domain: effect-ts` → loads `effect-ts` + `effect-ts-anti-patterns` |
-| `ship-react-vite` | Frontend (React 19+ / Vite 8+) | `verifier` with `domain: react-vite` → loads `react-vite-conventions` + `react-vite-anti-patterns` |
-| `ship-fullstack` | Cross-domain (both) | `verifier` per domain + `fullstack-boundary` for type contract checks |
-
-## Domain Agents
-
-| Domain | Discovery | Architect | Implementer | Orchestrator |
-|---|---|---|---|---|
-| effect-ts | `effect-ts-discovery` | `effect-ts-architect` | `effect-ts-implementer` | `effect-ts-ship` |
-| react-vite | `react-vite-discovery` | `react-vite-architect` | `react-vite-implementer` | `react-vite-ship` |
-
-## Gate Agents
-
-| Gate | Agent | Pipeline Position |
-|---|---|---|
-| Verification (unified) | `verifier` (loads domain skills dynamically) | After implementer |
-| Issue resolution | `fixer` (loads domain+concern skills) | After verifier flags blocking issues |
-| Syntax/scope/build gate | `edge-judge` | After fixer; runs `tsc --noEmit` + `eslint` |
-| Patch merge | `ast-aggregator` | After each level completes |
-| Integrity cross-reference | `global-judge` | After all levels; integrity score ≥ 70 threshold |
+| Gate | Type | Module | Position |
+|---|---|---|---|
+| Verification | LLM | `verifier` (JSON verdict; skills injected) | After implementer |
+| Issue resolution | LLM | `fixer` (skills injected) | After verifier BLOCKING / edge-judge REJECT |
+| Syntax / scope / build | Mechanical | `edge-judge` — `tsc --noEmit` + `eslint` + scope-escape + data-hollowing | Per node |
+| Patch merge | Mechanical | `ast-aggregator` — diff merge + collision detection | Per level |
+| Integrity coverage | Mechanical | `global-judge` — requirements ↔ satisfies coverage map | Terminal |

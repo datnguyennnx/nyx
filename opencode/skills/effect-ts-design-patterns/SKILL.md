@@ -1,6 +1,6 @@
 ---
 name: effect-ts-design-patterns
-description: Architecture patterns for Effect-TS v4 — Repository, UseCase/Service, CQRS-lite, Event Sourcing, DDD Layering, Module Structure, Config-Driven Layers.
+description: Architecture patterns for Effect — Repository, UseCase/Service, CQRS-lite, Event Sourcing, DDD Layering, Module Structure, Config-Driven Layers.
 ---
 
 ## Rules
@@ -13,12 +13,12 @@ description: Architecture patterns for Effect-TS v4 — Repository, UseCase/Serv
 | CQS is default; CQRS is upgrade | Query returns data. Command returns `void`. Split only when read/write diverge in optimization needs. |
 | State changes are data | Event Sourcing = immutable event stream. Use only when audit trail or temporal queries needed. |
 | Domain never imports Infrastructure | Dependencies: Infrastructure → Application → Domain. Domain imports only `effect/*` + `@effect/schema`. |
-| Configuration is a dependency | Never `process.env` in domain/application. Inject via `Config` service + Layer (v4: `Config` module, not process.env). |
+| Configuration is a dependency | Never `process.env` in domain/application. Inject via `Config` service + Layer (`Config` module, not process.env). |
 
 ## Patterns
 
 ### Repository
-Abstract data access behind service interface (v4: `Context.Service` class syntax):
+Abstract data access behind service interface (`Context.Service` class syntax):
 ```ts
 class UserRepository extends Context.Service<UserRepository, {
   readonly findById: (id: string) => Effect<Option<User>, never, never>
@@ -69,7 +69,7 @@ class AppConfig extends Context.Service<AppConfig, {
 }>()("AppConfig") {}
 
 const AppConfigLive = Layer.effect(AppConfig, Effect.gen(function* () {
-  const dbHost = yield* Config.string("DB_HOST")  // v4: Config module
+  const dbHost = yield* Config.string("DB_HOST")  // Config module
   return AppConfig.of({ dbHost, dbPort: 5432 })
 }))
 ```
@@ -82,7 +82,7 @@ All layers depend on `AppConfig`. Tests swap with `Layer.succeed`.
 | Service method Requirements ≠ `never` (leaking construction deps) | HIGH |
 | Domain layer importing `pg`, `fs`, `axios` | HIGH |
 | `process.env` outside dedicated Config layer | HIGH |
-| v3 `Context.Tag` / `Effect.Tag` service definition | HIGH |
+| `Context.Tag` / `Effect.Tag` service definition | HIGH |
 | Event Sourcing for entities without audit/temporal need | HIGH |
 | Per-request `Effect.provide(effect, AppLayer)` in hot path | HIGH |
 | 15+ methods on single service tag spanning unrelated domains | MEDIUM |
@@ -96,5 +96,5 @@ All layers depend on `AppConfig`. Tests swap with `Layer.succeed`.
 - Start simple. CQS before CQRS. Single-layer before DDD.
 - Pattern selection proportional to problem. No Event Sourcing without business case.
 - Smallest change that solves the problem. Don't prescribe full DDD for a 2-service app.
-- Respect existing conventions unless proven violations of Effect v4 principles.
-- v4: auto-memoization is default. Use `{ local: true }` only when per-request isolation needed.
+- Respect existing conventions unless they conflict with Effect principles.
+- Auto-memoization is default. Use `{ local: true }` only when per-request isolation needed.

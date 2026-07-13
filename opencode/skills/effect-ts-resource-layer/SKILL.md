@@ -1,15 +1,7 @@
 ---
 name: effect-ts-resource-layer
-description: Resource lifecycle and dependency graphs in Effect-TS v4 — Layer construction patterns with explicit acquisition and release semantics.
+description: Resource lifecycle and dependency graphs in Effect — Layer construction patterns with explicit acquisition and release semantics.
 ---
-
-## v4 Layer Changes
-
-| v3 | v4 |
-|---|---|
-| `Context.Tag` / `Effect.Tag` service definition | `Context.Service` class: `class Svc extends Context.Service<Svc, Shape>()("Svc") {}` |
-| Manual `Layer.memoize` | Auto-memoized across `Effect.provide` calls. Opt-out: `Effect.provide(layer, { local: true })` |
-| `ManagedRuntime.make(AppLayer)` | Still valid for framework bridging — keep |
 
 ## Core Principles
 
@@ -22,14 +14,14 @@ description: Resource lifecycle and dependency graphs in Effect-TS v4 — Layer 
 - Ensure finalizers run even when errors occur during acquisition using `Effect.acquireRelease`
 - Keep service interfaces independent of resource details by managing dependencies at Layer level
 
-## Preferred Patterns (v4)
+## Preferred Patterns
 
 | Pattern | Implementation |
 |---|---|
 | Safe acquisition | `Layer.effect(Tag, Effect.acquireRelease(acquire, release))` |
 | Layer composition | `Layer.merge` (parallel), `Layer.provide` (sequential) |
 | Localized lifetime | `Scope` when Layer sharing not appropriate |
-| Auto-memoization | Default in v4. Opt-out: `Effect.provide(layer, { local: true })` when per-request isolation needed |
+| Auto-memoization | Default across `Effect.provide` calls. Opt-out: `Effect.provide(layer, { local: true })` when per-request isolation needed |
 | Service definition | `class Svc extends Context.Service<Svc, { readonly find: (id: string) => Effect<User, never, never> }>()("Svc") {}` |
 | Framework bridging | `const runtime = ManagedRuntime.make(AppLayer)` once globally, then `runtime.runPromise(effect)` in route handlers |
 
@@ -37,7 +29,6 @@ description: Resource lifecycle and dependency graphs in Effect-TS v4 — Layer 
 
 | Pattern | Detect | Severity |
 |---|---|---|
-| v3 service definition | `Context.Tag` / `Effect.Tag` / `Effect.Service` class syntax | HIGH |
 | Manual resource mgmt | Direct open/close in service methods without Scope/Layer | HIGH |
 | Module-level singletons | Resource construction at module scope outside Layer | HIGH |
 | Missing release on failure | No release in acquireRelease when acquisition fails | HIGH |
@@ -53,19 +44,19 @@ description: Resource lifecycle and dependency graphs in Effect-TS v4 — Layer 
 
 | Level | Criteria |
 |---|---|
-| HIGH | Resource leak, double-release crash, missing cleanup on acquisition failure, v3 API, per-request provisioning (memory leak) |
+| HIGH | Resource leak, double-release crash, missing cleanup on acquisition failure, per-request provisioning (memory leak) |
 | MEDIUM | Hidden singleton outside Layer, missing Scope, non-idempotent finalizer |
 | LOW | Layer where succeed suffices, unnecessary memoize, mixable concerns |
 
 ## Output per finding
 - File:line location
 - Resource management issue
-- Recommended Layer/Scope pattern with v4 API
+- Recommended Layer/Scope pattern
 - Risk level
 
 ## Guardrails
 - Never remove resource cleanup without equivalent safe replacement.
-- Avoid over-scoping shared resources — use auto-memoization (v4 default).
+- Avoid over-scoping shared resources — use auto-memoization (default).
 - Per-request isolation: use `{ local: true }` when needed, not global memoization override.
 - Don't suggest Layer for values that don't need lifecycle management.
 - Prevent Layers that mix unrelated concerns — split by responsibility.

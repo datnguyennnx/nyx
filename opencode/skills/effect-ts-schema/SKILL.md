@@ -1,19 +1,7 @@
 ---
 name: effect-ts-schema
-description: Type-safe data contracts, validation boundaries, serialization using @effect/schema v4. Schema-first design — define once, derive types, JSON Schema, and test arbitraries.
+description: Type-safe data contracts, validation boundaries, serialization using @effect/schema. Schema-first design — define once, derive types, JSON Schema, and test arbitraries.
 ---
-
-## v4 Renames — Flag v3 APIs
-
-| v3 (WRONG) | v4 (CORRECT) |
-|---|---|
-| `Schema.Schema.Type<typeof S>` | `Schema.Type<typeof S>` |
-| `Schema.decodeUnknown` | `Schema.decodeUnknownEffect` |
-| `Schema.decode` | `Schema.decodeEffect` |
-| `Schema.decodeSync` | Still valid for sync validation |
-| `new Schema.ArbitraryCompiler()` | `Schema.makeArbitrary(S)` |
-| `Schema.to(S)(...)` | Direct functional tree: `Schema.makeArbitrary(S)`, `Schema.makeJsonSchema(S)`, `Schema.makeEquivalence(S)` |
-| `Schema.Codec.ToAsserts` | DELETED → use `Schema.asserts(schema, input)` |
 
 ## Schema Fundamentals
 
@@ -43,12 +31,12 @@ Schema values are immutable blueprints, interpreted by compilers:
 | Filters narrow; transforms reshape | `Schema.filter` — narrows allowed values only. `Schema.transform` / `transformOrFail` — changes shape. `Schema.brand` — carries proof in type. |
 | Errors are structured | `ParseResult.TreeFormatter` for canonical debugging. `ParseResult.ArrayFormatter` for structured field-level errors consumed by form libraries. |
 | Module-level consts | Schema values at module scope, not inside request handlers or hot paths. |
-| `exactOptionalPropertyTypes` | Enable in tsconfig. Without it, optional props widen to `string \| undefined`. |
+| `exactOptionalPropertyTypes` | Enable in tsconfig. Without it, optional props widen to `string | undefined`. |
 
 ## Preferred Patterns
 
 - **Basic Structs:** `Schema.Struct({ name: Schema.String, age: Schema.Number })`
-- **Type Derivation:** `type User = Schema.Type<typeof UserSchema>` (v4: no `Schema.Schema.` prefix)
+- **Type Derivation:** `type User = Schema.Type<typeof UserSchema>`
 - **Boundary Parsing:** `Schema.decodeUnknownEffect(UserSchema)(rawInput)` at handlers
 - **Domain Errors:** `class NotFoundError extends Schema.TaggedErrorClass<NotFoundError>()("NotFoundError", { id: Schema.String }) {}`
 - **Transformations:** `Schema.Date` (decodes from string, encodes to string) at JSON boundaries
@@ -65,7 +53,6 @@ Schema values are immutable blueprints, interpreted by compilers:
 | Schema + manual type duplication | `interface User` + separate `Schema.Struct` for User | HIGH |
 | `as` casts after parsing | Using `as User` instead of inferring from schema's `Type` | HIGH |
 | Untrusted data past boundaries | `unknown`/`any` flowing through domain logic | HIGH |
-| v3 API usage | `Schema.Schema.Type`, `decodeUnknown`/`decode`, OOP compilers, `Codec.ToAsserts` | HIGH |
 | Silent data loss in transform | `encode` drops fields or `decode` fabricates defaults | HIGH |
 | Schema in hot paths | New Schema instances in request handlers or loops | MEDIUM |
 | `Schema.filter` to change shape | Using filter for reshaping when transform/brand needed | MEDIUM |
@@ -76,7 +63,7 @@ Schema values are immutable blueprints, interpreted by compilers:
 
 | Level | Criteria |
 |---|---|
-| HIGH | Untrusted data past boundaries, drifted duplicate types, encode data loss, v3 API won't compile |
+| HIGH | Untrusted data past boundaries, drifted duplicate types, encode data loss, API that won't compile |
 | MEDIUM | Missing annotations, over-nested transforms, filter-where-brand-needed |
 | LOW | Suboptimal projections, inline schemas, redundant annotations |
 
@@ -91,4 +78,4 @@ Schema values are immutable blueprints, interpreted by compilers:
 - Verify encode+decode round-trips when suggesting transformations.
 - Use `Schema.decodeUnknownEffect` for untrusted input, never `decodeSync`.
 - Duplicate types → replace interface with `Schema.Type<typeof schema>`, never the reverse.
-- v4 beta APIs shift between releases — verify existence in `packages/effect/src/*.ts`.
+- Beta APIs shift between releases — verify existence in `packages/effect/src/*.ts`.

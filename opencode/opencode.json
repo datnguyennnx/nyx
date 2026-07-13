@@ -2,11 +2,14 @@
   "$schema": "https://opencode.ai/config.json",
   "instructions": [
     "Read ./AGENTS.md for repository architecture and MAS rules.",
-    "Read ./agents/context-manager.md to enforce context tiers before routing agents."
+    "The MAS architecture uses a Deterministic Automata (TS Engine) for control flow. LLM agents are pure execution templates that receive domain skills via engine injection.",
+    "{file:~/.config/opencode/schemas/manifest-field-guide.md}",
+    "{file:~/.config/opencode/schemas/manifest-examples.json}"
   ],
   "permission": {
     "read": {
       "*": "allow",
+      "~/.config/opencode/**/*": "allow",
       ".env": "deny",
       "*.env": "deny",
       "*.env.*": "deny",
@@ -21,8 +24,18 @@
       ".env.example": "allow",
       "*.env.example": "allow"
     },
+    "grep": {
+      "*": "allow"
+    },
+    "find": {
+      "*": "allow"
+    },
+    "rg": {
+      "*": "allow"
+    },
     "bash": {
-      "*": "ask",
+      "*": "allow",
+      "rm -rf *": "ask",
       "git*": "deny",
       "git diff *": "allow",
       "git status *": "allow",
@@ -32,9 +45,15 @@
       "cat .env*": "deny",
       "cat */.env*": "deny",
       "printenv*": "deny",
-      "env": "deny"
+      "env": "deny",
+      "node*": "ask",
+      "python*": "ask",
+      "python3*": "ask"
     },
-    "external_directory": "ask",
+    "external_directory": {
+      "*": "ask",
+      "~/.config/opencode/**/*": "allow"
+    },
     "skill": "allow"
   },
   "mcp": {
@@ -45,43 +64,18 @@
     }
   },
   "mode": {
-    "ship-effect-ts": {
-      "prompt": "{file:./modes/ship-effect-ts.md}",
+    "ship-mas": {
+      "prompt": "{file:./modes/ship-mas.md}",
       "permission": {
         "task": "allow",
         "skill": "allow",
-        "read": "deny",
+        "read": "allow",
         "edit": "deny",
         "bash": "deny",
-        "glob": "deny",
-        "grep": "deny",
-        "webfetch": "deny"
-      }
-    },
-    "ship-react-vite": {
-      "prompt": "{file:./modes/ship-react-vite.md}",
-      "permission": {
-        "task": "allow",
-        "skill": "allow",
-        "read": "deny",
-        "edit": "deny",
-        "bash": "deny",
-        "glob": "deny",
-        "grep": "deny",
-        "webfetch": "deny"
-      }
-    },
-    "ship-fullstack": {
-      "prompt": "{file:./modes/ship-fullstack.md}",
-      "permission": {
-        "task": "allow",
-        "skill": "allow",
-        "read": "deny",
-        "edit": "deny",
-        "bash": "deny",
-        "glob": "deny",
-        "grep": "deny",
-        "webfetch": "deny"
+        "glob": "allow",
+        "grep": "allow",
+        "webfetch": "deny",
+        "run_manifest": "allow"
       }
     }
   }

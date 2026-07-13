@@ -1,51 +1,22 @@
 ---
 name: mas-decision
-description: Ship judgment framework. Decision matrix from subagent evidence, multi-domain
-verdict combination, formal confidence formula. Loaded by all ship orchestrators.
+description: Ship judgment framework and confidence formula. Conceptual definitions for interpreting the TS Engine's global-judge output. Loaded by the ship-mas mode.
 ---
 
 ## Decision Matrix
 
-| Review Verdict | Condition | Ship Judgment |
+| Global Judge Verdict | Condition | Ship Judgment |
 |---|---|---|
-| READY TO SHIP | All agents VALID, no gaps, no conflicts | Safe to ship |
-| READY TO SHIP | Minor gaps, no blocking | Safe to ship with follow-up |
-| NEEDS FIXES | Blocking issues (Blocking? = YES) | Not ready to ship |
-| NEEDS FIXES | Non-blocking only | Safe to ship with follow-up |
-| NEEDS FIXES | Ambiguous | Not ready to ship |
-| NOT READY TO SHIP | Any reason | Not ready to ship |
-
-## Multi-Domain Verdict Combination
-
-| Backend | Frontend | Boundary | Ship Judgment |
-|---|---|---|---|
-| READY TO SHIP | READY TO SHIP | PASS | Safe to ship |
-| READY TO SHIP | NEEDS FIXES | PASS | Safe to ship with follow-up |
-| NEEDS FIXES | * | — | Not ready to ship |
-| * | NEEDS FIXES | — | Not ready to ship |
-| NOT READY TO SHIP | * | — | Not ready to ship |
-| * | NOT READY TO SHIP | — | Not ready to ship |
-| * | * | FAIL | Not ready to ship |
+| APPROVED | All requirements covered, no regression vectors | Safe to ship |
+| APPROVED_WITH_NOTES | Minor gaps, no blocking issues | Safe to ship with follow-up |
+| NEEDS_REMEDIATION | Missing requirements, corrupted mutations, or regression vectors | Not ready — present blocking issues |
 
 ## Confidence Formula
 
-```
-C = α·C_cit + β·C_ver + γ·C_gj
-α = β = γ = 1/3
-```
-
-| Component | Source | Formula |
-|---|---|---|
-| C_cit | verifier | `cited_changes / total_changes` |
-| C_ver | verifiers | 1.0 both PASS, 0.5 mixed, 0.0 both FAIL |
-| C_gj | global-judge | `integrity_score / 100` |
-
-Unavailable component → redistribute its weight equally: `w_i = 1/k`.
-
-### Level Mapping
+`C = (C_cit + C_ver + C_gj) / 3`. C_cit = cited/total changes. C_ver = 1.0 PASS, 0.5 mixed, 0.0 FAIL. C_gj = integrity_score/100. Unavailable component → redistribute weight equally.
 
 | C Range | Level | Action |
 |---|---|---|
-| C ≥ 0.80 | HIGH | Safe to ship |
-| 0.50 ≤ C < 0.80 | MEDIUM | Ship with caveats |
-| C < 0.50 | LOW | Escalate — do not auto-ship |
+| ≥ 0.80 | HIGH | Safe to ship |
+| 0.50 – 0.80 | MEDIUM | Ship with caveats |
+| < 0.50 | LOW | Escalate — do not auto-ship |

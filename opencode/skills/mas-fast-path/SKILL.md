@@ -1,54 +1,22 @@
 ---
 name: mas-fast-path
-description: Fast Lane pipeline — reduced path for low-complexity tasks. Hotpatch implementer,
-Lite Verifier constraints, re-spin (max 0), auto-apply threshold. Loaded by classifier and task-coordinator.
+description: Fast Lane manifest shape and escalation policy. Conceptual definitions only — pipeline execution is handled by the TS Engine. Loaded by the task-decomposer.
 ---
 
-## Trigger
+## Fast-Lane Manifest Shape
 
-ALL must hold:
-1. C(T) < τ (per `mas-complexity-scoring`)
-2. |task_set| = 1
-3. |output_files| ≤ 2
+- `nodes[]`: exactly 1 node
+- `edges[]`: empty
+- `levels[]`: `[["N1"]]`
+- `phase_chain`: implement + gate only (no discover/architect/verify/fix)
+- `retry_budget`: `{ max_respins: 0 }` — no re-spin, escalate on failure
 
-OR: `!quick` prefix (overrides all).
+Trigger conditions: see `mas-workflow` Fast-Lane Gate.
 
-## Pipeline
+## Escalation Policy
 
-Full DAG: `discover → architect → implement → verify ⇄ fix → edge-judge → ast-aggregator → global-judge → HITL → apply`
+If edge-judge REJECTS a fast-lane node, engine escalates immediately (no re-spin). ship-mas mode re-spawns task-decomposer to produce a `full_dag` manifest.
 
-Fast Lane: `hotpatch-implementer → lite-verifier → [HITL if above auto-apply] → apply`
+## Auto-Apply Threshold
 
-Fast Lane skips: discover, architect, fixer loop, edge-judge, ast-aggregator, global-judge.
-
-## Hotpatch Implementer Constraints
-
-- ≤ 2 files
-- Diff-only output (unified diff, never full file)
-- Context ≤ 1K tokens (signatures only, no cross-file reads)
-- Every change cites `file:line`
-- No new exports or imports (→ escalate if needed)
-
-## Lite Verifier Constraints
-
-Verifier Fast Path mode only:
-- `diff_size < 50`, `new_imports` empty, `new_exports` empty
-- No domain skills loaded
-- No anti-pattern, cross-file, Layer/component boundary checks
-- Checks: TypeScript syntax on diff hunks, scope ≤ 2 files, citation coverage ≥ 60%
-
-New imports or exports → reject, escalate.
-
-## Re-spin
-
-Max = 0. BLOCKING → escalate to full DAG immediately.
-
-## Auto-Apply
-
-Apply without HITL: diff ≤ 10 lines AND Lite Verifier PASS AND no new exports.
-
-Otherwise: present diff for approval.
-
-## Session State
-
-`lane: "fast"` mandatory. Full DAG = `lane: "full"`.
+Decomposer may set `hitl.required: false` when ALL: diff ≤10 lines (estimated) AND no new exports in `exports_delta` AND single file target. Otherwise `hitl.required: true`.

@@ -1,33 +1,13 @@
 ---
 name: effect-ts-code-conventions
-description: Idiomatic Effect-TS v4 coding style — pattern matching, Effect.gen, naming, module structure, Schema-first design, formatting.
+description: Idiomatic Effect-TS coding style — pattern matching, Effect.gen, naming, module structure, Schema-first design, formatting.
 ---
-
-## v4 Renames — Flag v3 APIs
-
-| v3 (WRONG) | v4 (CORRECT) |
-|---|---|
-| `Context.Tag` / `Effect.Tag` / `Effect.Service` class | `Context.Service` class syntax: `class Svc extends Context.Service<Svc, Shape>()("Svc") {}` |
-| `catchAll` | `catch` |
-| `catchSome` | `catchFilter` |
-| `catchAllCause` | `catchCause` |
-| `catchAllDefect` | `catchDefect` |
-| `catchSomeDefect` | DELETED |
-| `either` | `result` |
-| `fork` | `forkChild` |
-| `forkDaemon` | `forkDetach` |
-| `forkAll` / `forkWithErrorHandler` | DELETED |
-| `FiberRef` | `Context.Reference` in `References` module |
-| `Runtime<R>` / `Runtime.runFork` | `Effect.services<R>()` / `Effect.runForkWith(services)` |
-| `Effect.Do` | DELETED → use `Effect.gen` |
-| `Schema.Schema.Type<typeof S>` | `Schema.Type<typeof S>` |
-| `Schema.decodeUnknown` | `Schema.decodeUnknownEffect` |
-| `Schema.decode` | `Schema.decodeEffect` |
 
 ## Style Rules
 
 | Rule | Enforce |
 |---|---|
+| Service definition | `Context.Service` class syntax: `class Svc extends Context.Service<Svc, Shape>()("Svc") {}` |
 | Pattern matching | `Match.type` / `Match.tag` over `if/else` / `switch`. Always `Match.exhaustive` on known unions. |
 | Effect.gen | For 3+ sequential effectful steps. One `yield*` per line. Keep blocks single-screen. |
 | pipe | For 1-3 transformations. Never nest >3 levels. |
@@ -37,6 +17,13 @@ description: Idiomatic Effect-TS v4 coding style — pattern matching, Effect.ge
 | Branding | `Brand.nominal` for type distinction. `Brand.refined` for runtime validation. Not a general validation framework. |
 | No mid-flight execution | Never `Effect.runSync`/`runPromise` in services/layers. Tests only. |
 | Entry points | `NodeRuntime.runMain` from `@effect/platform-node`. Handles graceful SIGINT teardown. |
+| Error handling | `catch` (not `catchAll`), `catchFilter` (not `catchSome`), `result` (not `either`). |
+| Forking | `forkChild` (not `fork`), `forkDetach` (not `forkDaemon`). `forkAll` and `forkWithErrorHandler` do not exist — use `Effect.forEach` with `forkChild`. |
+| Fiber state | `Context.Reference` in `References` module (not `FiberRef`). |
+| Runtime access | `Effect.services<R>()` (not `Runtime<R>`), `Effect.runForkWith(services)` (not `Runtime.runFork`). |
+| Schema type derivation | `Schema.Type<typeof S>` (not `Schema.Schema.Type`). |
+| Schema decoding | `Schema.decodeUnknownEffect` / `Schema.decodeEffect` (not `decodeUnknown` / `decode`). |
+| Unstable imports | HTTP, SQL, RPC, Schema utilities under `effect/unstable/*`. Never `@effect/platform` for these. |
 
 ## Pattern Matching
 
@@ -56,8 +43,7 @@ description: Idiomatic Effect-TS v4 coding style — pattern matching, Effect.ge
 | Simple map/filter/flatMap | Conditional logic, error handling, resource mgmt |
 | Composing catchTag/timeout/retry | Imperative readability matters more |
 
-Never mix `pipe` inside `Effect.gen`. Never nest `pipe` >3 levels.
-`Effect.Do` is DELETED in v4 — migrate to `Effect.gen`.
+Never mix `pipe` inside `Effect.gen`. Never nest `pipe` >3 levels. Use `Effect.gen` (not `Effect.Do`).
 
 ## Naming Table
 
@@ -88,11 +74,11 @@ One concern per file. Export tag + shape together. Layer files export default + 
 ```ts
 import { Schema } from "effect"
 export const UserSchema = Schema.Struct({ id: Schema.String, name: Schema.String })
-export interface User extends Schema.Type<typeof UserSchema> {} // v4: Schema.Type, not Schema.Schema.Type
+export interface User extends Schema.Type<typeof UserSchema> {}
 ```
 
 Use `Schema.TaggedErrorClass` for domain errors. Use `Schema.Data` for value equality. Use `Schema.Class` when prototype methods needed.
-Compilers: `Schema.makeArbitrary(S)` not `new Schema.ArbitraryCompiler()`. `Schema.makeJsonSchema(S)`. `Schema.makeEquivalence(S)`.
+Compilers: `Schema.makeArbitrary(S)`. `Schema.makeJsonSchema(S)`. `Schema.makeEquivalence(S)`.
 Parse errors: `ParseResult.TreeFormatter` for canonical human-readable debugging.
 
 ## Formatting
@@ -100,7 +86,7 @@ Parse errors: `ParseResult.TreeFormatter` for canonical human-readable debugging
 - Imports: `"effect"` first, `"@effect/*"` next, then app modules.
 - Layer definitions: `Layer.effect(Tag, Effect.gen(...))` for resourceful. `Layer.succeed` for pure.
 - Pipeline chains: one operation per line, indented.
-- Layers are auto-memoized across `Effect.provide` calls (v4). Opt-out: `Effect.provide(layer, { local: true })`.
+- Layers are auto-memoized across `Effect.provide` calls. Opt-out: `Effect.provide(layer, { local: true })`.
 
 ## Anti-patterns (FLAG)
 
@@ -110,16 +96,15 @@ Parse errors: `ParseResult.TreeFormatter` for canonical human-readable debugging
 | Tacit function args (`Effect.map(fn)`) | HIGH |
 | Duplicate Schema + manual type | HIGH |
 | `Effect.runSync` in production | HIGH |
-| v3 API usage (`catchAll`, `fork`, `either`, `Effect.Do`, `Context.Tag`, `FiberRef`) | HIGH |
+| `@effect/platform` imports for unstable modules | HIGH |
 | Nested pipe >3 levels | MEDIUM |
 | Mixing `Effect.gen` + `pipe` in same expression | MEDIUM |
 | Giant `Effect.gen` blocks with multiple responsibilities | MEDIUM |
 | `switch` on `_tag` instead of `Match.tag` | MEDIUM |
 | Data-first in multi-step chains | LOW |
 | Generic file names (`types.ts`, `errors.ts`) | LOW |
-| `@effect/platform` imports for unstable modules | HIGH |
 
 ## Guardrails
 - Style suggestions must not alter business logic or runtime behavior.
 - Verify union is closed before recommending `Match.exhaustive`. Open unions → `Match.orElse`.
-- Defer to existing project conventions unless they conflict with Effect v4 patterns.
+- Defer to existing project conventions unless they conflict with Effect patterns.

@@ -1,73 +1,28 @@
 ---
 name: mas-routing
-description: DAG construction and staged parallelism scheduling. Edge creation rules,
-false-independence anti-patterns, spawn plan generation. Loaded by classifier and task-decomposer.
+description: DAG construction rules and dependency classification for manifest generation. Conceptual definitions only — execution is handled by the TS Engine. Loaded by the task-decomposer.
 ---
 
-## 1. DAG Construction
+## Edge Classification (Priority Order)
 
-```
-FUNCTION build_dag(subtask_list):
-  nodes = [], edges = []
-  FOR each subtask S:
-    node = { id, scope, domain, context_tier }
-    nodes.push(node)
-  FOR each pair (A, B) in nodes where A ≠ B:
-    IF shared_type_file(A, B):
-      edges.push({ from: A, to: B, reason: "shared_type_file" })
-      edges.push({ from: B, to: A, reason: "shared_type_file" })
-      // collapse into single node or apply ordering
-    ELSE IF shared_db_migration(A, B):
-      pre = create_pre_node("migration:" + name)
-      nodes.push(pre)
-      edges.push({ from: pre, to: A, reason: "shared_db_migration" })
-      edges.push({ from: pre, to: B, reason: "shared_db_migration" })
-    ELSE IF same_effect_layer(A, B):
-      edges.push({ from: A, to: B, reason: "same_effect_layer" })
-    ELSE IF A.imports_from(B.outputs):
-      edges.push({ from: B, to: A, reason: "import_dependency" })
-    ELSE IF B.imports_from(A.outputs):
-      edges.push({ from: A, to: B, reason: "import_dependency" })
-    ELSE IF A.consumes_type(B.exports):
-      edges.push({ from: B, to: A, reason: "type_contract_dependency" })
-    ELSE IF different_domain(A, B) AND no_shared_contract(A, B):
-      // no edge — parallel
-  levels = toposort_and_level(nodes, edges)
-  RETURN { dag: { nodes, edges, levels }, spawn_plan }
-```
+| Priority | Condition | Reason Field | Direction |
+|---|---|---|---|
+| P1 | Both touch shared type file (`**/types.ts`, `**/schemas/*.ts`, `**/contracts/*.ts`) AND one exports type the other imports | `shared_type_file` | exporter → importer |
+| P2 | Both create DB migrations | `shared_db_migration` | Create pre-node → both |
+| P3 | Both touch same Effect Layer (`Layer.provide`/`Layer.merge`) | `same_effect_layer` | smaller scope → larger |
+| P4 | A imports from B's output files | `import_dependency` | B → A |
+| P5 | A consumes B's export type | `type_contract_dependency` | B → A |
+| P6 | Different domains, no imports between them | (no edge) | Parallel-safe |
+| P7 | Same file, disjoint line ranges | `same_file_conservative` | Sequential |
 
-## 2. Staged Parallelism
+## Topological Sorting
 
-```
-Level 0: [node_a, node_b]     ← width (parallel)
-  Each: discover → architect → implement → verify → fix → judge  ← depth
-Level 1: [node_c]             ← depends on L0 output
-Level 2: [node_d, node_e]     ← depends on L1
-```
+Level 0: nodes with zero incoming edges. Level N: nodes whose edges are satisfied by levels 0..N-1. Every node in exactly one level. No edges within a level. `levels[]` must be a valid topological sort — no backward edges.
 
-- **Width**: nodes at same topological level, zero unresolved incoming edges
-- **Depth**: per-node 6-phase chain, strictly sequential
-- **Merge barrier**: ast-aggregator consolidates after each level
+## False-Independence Anti-Patterns (MUST detect)
 
-## 3. Edge Decision Table
+Shared type files, shared DB migrations, shared Effect layers, cross-domain type drift, same-file parallel edit → all require sequential edges (see P1-P5, P7 above).
 
-| Condition | Edge | Reason |
-|---|---|---|
-| `shared_type_file(A, B)` | A→B or B→A (sequential) | Both touch shared type file |
-| `shared_db_migration(A, B)` | pre-node → A, pre-node → B | Migration before code |
-| `same_effect_layer(A, B)` | A→B (scope order) | Layer construction non-commutative |
-| `A.imports(B.outputs)` | B→A | Import dependency |
-| `A.consumes_type(B.exports)` | B→A | Type contract dependency |
-| `different_domain, no_shared_contract` | No edge | Isolated domains, parallel safe |
-| Same domain, different files | No edge | Independent clusters |
-| Same domain, same file, disjoint ranges | Sequential (conservative) | Merge safety |
+## Synthetic Pre-Nodes
 
-## 4. False-Independence Anti-Patterns
-
-| Pattern | Detection |
-|---|---|
-| Shared type files | Both touch `**/types.ts` or `**/schemas/*.ts` |
-| Shared DB migrations | Both create `**/migrations/*.sql` or `**/migrations/*.ts` |
-| Shared Effect layers | Both touch `Layer.provide(...)` or `Layer.merge(...)` |
-| Cross-domain type drift | Node in domain A exports type consumed by node in domain B |
-| Same-component parallel edit | Same file → sequential (exception: architect-approved disjoint scopes) |
+When P2 triggers, create: `{ id: "N0", node_type: "pre_node", satisfies: [], domain: "shared", phase_chain: [implement, gate], retry_budget: { max_respins: 2 } }`. Pre-nodes participate in edges/levels identically to task nodes. See field guide Section 4 for template.

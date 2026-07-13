@@ -1,19 +1,7 @@
 ---
 name: effect-ts-error-handling
-description: Typed domain errors, boundary mapping, bounded recovery strategies — Effect-TS v4 error handling.
+description: Typed domain errors, boundary mapping, bounded recovery strategies — Effect error handling.
 ---
-
-## v4 Renames
-
-| v3 | v4 |
-|---|---|
-| `catchAll` | `catch` |
-| `catchAllCause` | `catchCause` |
-| `catchAllDefect` | `catchDefect` |
-| `catchSome` | `catchFilter` |
-| `catchSomeCause` | `catchCauseFilter` |
-| `catchSomeDefect` | DELETED |
-| `either` | `result` |
 
 ## Core Principles
 
@@ -22,9 +10,9 @@ description: Typed domain errors, boundary mapping, bounded recovery strategies 
 - Domain errors modeled as tagged errors: `Schema.TaggedErrorClass` or `Data.TaggedError`
 - Infrastructure errors mapped to domain errors at system boundaries — never leak outward
 - Recovery strategies (retry, timeout, fallback) must be policy-based, bounded, and idempotency-aware
-- Cause structure is FLAT in v4: iterate via `for (const reason of cause.reasons)` with `reason._tag "Fail" | "Die" | "Interrupt"`
+- Cause structure is FLAT: iterate via `for (const reason of cause.reasons)` with `reason._tag "Fail" | "Die" | "Interrupt"`
 
-## Preferred Patterns (v4)
+## Preferred Patterns
 
 | Pattern | Implementation |
 |---|---|
@@ -34,16 +22,15 @@ description: Typed domain errors, boundary mapping, bounded recovery strategies 
 | Timeout | `Effect.timeout('5 seconds')` or `Effect.timeoutFail` |
 | Fallback | `Effect.orElse` / `Effect.orElseSucceed` for safe defaults |
 | Defect preservation | `Effect.sandbox` at entry points to log unexpected errors |
-| Specific catch (v4) | `Effect.catchTag("NotFoundError", handler)` — v4 `catchTag` unchanged |
-| Generic catch (v4) | `Effect.catch(() => recover)` — was `catchAll` in v3 |
-| Error absorption | `Effect.result` (was `either`) to convert failures to values |
-| Catch with filter (v4) | `Effect.catchFilter((e) => e._tag === "NotFound")` — was `catchSome` |
+| Specific catch | `Effect.catchTag("NotFoundError", handler)` |
+| Generic catch | `Effect.catch(() => recover)` |
+| Error absorption | `Effect.result` to convert failures to values |
+| Catch with filter | `Effect.catchFilter((e) => e._tag === "NotFound")` |
 
 ## Anti-patterns
 
 | Pattern | Detect | Severity |
 |---|---|---|
-| v3 API usage | `catchAll`, `catchSome`, `catchAllCause`, `catchAllDefect`, `either` | HIGH |
 | Generic Error catches | `catch (error)` / `Effect.catch(() => ...)` without rethrowing defects | HIGH |
 | Catch-all swallowing defects | `Effect.catch(() => Effect.void)` without logging | HIGH |
 | Unbounded retry | Retry without maxRetries or duration limit | HIGH |
@@ -56,14 +43,14 @@ description: Typed domain errors, boundary mapping, bounded recovery strategies 
 
 | Level | Criteria |
 |---|---|
-| HIGH | Silent error swallowing, unbounded retry, defect information loss, v3 API won't compile |
+| HIGH | Silent error swallowing, unbounded retry, defect information loss, API that won't compile |
 | MEDIUM | Generic Error where typed is appropriate, missing boundary mapping |
 | LOW | Over-specified retry without evidence, minor implementation detail leak |
 
 ## Output per finding
 - File:line location
 - Error handling issue (from table)
-- Recommended typed/bounded alternative with v4 API
+- Recommended typed/bounded alternative
 - Risk level
 
 ## Guardrails

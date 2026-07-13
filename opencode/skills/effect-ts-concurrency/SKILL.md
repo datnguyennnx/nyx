@@ -1,16 +1,7 @@
 ---
 name: effect-ts-concurrency
-description: Concurrent operations in Effect-TS v4 — fiber management, interruption handling, bounded parallelism using Effect primitives.
+description: Concurrent operations in Effect — fiber management, interruption handling, bounded parallelism using Effect primitives.
 ---
-
-## v4 Renames
-
-| v3 | v4 |
-|---|---|
-| `fork` | `forkChild` |
-| `forkDaemon` | `forkDetach` |
-| `forkAll` | DELETED → use `Effect.forEach` with `forkChild` per element |
-| `forkWithErrorHandler` | DELETED |
 
 ## Core Principles
 
@@ -23,11 +14,11 @@ description: Concurrent operations in Effect-TS v4 — fiber management, interru
 - `Deferred` for one-time synchronization between fibers, `Ref` for coordinated state updates
 - Proper error propagation in concurrent contexts — don't swallow errors from fibers
 
-## Preferred Primitives (v4)
+## Preferred Primitives
 
 | Primitive | Use for |
 |---|---|
-| `Effect.forEach` + concurrency | Bounded parallelism over collections (replaces deleted `forkAll`) |
+| `Effect.forEach` + concurrency | Bounded parallelism over collections |
 | `Effect.forkChild` | Supervised child fiber — tied to parent Scope |
 | `Effect.forkDetach` | Detached fiber with explicit supervision strategy |
 | `Semaphore` | Resource limiting (DB connections, file handles) |
@@ -42,7 +33,6 @@ description: Concurrent operations in Effect-TS v4 — fiber management, interru
 
 | Pattern | Detect | Severity |
 |---|---|---|
-| v3 API usage | `fork`, `forkDaemon`, `forkAll`, `forkWithErrorHandler` | HIGH |
 | Unbounded concurrency | Many fibers without Semaphore or concurrency limits | HIGH |
 | Ignoring interruption | No finalizers/cleanup on fiber interruption | HIGH |
 | Lost updates | Concurrent Ref modification without atomic ops (`Effect.update`/`modify`) | HIGH |
@@ -58,14 +48,14 @@ description: Concurrent operations in Effect-TS v4 — fiber management, interru
 
 | Level | Criteria |
 |---|---|
-| HIGH | Resource exhaustion, memory leak, deadlock, data corruption, v3 API won't compile |
+| HIGH | Resource exhaustion, memory leak, deadlock, data corruption, API that won't compile |
 | MEDIUM | Degradation under load, stuck fibers, potential race conditions |
 | LOW | Over-coordination, suboptimal primitive choice — correct but not idiomatic |
 
 ## Output per finding
 - File:line location
 - Concurrency issue (from table)
-- Recommended bounded/safe alternative with v4 API
+- Recommended bounded/safe alternative
 - Risk level
 
 ## Guardrails
