@@ -5,25 +5,6 @@ mode: subagent
 model: opencode-go/deepseek-v4-flash
 hidden: true
 temperature: 0.1
-permission:
-  read: allow
-  edit: allow
-  bash:
-    node*: ask
-    python*: ask
-    python3*: ask
-    "*": allow
-  glob: allow
-  grep: allow
-  list: allow
-  task: deny
-  skill: allow
-  webfetch: deny
-  websearch: deny
-  external_directory: deny
-  todowrite: deny
-  question: deny
-  lsp: deny
 ---
 
 # Role

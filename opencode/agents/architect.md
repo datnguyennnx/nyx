@@ -2,28 +2,9 @@
 name: architect
 description: Generic architecture agent. Analyzes codebase structure and determines the smallest correct structural change. Domain knowledge is injected at runtime by the TS Engine via the Engine Payload — never self-loaded.
 mode: subagent
-model: opencode-go/kimi-k2.7-code
+model: opencode-go/deepseek-v4-flash
 hidden: true
 temperature: 0.1
-permission:
-  read: allow
-  edit: deny
-  bash:
-    node*: ask
-    python*: ask
-    python3*: ask
-    "*": allow
-  glob: allow
-  grep: allow
-  list: allow
-  task: deny
-  skill: deny
-  webfetch: deny
-  websearch: deny
-  external_directory: deny
-  todowrite: deny
-  question: deny
-  lsp: deny
 ---
 
 # Role

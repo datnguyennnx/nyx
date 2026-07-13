@@ -1,10 +1,8 @@
 {
   "$schema": "https://opencode.ai/config.json",
+  "model": "opencode-go/deepseek-v4-flash",
   "instructions": [
-    "Read ./AGENTS.md for repository architecture and MAS rules.",
-    "The MAS architecture uses a Deterministic Automata (TS Engine) for control flow. LLM agents are pure execution templates that receive domain skills via engine injection.",
-    "{file:~/.config/opencode/schemas/manifest-field-guide.md}",
-    "{file:~/.config/opencode/schemas/manifest-examples.json}"
+    "The MAS architecture uses a Deterministic Automata (TS Engine) for control flow. LLM agents are pure execution templates that receive domain skills via engine injection."
   ],
   "permission": {
     "read": {
@@ -53,14 +51,6 @@
     "external_directory": {
       "*": "ask",
       "~/.config/opencode/**/*": "allow"
-    },
-    "skill": "allow"
-  },
-  "mcp": {
-    "sequential-thinking": {
-      "type": "local",
-      "command": ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"],
-      "enabled": false
     }
   },
   "mode": {
@@ -75,7 +65,8 @@
         "glob": "allow",
         "grep": "allow",
         "webfetch": "deny",
-        "run_manifest": "allow"
+        "run_manifest": "allow",
+        "question": "allow"
       }
     }
   }
