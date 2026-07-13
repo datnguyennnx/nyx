@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# gsearch — web search + page automation for AI agents.
+# Usage: gsearch [command] [args...]
+set -euo pipefail
+
+# --- config ---
+GSEARCH_CDP_PORT="${GSEARCH_CDP_PORT:-9222}"
+GSEARCH_ALLOW_REAL="${GSEARCH_ALLOW_REAL:-}"
+GSEARCH_TOKEN_DIR="${GSEARCH_TOKEN_DIR:-/tmp/gsearch-tokens}"
+
+# --- source libs ---
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LIB="$SCRIPT_DIR/../lib"
+. "$LIB/common.sh"
+. "$LIB/actions.sh"
+
+# --- dispatch ---
+case "${1:-}" in
+  launch)     shift; cmd_launch "$@" ;;
+  follow)     shift; cmd_follow "$@" ;;
+  screenshot) shift; cmd_screenshot "$@" ;;
+  scrape)     shift; cmd_scrape "$@" ;;
+  *)
+    # default: search mode
+    cmd_search "$@"
+    ;;
+esac

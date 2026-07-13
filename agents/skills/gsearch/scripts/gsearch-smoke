@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# gsearch smoke test — runs with GSEARCH_ALLOW_REAL=1 (trusted test context).
+set -uo pipefail
+export GSEARCH_ALLOW_REAL=1
+
+script_dir="$(cd "$(dirname "$0")" && pwd)"
+cli="$script_dir/gsearch"
+
+if [ ! -f "$cli" ]; then
+  echo "FAIL: $cli not found" >&2
+  exit 1
+fi
+
+if ! command -v browser-harness-js >/dev/null 2>&1; then
+  echo "skip: browser-harness-js not on PATH" >&2
+  exit 77
+fi
+
+run() { "$cli" "$@" 2>&1 || true; }
+
+probe=$(run follow https://example.com --raw 2>/dev/null)
+case "$probe" in
+  *Cannot*connect*|*ECONNREFUSED*|*connect:*|*WS*error*)
+    echo "skip: browser not reachable" >&2
+    exit 77 ;;
+esac
+
+pass=0; fail=0
+ok()  { echo "  PASS  $1"; pass=$((pass + 1)); }
+bad() { echo "  FAIL  $1"; printf '%s\n' "$2" | sed 's/^[[:space:]]*/        /' | head -6; fail=$((fail + 1)); }
+expect_in() { if printf '%s' "$3" | grep -qFe "$2"; then ok "$1"; else bad "$1" "$3"; fi; }
+
+extract_json() {
+  node -e "try{var d=JSON.parse(require('fs').readFileSync(0,'utf8'));var v=d['$1'];if(v!==undefined&&v!==null)process.stdout.write(typeof v==='object'?JSON.stringify(v):String(v))}catch(e){}" 2>/dev/null
+}
+expect_json_key() {
+  local val; val=$(printf '%s' "$3" | extract_json "$2") && [ -n "$val" ] && ok "$1" || bad "$1" "$3"
+}
+expect_json_field() {
+  local val; val=$(printf '%s' "$3" | extract_json "$2") && printf '%s' "$val" | grep -qFe "$4" && ok "$1" || bad "$1" "$3"
+}
+
+echo "gsearch smoke test"
+
+# -- follow: text --
+echo "--- follow: text ---"
+text=$(run follow https://example.com)
+expect_json_key "JSON .success" "success" "$text"
+expect_json_key "JSON .url" "url" "$text"
+expect_json_key "JSON .data" "data" "$text"
+data=$(printf '%s' "$text" | extract_json "data")
+expect_in "text: contains Example Domain" "Example Domain" "$data"
+
+raw_text=$(run follow https://example.com --raw)
+expect_in "raw text: contains Example Domain" "Example Domain" "$raw_text"
+
+# -- follow: JSON URL --
+echo "--- follow: json-url ---"
+json_resp=$(run follow https://jsonplaceholder.typicode.com/todos/1 --json-url)
+expect_json_key "json-url .success" "success" "$json_resp"
+expect_json_field "json-url contains userId" "data" "$json_resp" "1"
+
+json_raw=$(run follow https://jsonplaceholder.typicode.com/todos/1 --json-url --raw)
+expect_in "json-url --raw valid" '"userId":1' "$json_raw"
+
+# -- guards --
+echo "--- guards ---"
+g1=$("$cli" follow 2>&1); rc1=$?
+[ "$rc1" -ne 0 ] && printf '%s' "$g1" | grep -qF "Usage" && ok "guard: follow no url" || bad "guard: follow no url" "rc=$rc1 out=$g1"
+g2=$("$cli" follow https://example.com --bogus 2>&1); rc2=$?
+[ "$rc2" -ne 0 ] && printf '%s' "$g2" | grep -qF "unknown option" && ok "guard: follow bad flag" || bad "guard: follow bad flag" "rc=$rc2 out=$g2"
+g3=$("$cli" --bogus 2>&1); rc3=$?
+[ "$rc3" -ne 0 ] && printf '%s' "$g3" | grep -qF "unknown option" && ok "guard: search bad flag" || bad "guard: search bad flag" "rc=$rc3 out=$g3"
+g4=$("$cli" "test" extra 2>&1); rc4=$?
+[ "$rc4" -ne 0 ] && printf '%s' "$g4" | grep -qF "unexpected argument" && ok "guard: search extra arg" || bad "guard: search extra arg" "rc=$rc4 out=$g4"
+
+# -- search --
+echo "--- search ---"
+search=$(run --count 1 "effect" 2>/dev/null) || true
+if printf '%s' "$search" | node -e "try{var d=JSON.parse(require('fs').readFileSync(0,'utf8'));process.exit(Array.isArray(d)?0:1)}catch(e){process.exit(1)}" 2>/dev/null; then
+  ok "search: returns JSON array"
+else
+  bad "search: returns JSON array" "$search"
+fi
+
+echo
+echo "$pass passed, $fail failed"
+[ "$fail" -eq 0 ]
