@@ -2,7 +2,7 @@
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode-go/deepseek-v4-flash",
   "instructions": [
-    "The MAS architecture uses a Deterministic Automata (TS Engine) for control flow. LLM agents are pure execution templates that receive domain skills via engine injection."
+    "MAS uses a light orchestrator (ship-mas) that decomposes tasks using information-theoretic complexity scoring, spawns generic agents in parallel via task tool, and verifies with mechanical tsc/eslint gates. No JSON manifests. No engine plugin. Agents are self-contained with direct tool access."
   ],
   "permission": {
     "read": {
@@ -59,14 +59,14 @@
       "permission": {
         "task": "allow",
         "skill": "allow",
-        "read": "allow",
+        "bash": "allow",
+        "webfetch": "allow",
+        "todowrite": "allow",
+        "question": "allow",
+        "read": "deny",
         "edit": "deny",
-        "bash": "deny",
-        "glob": "allow",
-        "grep": "allow",
-        "webfetch": "deny",
-        "run_manifest": "allow",
-        "question": "allow"
+        "glob": "deny",
+        "grep": "deny"
       }
     }
   }
