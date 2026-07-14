@@ -1,20 +1,262 @@
 # Action implementations for gsearch — sourced by main entry point.
 # shellcheck disable=all
 
-# --- launch: start Chrome with isolated guest profile ---
+# --- launch: start Chrome/Chromium with isolated guest profile ---
+
+# Check if a binary supports Chrome DevTools Protocol (CDP) — i.e. is Chromium-based.
+# Uses 'strings' which is fast and safe (does not execute the binary).
+# Avoids grep -q + pipefail SIGPIPE issue by using a temp file.
+_is_chromium() {
+  local bin="$1"
+  [ -z "$bin" ] && return 1
+  local _tmp_chk
+  _tmp_chk=$(mktemp /tmp/gsearch-chk-XXXXXX 2>/dev/null) || _tmp_chk="/tmp/gsearch-chk-$$"
+  strings "$bin" 2>/dev/null > "$_tmp_chk"
+  grep -q "remote-debugging-port" "$_tmp_chk" 2>/dev/null
+  local ret=$?
+  rm -f "$_tmp_chk"
+  return $ret
+}
+
+# Detect the system's default web browser and check if it is Chromium-based.
+# Returns the path to the default browser binary if Chromium-based, or empty.
+_detect_default_chrome() {
+  local bundle_id="" app_path=""
+
+  # macOS: Read default HTTPS handler from LaunchServices
+  if [ -f "$HOME/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist" ]; then
+    bundle_id=$(python3 -c "
+import plistlib, os
+path = os.path.expanduser('~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist')
+try:
+    pl = plistlib.load(open(path, 'rb'))
+    for h in pl.get('LSHandlers', []):
+        if h.get('LSHandlerURLScheme') == 'https':
+            print(h.get('LSHandlerRoleAll', ''))
+            break
+except: pass
+" 2>/dev/null)
+    if [ -n "$bundle_id" ]; then
+      app_path=$(mdfind "kMDItemCFBundleIdentifier == '$bundle_id'" 2>/dev/null | head -1)
+      if [ -n "$app_path" ]; then
+        local bin="$app_path/Contents/MacOS/$(basename "$app_path" .app)"
+        [ -x "$bin" ] || bin=$(find "$app_path/Contents/MacOS" -maxdepth 1 -type f -perm +111 2>/dev/null | head -1)
+        if [ -n "$bin" ] && [ -x "$bin" ] && _is_chromium "$bin"; then
+          printf '%s' "$bin"
+          return 0
+        fi
+      fi
+    fi
+  fi
+
+  # Linux: check xdg-mime for default web browser
+  if command -v xdg-mime >/dev/null 2>&1; then
+    local desktop
+    desktop=$(xdg-mime query default x-scheme-handler/https 2>/dev/null || xdg-mime query default text/html 2>/dev/null)
+    if [ -n "$desktop" ]; then
+      # Look through desktop entry paths
+      for dir in "$HOME/.local/share/applications" "/usr/share/applications" "/usr/local/share/applications"; do
+        local desktop_file="$dir/$desktop"
+        if [ -f "$desktop_file" ]; then
+          local exec_line
+          exec_line=$(grep '^Exec=' "$desktop_file" | head -1 | sed 's/^Exec=//' | sed 's/%.*//' | sed 's/^\"//;s/\"$//')
+          if [ -n "$exec_line" ]; then
+            local bin_path
+            bin_path=$(command -v "${exec_line%% *}" 2>/dev/null || echo "$exec_line")
+            bin_path="${bin_path%% *}"
+            if [ -x "$bin_path" ] && _is_chromium "$bin_path"; then
+              printf '%s' "$bin_path"
+              return 0
+            fi
+          fi
+        fi
+      done
+    fi
+  fi
+
+  return 1
+}
+
+# Detect any Chromium-based browser on the system (not the default).
+# Returns the path to the browser binary, or empty string if none found.
+_detect_chrome() {
+  # 1. Common browser paths (ordered by popularity)
+  local browsers=(
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    "/Applications/Chromium.app/Contents/MacOS/Chromium"
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
+    "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
+    "/Applications/Opera.app/Contents/MacOS/Opera"
+    "/Applications/Vivaldi.app/Contents/MacOS/Vivaldi"
+    "/Applications/Arc.app/Contents/MacOS/Arc"
+    "/Applications/Dia.app/Contents/MacOS/Dia"
+    "/Applications/Thorium.app/Contents/MacOS/Thorium"
+    "/Applications/Naver Whale.app/Contents/MacOS/Naver Whale"
+    "/Applications/Slimjet.app/Contents/MacOS/Slimjet"
+    "/Applications/Yandex Browser.app/Contents/MacOS/Yandex Browser"
+    "/opt/homebrew/bin/chromium"
+    "/usr/local/bin/chromium"
+    "/usr/bin/google-chrome"
+    "/usr/bin/chromium"
+    "/usr/bin/chromium-browser"
+    "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    "$HOME/Applications/Chromium.app/Contents/MacOS/Chromium"
+    "$HOME/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"
+    "$HOME/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
+  )
+  local c
+  for c in "${browsers[@]}"; do
+    [ -x "$c" ] && { printf '%s' "$c"; return 0; }
+  done
+
+  # 3. macOS Spotlight search for any Chromium-based browser not in common paths
+  if command -v mdfind >/dev/null 2>&1; then
+    while IFS= read -r app; do
+      name="$(basename "$app" .app)"
+      # Check if the app name suggests Chromium-based
+      case "$name" in
+        *[Cc]hrom*|*[Ee]dge*|*[Bb]rave*|*[Oo]pera*|*[Vv]ivaldi*|*[Aa]rc*|*[Dd]ia*|*[Tt]horium*|*[Ss]limjet*|*[Ww]hale*|*[Yy]andex*)
+          bin="$app/Contents/MacOS/$name"
+          [ -x "$bin" ] || bin="$app/Contents/MacOS/$(basename "$app" .app | tr '[:upper:]' '[:lower:]')"
+          [ -x "$bin" ] || bin=$(find "$app/Contents/MacOS" -maxdepth 1 -type f -perm +111 2>/dev/null | head -1)
+          if [ -n "$bin" ] && [ -x "$bin" ] && _is_chromium "$bin"; then
+            found="$bin"
+            break
+          fi
+          ;;
+      esac
+    done < <(mdfind "kMDItemKind == 'Application'" 2>/dev/null | head -100)
+    if [ -n "${found:-}" ]; then
+      printf '%s' "$found"
+      return 0
+    fi
+  fi
+
+  # 4. Check PATH for any chromium/chrome variant
+  local path_bin
+  path_bin=$(command -v chromium chrome chromium-browser google-chrome 2>/dev/null | head -1)
+  if [ -n "$path_bin" ] && [ -x "$path_bin" ]; then
+    printf '%s' "$path_bin"
+    return 0
+  fi
+
+  return 1
+}
+
+# Install Chromium using available package manager.
+_install_chrome() {
+  echo "No Chromium-based browser found. Attempting to install Chromium..." >&2
+
+  # macOS: Homebrew
+  if command -v brew >/dev/null 2>&1; then
+    echo "Installing Chromium via Homebrew..." >&2
+    brew install --cask chromium 2>&1 || {
+      echo "Homebrew cask failed, trying brew formula..." >&2
+      brew install chromium 2>&1 || {
+        echo '{"error":"Failed to install Chromium via Homebrew"}' >&2
+        exit 2
+      }
+    }
+    local installed="/opt/homebrew/bin/chromium"
+    if [ -x "$installed" ]; then
+      printf '%s' "$installed"
+      return 0
+    fi
+    # Check Applications too
+    if [ -x "/Applications/Chromium.app/Contents/MacOS/Chromium" ]; then
+      printf '%s' "/Applications/Chromium.app/Contents/MacOS/Chromium"
+      return 0
+    fi
+    echo '{"error":"Chromium installed but binary not found at expected path"}' >&2
+    exit 2
+  fi
+
+  # Linux: apt-get
+  if command -v apt-get >/dev/null 2>&1; then
+    echo "Installing Chromium via apt-get..." >&2
+    sudo apt-get update -qq && sudo apt-get install -y -qq chromium-browser 2>&1 || {
+      echo '{"error":"Failed to install Chromium via apt-get"}' >&2
+      exit 2
+    }
+    command -v chromium-browser chromium google-chrome 2>/dev/null | head -1 && return 0
+    echo '{"error":"Chromium installed but not found in PATH"}' >&2
+    exit 2
+  fi
+
+  # Linux: dnf/yum
+  if command -v dnf >/dev/null 2>&1; then
+    echo "Installing Chromium via dnf..." >&2
+    sudo dnf install -y chromium 2>&1 || {
+      echo '{"error":"Failed to install Chromium via dnf"}' >&2
+      exit 2
+    }
+    command -v chromium 2>/dev/null | head -1 && return 0
+    echo '{"error":"Chromium installed but not found in PATH"}' >&2
+    exit 2
+  fi
+  if command -v yum >/dev/null 2>&1; then
+    echo "Installing Chromium via yum..." >&2
+    sudo yum install -y chromium 2>&1 || {
+      echo '{"error":"Failed to install Chromium via yum"}' >&2
+      exit 2
+    }
+    command -v chromium 2>/dev/null | head -1 && return 0
+    echo '{"error":"Chromium installed but not found in PATH"}' >&2
+    exit 2
+  fi
+
+  # Linux: pacman (Arch)
+  if command -v pacman >/dev/null 2>&1; then
+    echo "Installing Chromium via pacman..." >&2
+    sudo pacman -S --noconfirm chromium 2>&1 || {
+      echo '{"error":"Failed to install Chromium via pacman"}' >&2
+      exit 2
+    }
+    command -v chromium 2>/dev/null | head -1 && return 0
+    echo '{"error":"Chromium installed but not found in PATH"}' >&2
+    exit 2
+  fi
+
+  # No known package manager
+  echo '{"error":"No Chromium-based browser found. Please install one manually (e.g. \"brew install --cask chromium\")."}' >&2
+  exit 2
+}
+
 cmd_launch() {
-  echo "Starting Chrome with isolated profile..." >&2
   local profile="/tmp/gsearch-profile-$(date +%s)"
   mkdir -p "$profile"
-  local chrome="${CHROME_PATH:-}"
-  if [ -z "$chrome" ]; then
-    for c in "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-             "/usr/bin/google-chrome" "/usr/bin/chromium" \
-             "/usr/bin/chromium-browser" "/opt/homebrew/bin/chromium"; do
-      [ -x "$c" ] && { chrome="$c"; break; }
-    done
+
+  # Detect browser — priority order:
+  #   1. $CHROME_PATH env var (explicit user override)
+  #   2. System default browser (if Chromium-based)
+  #   3. Any installed Chromium-based browser
+  #   4. Auto-install Chromium
+  local chrome=""
+
+  # Step 1: CHROME_PATH env var
+  if [ -z "$chrome" ] && [ -n "${CHROME_PATH:-}" ] && [ -x "$CHROME_PATH" ]; then
+    chrome="$CHROME_PATH"
+    echo "Using browser from CHROME_PATH: $chrome" >&2
   fi
-  [ -n "$chrome" ] || { echo '{"error":"Chrome not found"}' >&2; exit 2; }
+
+  # Step 2: System default browser (if Chromium-based)
+  if [ -z "$chrome" ]; then
+    chrome=$(_detect_default_chrome) && echo "Using default browser: $chrome" >&2 || true
+  fi
+
+  # Step 3: Any Chromium-based browser
+  if [ -z "$chrome" ]; then
+    chrome=$(_detect_chrome) && echo "Using detected browser: $chrome" >&2 || true
+  fi
+
+  # Step 4: Auto-install
+  if [ -z "$chrome" ]; then
+    echo "No Chromium-based browser found. Attempting to install..." >&2
+    chrome=$(_install_chrome)
+    echo "Installed browser: $chrome" >&2
+  fi
+
+  echo "Using browser: $chrome" >&2
   "$chrome" --remote-debugging-port="$GSEARCH_CDP_PORT" --user-data-dir="$profile" \
     --no-first-run --no-default-browser-check --new-window "about:blank" >/dev/null 2>&1 &
   local pid=$!
@@ -27,7 +269,7 @@ cmd_launch() {
     printf '%s' "$pid" > "$GSEARCH_TOKEN_DIR/port-$GSEARCH_CDP_PORT"
     printf '{"success":true,"pid":%d,"profile":"%s","port":%s}\n' "$pid" "$profile" "$GSEARCH_CDP_PORT"
   else
-    echo '{"error":"Chrome failed to start"}' >&2; exit 2
+    echo '{"error":"Browser failed to start"}' >&2; exit 2
   fi
 }
 
