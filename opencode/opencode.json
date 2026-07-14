@@ -69,5 +69,32 @@
         "grep": "deny"
       }
     }
+  },
+  "agent": {
+    "discovery": {
+      "permission": {
+        "task": "deny"
+      }
+    },
+    "architect": {
+      "permission": {
+        "task": "deny"
+      }
+    },
+    "implementer": {
+      "permission": {
+        "task": "deny"
+      }
+    },
+    "fixer": {
+      "permission": {
+        "task": "deny"
+      }
+    },
+    "verifier": {
+      "permission": {
+        "task": "deny"
+      }
+    }
   }
 }
