@@ -1,9 +1,14 @@
 /**
- * CDP Session: one persistent WebSocket to Chrome's browser endpoint.
+ * CDP Session: persistent WebSocket to Chrome's browser endpoint.
  * Auto-injects sessionId for the active target on every call.
  *
  * Connect with `flatten: true` so all sessions share one WS (no nested
  * Target.sendMessageToTarget envelopes).
+ *
+ * Detection priority:
+ *  1. DevToolsActivePort file scan (standard Chrome/Chromium)
+ *  2. HTTP port scan on 9222-9225 (Dia, Arc, Vivaldi, Opera — browsers
+ *     that don't write DevToolsActivePort but serve /json/version)
  */
 
 import { bindDomains, type Domains, type Transport } from './generated.ts';
@@ -14,30 +19,22 @@ type Pending = {
 };
 
 export type ConnectOptions = {
-  /** Full WS URL: ws://host:port/devtools/browser/<id>. Escape hatch. */
+  /** Full WS URL: ws://host:port/devtools/browser/<id>. */
   wsUrl?: string;
-  /** Or: read DevToolsActivePort from a specific browser's profile dir. */
+  /** Read DevToolsActivePort from profile dir. Polls up to 30s. */
   profileDir?: string;
-  /** Per-candidate WS-open timeout in ms. Default 5000.
-   *  A live browser opens or 403s within ~100ms, so 5s is generous.
-   *  The only case that legitimately needs longer is waiting on the Chrome
-   *  "Allow" popup — bump to 30000 if you expect the user to click it. */
+  /** Connect by debug port. Fetches /json/version to get WS URL. */
+  port?: number;
+  /** Per-candidate WS-open timeout in ms. Default 5000. */
   timeoutMs?: number;
 };
 
-/** A Chromium-based browser detected as running on this machine. */
 export type DetectedBrowser = {
-  /** Short label, e.g. 'Google Chrome', 'Brave', 'Comet'. */
   name: string;
-  /** Absolute profile (user-data) dir. */
   profileDir: string;
-  /** Port from DevToolsActivePort line 1. */
   port: number;
-  /** WebSocket path from DevToolsActivePort line 2. */
   wsPath: string;
-  /** `ws://127.0.0.1:<port><wsPath>` — ready for WebSocket. */
   wsUrl: string;
-  /** DevToolsActivePort mtime (ms since epoch). Used to order by recency. */
   mtimeMs: number;
 };
 
@@ -48,43 +45,33 @@ export class Session implements Transport {
   private activeSessionId: string | undefined;
   private eventListeners: Array<(method: string, params: unknown, sessionId?: string) => void> = [];
 
-  // Generated bindings — one per CDP domain.
-  // Initialized lazily after construction so `_call` is available.
   domains!: Domains;
 
   constructor() {
     this.domains = bindDomains(this);
-    // Mirror domains onto `this` so calls read as `session.Page.navigate(...)`.
     for (const k of Object.keys(this.domains) as (keyof Domains)[]) {
       (this as any)[k] = this.domains[k];
     }
   }
 
-  /**
-   * Connect to Chrome's browser-level WebSocket.
-   *
-   * With no args, runs auto-detect: scans OS-specific profile dirs via
-   * `detectBrowsers()` and tries each candidate (most-recently-launched first)
-   * until a WebSocket open succeeds. Each attempt has a short timeout so
-   * dead ports and permission-denied (403) candidates fail fast and the
-   * loop moves on.
-   *
-   * With explicit opts ({ wsUrl } | { profileDir } | { port }), connects
-   * directly to that single URL with a generous timeout.
-   */
   async connect(opts: ConnectOptions = {}): Promise<void> {
     const timeoutMs = opts.timeoutMs ?? 5_000;
+
+    if (opts.port) {
+      const wsUrl = await discoverByPort(opts.port);
+      await this.openWs(wsUrl, timeoutMs);
+      return;
+    }
     if (opts.wsUrl || opts.profileDir) {
       const wsUrl = await resolveWsUrl(opts);
       await this.openWs(wsUrl, timeoutMs);
       return;
     }
+
     const browsers = await detectBrowsers();
     if (browsers.length === 0) {
-      const scanned = getBrowserCandidates().map(c => c.name).join(', ');
-      throw new Error(
-        `No running browser with remote debugging detected. Enable it from chrome://inspect > "Discover network targets", or pass { profileDir } / { wsUrl } explicitly. Scanned: ${scanned}.`,
-      );
+      const help = buildNoBrowserHelp();
+      throw new Error(help);
     }
     const errors: string[] = [];
     for (const b of browsers) {
@@ -92,12 +79,13 @@ export class Session implements Transport {
         await this.openWs(b.wsUrl, timeoutMs);
         return;
       } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        errors.push(`  ${b.name} @ ${b.wsUrl}: ${msg}`);
+        errors.push(`  ${b.name} @ ${b.wsUrl}: ${e instanceof Error ? e.message : e}`);
       }
     }
     throw new Error(
-      `No detected browser accepted a connection. If one of these is the browser you want, click "Allow" on its remote-debugging prompt and retry, or pass { profileDir, timeoutMs: 30000 } to wait for the click:\n${errors.join('\n')}`,
+      `No browser accepted connection.\n` +
+      `If one of these is yours, click "Allow" then retry, or pass { timeoutMs: 30000 }:\n` +
+      `${errors.join('\n')}`,
     );
   }
 
@@ -114,53 +102,34 @@ export class Session implements Transport {
       };
       const timer = setTimeout(() => finish(new Error(`timed out after ${timeoutMs}ms`)), timeoutMs);
       ws.addEventListener('open', () => finish());
-      ws.addEventListener('error', (e) => finish(new Error(`WS error: ${(e as any)?.message ?? 'connect failed (likely 403, permission not granted, or port closed)'}`)));
+      ws.addEventListener('error', (e) => finish(new Error(`WS error: ${(e as any)?.message ?? 'connect failed (403 or port closed)'}`)));
       ws.addEventListener('message', (e) => this.onMessage(String(e.data)));
       ws.addEventListener('close', () => {
         for (const [, p] of this.pending) p.reject(new Error('CDP socket closed'));
         this.pending.clear();
-        finish(new Error('WS closed before open (likely 403 or port closed)'));
+        finish(new Error('WS closed before open (403 or port closed)'));
       });
       this.ws = ws;
     });
   }
 
-  isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
-  }
+  isConnected(): boolean { return this.ws?.readyState === WebSocket.OPEN; }
+  close(): void { this.ws?.close(); }
 
-  close(): void {
-    this.ws?.close();
-  }
-
-  /**
-   * Pick a target and make subsequent calls auto-route to it.
-   * Uses Target.attachToTarget with flatten:true (single-WS, sessionId-on-message).
-   */
   async use(targetId: string): Promise<string> {
     const r = await this._call('Target.attachToTarget', { targetId, flatten: true }) as { sessionId: string };
     this.activeSessionId = r.sessionId;
     return r.sessionId;
   }
 
-  /** Set the active sessionId directly (e.g. one you already attached). */
-  setActiveSession(sessionId: string | undefined): void {
-    this.activeSessionId = sessionId;
-  }
+  setActiveSession(sessionId: string | undefined): void { this.activeSessionId = sessionId; }
+  getActiveSession(): string | undefined { return this.activeSessionId; }
 
-  getActiveSession(): string | undefined {
-    return this.activeSessionId;
-  }
-
-  /** Subscribe to all CDP events. Returns an unsubscribe fn. */
   onEvent(fn: (method: string, params: unknown, sessionId?: string) => void): () => void {
     this.eventListeners.push(fn);
-    return () => {
-      this.eventListeners = this.eventListeners.filter(x => x !== fn);
-    };
+    return () => { this.eventListeners = this.eventListeners.filter(x => x !== fn); };
   }
 
-  /** Wait for the next event matching `method` (and optional predicate). */
   waitFor<T = unknown>(method: string, predicate?: (params: T) => boolean, timeoutMs = 30_000): Promise<T> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
@@ -177,7 +146,6 @@ export class Session implements Transport {
     });
   }
 
-  // Transport implementation. Called by the generated domain bindings.
   _call(method: string, params: unknown = {}): Promise<unknown> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error('Not connected. Call session.connect(...) first.'));
@@ -217,36 +185,19 @@ export class CdpError extends Error {
   }
 }
 
-/** Browser-level methods never take a sessionId. */
 function isBrowserLevel(method: string): boolean {
   return method.startsWith('Browser.') || method.startsWith('Target.');
 }
 
-/**
- * Resolve a WebSocket URL for one of the explicit connect forms:
- *   { wsUrl }      — passthrough.
- *   { profileDir } — reads `<profileDir>/DevToolsActivePort` and builds the
- *                    WS URL directly. Works on all Chrome versions including
- *                    144+ / chrome://inspect (which doesn't serve /json/version).
- *
- * For auto-detect, call `session.connect()` with no args — it iterates
- * `detectBrowsers()` and picks the first browser whose WS accepts.
- */
 export async function resolveWsUrl(opts: ConnectOptions): Promise<string> {
   if (opts.wsUrl) return opts.wsUrl;
   if (opts.profileDir) {
     const { port, path } = await readDevToolsActivePort(opts.profileDir);
     return `ws://127.0.0.1:${port}${path}`;
   }
-  throw new Error('resolveWsUrl needs { wsUrl } or { profileDir }. For auto-detect, call session.connect() directly.');
+  throw new Error('resolveWsUrl needs { wsUrl } or { profileDir }.');
 }
 
-/**
- * Parse both lines of DevToolsActivePort. Chrome writes:
- *   line 1: port number
- *   line 2: path (e.g. "/devtools/browser/<uuid>")
- * With both in hand we can build `ws://host:port<path>` with no HTTP probe.
- */
 async function readDevToolsActivePort(profileDir: string): Promise<{ port: number; path: string }> {
   const deadline = Date.now() + 30_000;
   let lastErr: unknown;
@@ -257,8 +208,7 @@ async function readDevToolsActivePort(profileDir: string): Promise<{ port: numbe
       const port = Number(portStr);
       if (!Number.isFinite(port)) throw new Error(`malformed port line: ${portStr}`);
       if (!path || !path.startsWith('/devtools/')) {
-        // File is written atomically but path line may not be there on first open.
-        throw new Error(`missing/invalid path line in DevToolsActivePort: ${JSON.stringify(text)}`);
+        throw new Error(`missing/invalid path line: ${JSON.stringify(text)}`);
       }
       return { port, path };
     } catch (e) {
@@ -269,11 +219,6 @@ async function readDevToolsActivePort(profileDir: string): Promise<{ port: numbe
   throw new Error(`Could not read ${profileDir}/DevToolsActivePort after 30s: ${lastErr}`);
 }
 
-/**
- * List page targets via CDP's `Target.getTargets` (works on all Chrome versions,
- * including those that do not serve /json). Filters out chrome:// and devtools://
- * internals. Requires the session to be connected already.
- */
 export type PageTarget = { targetId: string; title: string; url: string; type: string };
 export async function listPageTargets(session: Session): Promise<PageTarget[]> {
   const { targetInfos } = await session.domains.Target.getTargets({});
@@ -282,25 +227,15 @@ export async function listPageTargets(session: Session): Promise<PageTarget[]> {
   );
 }
 
-/**
- * Scan OS-specific user-data directories for Chromium-based browsers that
- * currently have remote debugging enabled (a `DevToolsActivePort` file exists
- * in the profile dir). Does NOT verify the WS endpoint is live — call
- * `verifyWsEndpoint(wsUrl)` on each entry if you need that.
- *
- * Ordered by DevToolsActivePort mtime descending, so the most-recently-
- * launched browser is first — that's the one `connect()` picks by default.
- *
- * This is the ONLY reliable connect method for Chrome 144+ with remote
- * debugging toggled from chrome://inspect — those browsers do NOT serve
- * `/json/version`, so port-probe discovery fails.
- */
 export async function detectBrowsers(): Promise<DetectedBrowser[]> {
-  const candidates = getBrowserCandidates();
   const detected: DetectedBrowser[] = [];
-  for (const { name, profileDir } of candidates) {
+  const seenPorts = new Set<number>();
+
+  // Method 1: DevToolsActivePort file scan (standard Chrome)
+  for (const { name, profileDir } of getBrowserCandidates()) {
     const parsed = await tryReadDevToolsActivePort(profileDir);
     if (!parsed) continue;
+    seenPorts.add(parsed.port);
     detected.push({
       name,
       profileDir,
@@ -310,13 +245,24 @@ export async function detectBrowsers(): Promise<DetectedBrowser[]> {
       mtimeMs: parsed.mtimeMs,
     });
   }
+
+  // Method 2: HTTP port scan (Dia, Arc, Opera, Vivaldi — no DevToolsActivePort)
+  const ports = [9222, 9223, 9224, 9225];
+  const results = await Promise.allSettled(
+    ports.filter(p => !seenPorts.has(p)).map(port => probePort(port))
+  );
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value) {
+      detected.push(r.value);
+    }
+  }
+
   detected.sort((a, b) => b.mtimeMs - a.mtimeMs);
   return detected;
 }
 
 type BrowserCandidate = { name: string; profileDir: string };
 
-/** OS-specific user-data dirs for Chromium-based browsers, in rough popularity order. */
 function getBrowserCandidates(): BrowserCandidate[] {
   const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
   const list: BrowserCandidate[] = [];
@@ -329,6 +275,7 @@ function getBrowserCandidates(): BrowserCandidate[] {
     push('Microsoft Edge',         `${base}/Microsoft Edge`);
     push('Brave',                  `${base}/BraveSoftware/Brave-Browser`);
     push('Arc',                    `${base}/Arc/User Data`);
+    push('Dia',                    `${base}/Dia/User Data`);
     push('Vivaldi',                `${base}/Vivaldi`);
     push('Opera',                  `${base}/com.operasoftware.Opera`);
     push('Comet',                  `${base}/Comet`);
@@ -349,6 +296,7 @@ function getBrowserCandidates(): BrowserCandidate[] {
     push('Microsoft Edge',         `${local}\\Microsoft\\Edge\\User Data`);
     push('Brave',                  `${local}\\BraveSoftware\\Brave-Browser\\User Data`);
     push('Arc',                    `${local}\\Arc\\User Data`);
+    push('Dia',                    `${local}\\Dia\\User Data`);
     push('Vivaldi',                `${local}\\Vivaldi\\User Data`);
     push('Opera',                  `${local}\\Opera Software\\Opera Stable`);
     push('Google Chrome Canary',   `${local}\\Google\\Chrome SxS\\User Data`);
@@ -356,11 +304,6 @@ function getBrowserCandidates(): BrowserCandidate[] {
   return list;
 }
 
-/**
- * Read and parse `<profileDir>/DevToolsActivePort` once (no polling), returning
- * undefined if the file is missing or malformed. Also returns mtime so callers
- * can sort by recency.
- */
 async function tryReadDevToolsActivePort(
   profileDir: string,
 ): Promise<{ port: number; path: string; mtimeMs: number } | undefined> {
@@ -377,3 +320,86 @@ async function tryReadDevToolsActivePort(
   }
 }
 
+async function probePort(port: number): Promise<DetectedBrowser | null> {
+  try {
+    const resp = await fetch(`http://127.0.0.1:${port}/json/version`, {
+      signal: AbortSignal.timeout(800),
+    });
+    if (!resp.ok) return null;
+    const info = await resp.json();
+    return {
+      name: cleanBrowserName(info.Browser || `Chromium`),
+      profileDir: '',
+      port,
+      wsPath: info.webSocketDebuggerUrl.replace(/^ws:\/\/[^\/]+/, ''),
+      wsUrl: info.webSocketDebuggerUrl,
+      mtimeMs: Date.now(),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function discoverByPort(port: number): Promise<string> {
+  // Method 1: HTTP /json/version (--remote-debugging-port flag)
+  try {
+    const resp = await fetch(`http://127.0.0.1:${port}/json/version`, {
+      signal: AbortSignal.timeout(2000),
+    });
+    if (resp.ok) {
+      const info = await resp.json();
+      return info.webSocketDebuggerUrl;
+    }
+  } catch { /* fall through */ }
+
+  // Method 2: Scan DevToolsActivePort files (Chrome 144+ inspect mode, no HTTP)
+  const home = process.env.HOME ?? '';
+  const candidates = [
+    `${home}/Library/Application Support/Dia/User Data`,
+    `${home}/Library/Application Support/Arc/User Data`,
+    `${home}/Library/Application Support/Google/Chrome`,
+    `${home}/Library/Application Support/Chromium`,
+    `${home}/Library/Application Support/Microsoft Edge`,
+    `${home}/Library/Application Support/BraveSoftware/Brave-Browser`,
+  ];
+  for (const dir of candidates) {
+    try {
+      const file = Bun.file(`${dir}/DevToolsActivePort`);
+      const text = await file.text();
+      const [p, wsPath] = text.trim().split('\n');
+      if (Number(p) === port && wsPath?.startsWith('/devtools/')) {
+        return `ws://127.0.0.1:${port}${wsPath}`;
+      }
+    } catch { /* no file or not matching */ }
+  }
+
+  throw new Error(`No browser on port ${port}. Enable CDP from chrome://inspect or start with --remote-debugging-port=${port}`);
+}
+
+function cleanBrowserName(raw: string): string {
+  return raw.replace(/^Chrome\//, '').replace(/^Chromium\//, '').trim();
+}
+
+function buildNoBrowserHelp(): string {
+  const home = process.env.HOME ?? '';
+  const known = [];
+  for (const c of getBrowserCandidates()) {
+    known.push(c.name);
+  }
+  const uniq = [...new Set(known)];
+  return [
+    `No running browser with remote debugging detected.`,
+    ``,
+    `How to enable:`,
+    `  Chrome/Edge/Brave: open chrome://inspect/#remote-debugging → toggle ON`,
+    `  Dia: dia://inspect/#remote-debugging → toggle ON`,
+    `  Terminal: <browser> --remote-debugging-port=9222`,
+    ``,
+    `Or pass options explicitly:`,
+    `  session.connect({ port: 9222 })`,
+    `  session.connect({ wsUrl: "ws://127.0.0.1:9222/devtools/browser/<id>" })`,
+    `  session.connect({ profileDir: "/path/to/profile" })`,
+    ``,
+    `Browsers scanned: ${uniq.join(', ')}`,
+  ].join('\n');
+}

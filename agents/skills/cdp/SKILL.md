@@ -75,11 +75,17 @@ const { nodeId } = await session.DOM.querySelector({ nodeId: root.nodeId, select
 
 ## Connect
 
+Auto-detection scans DevToolsActivePort files AND probes ports 9222-9225 via HTTP
+(catches Dia/Arc/Vivaldi which don't write DevToolsActivePort).
+
 ```js
-await session.connect()                                  // auto-detect
-await session.connect({ wsUrl: "ws://127.0.0.1:9222/..." })  // explicit
-await session.connect({ profileDir: "~/Library/.../Chrome" }) // by profile
+await session.connect()                                    // auto-detect (2 methods)
+await session.connect({ port: 9222 })                      // by port (HTTP probe)
+await session.connect({ wsUrl: "ws://127.0.0.1:9222/..." })  // explicit WS
+await session.connect({ profileDir: "~/Library/.../Dia/User Data" }) // by profile
 ```
+
+Supported browsers: Chrome, Chromium, Edge, Brave, **Dia**, **Arc**, Vivaldi, Opera, Comet, Canary.
 
 ## State persistence
 

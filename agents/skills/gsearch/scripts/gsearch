@@ -9,7 +9,15 @@ GSEARCH_ALLOW_REAL="${GSEARCH_ALLOW_REAL:-}"
 GSEARCH_TOKEN_DIR="${GSEARCH_TOKEN_DIR:-/tmp/gsearch-tokens}"
 
 # --- source libs ---
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SELF="$0"
+if [ -L "$SELF" ]; then
+  LINK="$(readlink "$SELF")"
+  case "$LINK" in
+    /*) SELF="$LINK" ;;
+    *) SELF="$(cd "$(dirname "$SELF")" && pwd)/$LINK" ;;
+  esac
+fi
+SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
 LIB="$SCRIPT_DIR/../lib"
 . "$LIB/common.sh"
 . "$LIB/actions.sh"
