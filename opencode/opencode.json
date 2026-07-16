@@ -2,7 +2,8 @@
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode-go/deepseek-v4-flash",
   "instructions": [
-    "MAS uses a light orchestrator (ship-mas) that decomposes tasks using information-theoretic complexity scoring, spawns generic agents in parallel via task tool, and verifies with mechanical tsc/eslint gates. No JSON manifests. No engine plugin. Agents are self-contained with direct tool access."
+    "MAS uses an orchestrator (ship-mas) that decomposes tasks using information-theoretic complexity scoring, spawns generic agents in parallel via task tool, and verifies output before completing. Agents are self-contained with direct tool access.",
+    "CRITICAL: Respect repository rules. Every repo defines agent rules via AGENTS.md and markdown files in its root. Read them as priority instructions. Never skip or override the instruction author."
   ],
   "permission": {
     "read": {
