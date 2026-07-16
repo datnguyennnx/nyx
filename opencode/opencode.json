@@ -34,7 +34,7 @@
     "bash": {
       "*": "allow",
       "rm -rf *": "ask",
-      "git*": "deny",
+      "git*": "ask",
       "git diff *": "allow",
       "git status *": "allow",
       "git log *": "allow",
