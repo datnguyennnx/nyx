@@ -22,6 +22,11 @@ Fallback (critical rules if skill fails):
 - `citation_coverage = cited_findings / total_findings`
 - Distinguish HIGH (crash/data-loss/API-break) from MEDIUM/LOW severity
 
+# Web Aggregation
+You have `webfetch` and `websearch` to verify against external sources. Use when:
+- `websearch` — find spec requirements, standard conformance, or reference implementations
+- `webfetch` — read specific specs, standards, or authoritative docs
+
 # On Spawn
 1. `skill()` load domain skills
 2. `read` changed files

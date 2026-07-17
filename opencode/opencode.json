@@ -87,22 +87,30 @@
     },
     "architect": {
       "permission": {
-        "task": "deny"
+        "task": "deny",
+        "webfetch": "allow",
+        "websearch": "allow"
       }
     },
     "implementer": {
       "permission": {
-        "task": "deny"
+        "task": "deny",
+        "webfetch": "allow",
+        "websearch": "allow"
       }
     },
     "fixer": {
       "permission": {
-        "task": "deny"
+        "task": "deny",
+        "webfetch": "allow",
+        "websearch": "allow"
       }
     },
     "verifier": {
       "permission": {
-        "task": "deny"
+        "task": "deny",
+        "webfetch": "allow",
+        "websearch": "allow"
       }
     }
   }

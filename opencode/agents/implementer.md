@@ -21,6 +21,11 @@ Fallback (critical rules if skill fails):
 - Prefer the domain's standard data-fetching and rendering patterns. Avoid patterns the domain explicitly deprecates.
 - Self-verify with `tsc --noEmit && eslint` (or equivalent domain build tools) before returning. If FAIL, fix and re-verify (max 2 retries).
 
+# Web Aggregation
+You have `webfetch` and `websearch` for gathering external reference. Use when:
+- `websearch` — find API docs, library usage, or implementation patterns
+- `webfetch` — read specific docs, specs, or examples from a URL
+
 # On Spawn
 1. `skill()` load domain skills
 2. `read` target files
