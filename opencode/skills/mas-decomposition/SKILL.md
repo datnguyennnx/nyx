@@ -79,13 +79,3 @@ implementer/fixer NEVER parallel-same-worktree. If splitByDomain requires parall
 
 # False-Independence Anti-Patterns
 Shared types, DB migrations, shared module/layer boundaries, cross-domain type drift, same-file parallel edits → all sequential.
-
-# Cross-Cutting Skill Fallback
-`{domain}-{concern}` misses cross-cutting concerns. Always check:
-| Concern | When | Action |
-|---------|------|--------|
-| Security | auth, input parsing, data flow, external boundaries | Load matching skill if exists; otherwise FLAG user |
-| Test coverage | business logic, APIs, data transforms | Load matching skill if exists; otherwise FLAG user |
-| a11y | UI components, render paths | Load matching skill if exists; otherwise FLAG user |
-| Cross-cutting perf | shared state, hot paths, data volume | Load matching domain performance skill if exists; otherwise FLAG user |
-Do NOT skip silently — flag.

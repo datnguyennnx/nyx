@@ -3,7 +3,7 @@ name: mas-verification
 description: Build/lint verification, citation quality, ship confidence, conflict detection. For ship-mas orchestrator.
 ---
 
-# GATE (Binary — Evaluated First, Never Averaged)
+# GATE
 ```
 tsc --noEmit && eslint must both exit 0.
 ```

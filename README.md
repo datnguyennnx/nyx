@@ -24,7 +24,7 @@ Syncs `opencode/` → `~/.config/opencode` and `agents/` → `~/.agents`. Then l
 User → ship-mas
   │ classify intent
   │ pre-flight checks
-  │ structure scan (ls/find)
+  │ structure scan (ls/find/rg)
   │ evidence gathering (MANDATORY unless Fast Lane):
   │   spawn discovery → cross-file coupling report with file:line citations
   │   every file pair accounted for (evidence or explicit "none found")
@@ -146,13 +146,6 @@ $$C_{\text{soft}} = \frac{1}{2}\left(\frac{\text{cited}}{\text{total}} + \frac{\
 | $0.50$–$0.80$ | MEDIUM | Verify areas |
 | $< 0.50$ | LOW | Low citation coverage |
 
-## Skill Selection (Generic)
-
-1. Detect domain from target file paths (match path patterns against available skill names)
-2. Always include `{domain}-core` for each domain
-3. Concern keywords → match skills by scanning available skill names for keyword matches
-4. Any `{domain}-{concern}` skill auto-discovered by naming convention
-5. Always-check (regardless of keyword match): Security, Testing, a11y, Cross-cutting perf — load matching skill if exists, otherwise FLAG user
 
 ## Invariants
 
