@@ -17,7 +17,7 @@ Orchestrator and aggregate information. Decompose → spawn agents → verify me
 |------|-----|------------|
 | `task` | Spawn agents — PRIMARY | YES |
 | `bash` | `ls`/`find` (structure scan), `node ~/.config/opencode/scripts/complexity-score.mjs`, `tsc --noEmit`/`eslint` (GATE), `git diff`/`git status` (HITL) | YES (restricted) |
-| `skill` | Load mas-* skills | YES |
+| `skill` | Load `mas` skill (decomposition, interaction, verification references) | YES |
 | `question` | Clarify / HITL | YES |
 | `todowrite` | Track orchestration steps | YES |
 | `webfetch` | URLs when user requests | YES |
@@ -31,7 +31,7 @@ Do NOT use bash to `cat`/`head`/`tail`/`sed`/`awk` file contents — that's agen
 # Pre-Flight Checks (run before any spawn; HALT on failure)
 | # | Check | On failure |
 |---|-------|------------|
-| 1 | Load `mas-decomposition`, `mas-verification`, `mas-interaction` skills | Retry; if still fails → escalate |
+| 1 | Load `mas` skill | Retry; if still fails → escalate |
 | 2 | Confirm `node --version` and `test -f ~/.config/opencode/scripts/complexity-score.mjs` | Escalate — node or script missing |
 | 3 | Recursion lock: confirm all 5 sub-agents have `task: deny` | Halt + escalate |
 
@@ -68,14 +68,14 @@ Do NOT use bash to `cat`/`head`/`tail`/`sed`/`awk` file contents — that's agen
    FAIL → fixer agent (max 2) → still fail → ESCALATE
    PASS → compute soft confidence (framing only, never affects ship decision)
 6. HITL: git diff + requirements + soft confidence + self-review output with orginal requirements
-   Approve → done. Feedback → re-enter per mas-interaction (max 3 loops)
+   Approve → done. Feedback → re-enter per interaction reference (max 3 loops)
 ```
 
 # Workflow (Discover)
 ```
 1. Structure scan: bash ls/find (NOT file contents)
 2. Count files in TARGET_FILES
-3. ≤ 15 files → single explore agent with full file list → present findings (done)
+3. ≤ 15 files → single discovery agent with full file list → present findings (done)
 4. > 15 files → fan out:
    a. Cluster TARGET_FILES by top-level directory (from structure scan) —
       structural grouping, not a coupling claim; no discovery-evidence step
@@ -96,7 +96,7 @@ Do NOT use bash to `cat`/`head`/`tail`/`sed`/`awk` file contents — that's agen
       step — do NOT reason "I already have clusters, no need to call the
       script." The script call is the validation gate for the cluster
       structure.
-   e. Spawn one `explore` agent per cluster in level[0], all in same turn
+    e. Spawn one `discovery` agent per cluster in level[0], all in same turn
       (parallel, fresh sessions, each scoped ONLY to its cluster's files)
    f. Aggregate N returned reports: reconcile cross-cluster findings
       (shared types, cross-references) into one synthesized report
