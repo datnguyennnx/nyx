@@ -1,13 +1,32 @@
 ---
 name: gsearch
 description: "Search Google + read web pages + extract PDFs. Parallel multi-tab batch operations. arXiv PDFs auto-convert to abstract pages. Use ONLY when you need web research — not for local file operations or system administration."
-setup: bash <skill-dir>/scripts/setup
-compatibility: "browser-harness-js on PATH + Chromium browser (Chrome, Edge, Brave, Dia, Arc). Bun auto-installed."
-exit_codes:
-  0: success (JSON on stdout)
-  1: usage error (bad args)
-  2: browser/dependency error (JSON on stderr)
+compatibility: "Bun and Chromium required (auto-installed on first run). gsearch launch starts isolated Chrome at /tmp/gsearch-profile."
 ---
+
+
+## ⚡ When This Skill Activates
+
+The user says ANY of these phrases → you MUST load this skill and use gsearch commands:
+- "/gsearch", "gsearch", "/gsearch skill"
+- "search for", "search the web", "research", "find papers", "look up"
+- "arxiv", "google scholar", "latest papers", "find me"
+
+### What you must do:
+
+1. Use `gsearch batch search --count N "query1" "query2" ...` for multi-query discovery
+2. Use `gsearch search "query"` for a single fact
+3. Use `gsearch follow <url>` to read any full page
+4. Use `gsearch batch follow <url1> <url2> ...` for multiple pages
+5. Use `gsearch batch harvest --count N --max M "q1" "q2" ...` for full research pipelines
+
+### What you must NOT do:
+
+**Do NOT use `webfetch`** for any web research task. See Trap 7 (Fetch-Tool-Fallback Trap) below for why.
+
+### Why this matters
+
+gsearch launches a real Chrome browser via CDP. It executes JavaScript, bypasses Cloudflare/bot-detection, renders dynamic pages, and extracts visible text from real rendered DOM. webfetch sends a raw HTTP request — no JS execution, no anti-bot evasion, returns empty shells or captcha pages. For arXiv, Google Scholar, SSRN, or any real website, gsearch follow is the only tool that works reliably.
 
 ## The Core Rule
 
@@ -34,7 +53,7 @@ Starts isolated Chromium at `/tmp/gsearch-profile` with `--remote-debugging-port
 | `reference/pdf-extraction.md` | 3-tier PDF handling (arXiv rewrite, Chrome viewer, pdftotext), URL detection logic, error reference |
 | `reference/troubleshooting.md` | CDP connection failures, empty results, PDF extraction issues, environment setup, exit codes |
 | `reference/ast-discovery.md` | Structured knowledge tree for web research — provenance, token efficiency, anti-hallucination |
-| `reference/workspace-management.md` | /tmp/nyx-search/ workspace — lifecycle, cleanup, grep patterns, safety rules |
+| `cdp/reference/workspace-management.md` | `/tmp/nyx-search/` workspace, session isolation, cache TTL, artifact lifecycle, cleanup rules — shared with CDP skill |
 
 ## Architecture
 

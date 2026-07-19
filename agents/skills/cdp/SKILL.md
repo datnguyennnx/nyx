@@ -9,99 +9,87 @@ compatibility: "Chromium with --remote-debugging-port. Bun required (auto-instal
 **CRITICAL:** Never connect CDP to Chrome running with your real profile.
 CDP has full access to cookies, passwords, history, and can execute JS in any tab context.
 
-Safe workflow:
-```bash
-gsearch launch    # starts Chrome with isolated /tmp/profile (no cookies, no passwords)
-browser-harness-js 'await session.connect()'  # connects to that isolated instance
+Always use `gsearch launch` to start Chrome with an isolated temp profile at `/tmp/gsearch-profile`.
+
+## The Core Rule
+
+All browser automation goes through `browser-automation.ts`. It wraps every tab operation with timeouts, error isolation, and content quality gates. Never call `browser-harness-js` directly — it has none of these safeguards.
+
+## When This Applies
+
+| Use CDP when | Use gsearch instead |
+|---|---|
+| Single page follow, extract, screenshot | Multi-query web search with batch research |
+| Raw CDP automation code | Batch follow with dedup and ranking |
+| Tab lifecycle control (create, navigate, close) | arXiv auto-conversion, PDF extraction |
+| Debugging browser interaction | Full research pipeline (search → dedup → extract) |
+
+## Core Commands
+
+```
+browser-automation.ts follow <url> [--selector S] [--timeout MS] [--port N] [--raw]
+browser-automation.ts batch-follow <url1> ... [--selector S] [--timeout MS] [--port N]
+browser-automation.ts search <query> [--count N] [--port N]
+browser-automation.ts batch-search <q1> ... [--count N] [--port N]
+browser-automation.ts batch-harvest <q1> ... [--count N] [--max M] [--timeout MS] [--port N]
 ```
 
-If you see a warning about `real profile` — close that Chrome and use `gsearch launch` instead.
-The agent's skills/config should also not be shared — they grant full CDP browser access.
+## The Traps You Will Hit
 
-## Usage
+### Trap 1: The Direct-Call Trap
+You think calling `browser-harness-js` directly is faster. But it has no timeout wrapping, no error isolation, no quality gate. Every call must go through `browser-automation.ts`.
+— `reference/multi-tab.md`, `SKILL.md` Core Rule
 
-```bash
-browser-harness-js '<js>'             # single expression (auto-return)
-browser-harness-js <<'EOF' ... EOF    # multi-line with explicit return
-browser-harness-js --status           # health JSON
-browser-harness-js --start            # start REPL server
-browser-harness-js --stop             # shutdown server
-```
+### Trap 2: The One-Shot Wait Trap
+You think `session.waitFor()` registers a persistent listener. But it fires once on the currently active target. Switching tabs orphans the listener. Use polling (`document.readyState`) for multi-tab operations.
+— `reference/multi-tab.md`
 
-## Globals (pre-loaded)
+### Trap 3: The Leaking-Tab Trap
+You think closing the script closes all tabs. They persist across calls. Every `createTarget()` needs a `closeTarget()` in try/finally.
+— `reference/errors.md`
 
-| Global | Description |
-|--------|-------------|
-| `session` | Persistent `Session` instance. All CDP domains mounted. |
-| `session.connect()` | Auto-detect browser or `{wsUrl}` / `{profileDir}` |
-| `session.use(targetId)` | Attach to a tab. Subsequent calls route to it. |
-| `session.waitFor(method, pred?, timeoutMs)` | Wait for CDP event |
-| `listPageTargets()` | `[{targetId,title,url,type}]` — filters chrome:// |
-| `detectBrowsers()` | Scan running Chromium browsers |
-| `CDP.Page`, `CDP.Runtime`, etc. | Generated type namespaces (for reference) |
+### Trap 4: The Content-Confidence Trap
+You think extracted text is always usable. Many pages return error messages, paywalls, or empty shells. Always run the quality gate and check for `_error: "low_quality_content"`.
+— `reference/content-quality.md`
 
-## Method convention
+## Playbook
 
-```js
-// No params
-await session.Page.enable()
+1. **Launch browser** — `gsearch launch` (isolated Chrome on port 9222)
+2. **Connect** — `browser-automation.ts` handles connection automatically
+3. **Pick command** — follow (single URL), search (single query), batch-follow (multi URL), batch-search (multi query), batch-harvest (research pipeline)
+4. **Extract** — content is quality-gated automatically
+5. **Close** — tabs close in try/finally; REPL state persists across calls
+6. **Verify** — check output for `_error` fields; retry with longer timeout if empty
 
-// Object params
-await session.Page.navigate({ url: "https://example.com" })
+## Decision Tree
 
-// Return = typed result (no CDP envelope)
-const { root } = await session.DOM.getDocument()
-const { nodeId } = await session.DOM.querySelector({ nodeId: root.nodeId, selector: "h1" })
-```
+| Task | Command |
+|---|---|
+| Single URL content | `browser-automation.ts follow <url>` |
+| Multiple URLs | `browser-automation.ts batch-follow <url1> <url2> ...` |
+| Single Google search | `browser-automation.ts search <query> --count N` |
+| Multiple Google searches | `browser-automation.ts batch-search <q1> <q2> ... --count N` |
+| Full research pipeline | `browser-automation.ts batch-harvest <q1> ... --count N --max M` |
+| PDF URL | Use follow or batch-follow; PDFs auto-detected |
 
-## Common patterns
+## Reference Documents
 
-| Operation | Code |
-|-----------|------|
-| Navigate + wait idle | `await session.Page.navigate({url:"..."}); await session.waitFor("Page.lifecycleEvent", p => p.name==="networkIdle")` |
-| Click element | `await session.Runtime.evaluate({expression:"document.querySelector('...').click()"})` |
-| Type text | `await session.Runtime.evaluate({expression:"document.querySelector('...').value='...'"})` |
-| Read text | `(await session.Runtime.evaluate({expression:"document.querySelector('...').textContent",returnByValue:true})).result.value` |
-| Get attribute | `(await session.Runtime.evaluate({expression:"document.querySelector('...').getAttribute('...')",returnByValue:true})).result.value` |
-| Screenshot | `(await session.Page.captureScreenshot({format:"png"})).data` → base64 PNG |
-| Scroll to | `await session.Runtime.evaluate({expression:"document.querySelector('...').scrollIntoView()"})` |
-| Wait for element | poll with `document.querySelector('...')` in a loop |
-| Tab list | `await listPageTargets()` |
-| Create tab | `await session.Target.createTarget({url:"about:blank"})` |
-| Switch tab | `await session.use(targetId)` |
-| Close tab | `await session.Target.closeTarget({targetId})` |
-| Block request | `await session.Network.setBlockedURLs({urls:["*"]})` |
-| Mock response | `await session.Network.enable();` then handle `Network.requestIntercepted` |
+| File | Content |
+|---|---|
+| `reference/multi-tab.md` | Multi-tab parallelism, polling vs waitFor, error isolation |
+| `reference/errors.md` | CDP error codes, JS errors, REPL health, failure patterns |
+| `reference/content-quality.md` | Content quality gate — detection patterns |
+| `reference/workspace-management.md` | /tmp/nyx-search/ workspace, cleanup rules |
+| `interaction-skills/01-page-lifecycle.md` | Tab creation, navigation, wait strategies, iframes, dialogs |
+| `interaction-skills/02-page-content.md` | Text extraction, screenshots, PDF, scrolling, shadow DOM |
+| `interaction-skills/03-user-interaction.md` | Click, type, select, drag-and-drop, file upload |
+| `interaction-skills/04-network-data.md` | Cookies, network interception, downloads, credentials |
 
-## Connect
+## State Persistence
 
-Auto-detection scans DevToolsActivePort files AND probes ports 9222-9225 via HTTP
-(catches Dia/Arc/Vivaldi which don't write DevToolsActivePort).
+REPL state persists across `browser-automation.ts` calls. The `session` object and `globalThis` variables accumulate. Use `browser-harness-js --restart` to drop all state.
 
-```js
-await session.connect()                                    // auto-detect (2 methods)
-await session.connect({ port: 9222 })                      // by port (HTTP probe)
-await session.connect({ wsUrl: "ws://127.0.0.1:9222/..." })  // explicit WS
-await session.connect({ profileDir: "~/Library/.../Dia/User Data" }) // by profile
-```
+## Testing
 
-Supported browsers: Chrome, Chromium, Edge, Brave, **Dia**, **Arc**, Vivaldi, Opera, Comet, Canary.
-
-## State persistence
-
-- `session`, active `sessionId`, event subscribers, and `globalThis.*` persist across `browser-harness-js` calls.
-- Each call runs in its own async wrapper; use `globalThis` to carry data.
-- REPL server (`repl.ts`) holds everything; kill with `--stop` or restart with `--restart`.
-
-## Interaction skills (task-organized)
-
-Agent: given a task, read the relevant file for exact CDP recipes.
-
-| File | Use when |
-|------|----------|
-| `01-page-lifecycle.md` | Connect to browser, navigate, manage tabs, handle iframes, wait for page ready |
-| `02-page-content.md` | Extract text, take screenshots, generate PDF, scroll, traverse shadow DOM, set viewport |
-| `03-user-interaction.md` | Click elements, type text, select dropdowns, drag-and-drop, handle dialogs, upload files |
-| `04-network-data.md` | Read/write cookies, intercept network requests, handle downloads |
-
-**Note:** `gsearch` CLI handles the 3 most common agent tasks: search (`gsearch "q"`), read page (`gsearch follow <url>`), screenshot (`gsearch screenshot <url>`), and scrape (`gsearch scrape <url> --selector "..."`). For anything beyond those 4, use `browser-harness-js` directly with recipes from `interaction-skills/`.
+74 TypeScript tests at `tests/`: `bun test agents/skills/cdp/tests/`
+Covers template function purity, session.ts hardening, repl.ts serialization.
