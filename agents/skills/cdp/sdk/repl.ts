@@ -28,6 +28,21 @@ const session = new Session();
 const PORT = Number(process.env.CDP_REPL_PORT ?? 9876);
 const startedAt = Date.now();
 
+// ---- Rate limiting (sliding window, per-second counter) ----
+// Allow up to 200 requests in any rolling 1-second window.
+// This gives generous headroom for bursty single-CLI usage (100 req/s sustained).
+const RATE_BURST = 200;
+let requestTimes: number[] = [];
+
+function checkRateLimit(): boolean {
+  const now = Date.now();
+  // Prune timestamps outside the 1-second sliding window
+  requestTimes = requestTimes.filter(t => now - t < 1000);
+  if (requestTimes.length >= RATE_BURST) return false;
+  requestTimes.push(now);
+  return true;
+}
+
 function isExpression(code: string): boolean {
   const trimmed = code.trim();
   if (!trimmed) return false;
@@ -36,10 +51,24 @@ function isExpression(code: string): boolean {
   return true;
 }
 
+function serializeValue(v: unknown): unknown {
+  if (typeof v === 'bigint') return v.toString();
+  if (v === null || v === undefined) return v;
+  if (Array.isArray(v)) return v.map(serializeValue);
+  if (typeof v === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(v as Record<string, unknown>)) {
+      result[key] = serializeValue(val);
+    }
+    return result;
+  }
+  return v;
+}
+
 function serialize(v: unknown): unknown {
   if (v === undefined) return undefined;
   try {
-    return JSON.parse(JSON.stringify(v, (_k, val) => typeof val === 'bigint' ? val.toString() : val));
+    return serializeValue(v);
   } catch {
     return String(v);
   }
@@ -84,6 +113,9 @@ const server = Bun.serve({
     }
 
     if (req.method === 'POST' && url.pathname === '/eval') {
+      if (!checkRateLimit()) {
+        return Response.json({ error: 'rate limit exceeded' }, { status: 429 });
+      }
       const code = await req.text();
       if (!code.trim()) {
         return new Response('empty body\n', { status: 400, headers: TEXT });

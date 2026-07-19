@@ -43,6 +43,7 @@ export class Session implements Transport {
   private nextId = 1;
   private pending = new Map<number, Pending>();
   private activeSessionId: string | undefined;
+  static MAX_PENDING = 1000;
   private eventListeners: Array<(method: string, params: unknown, sessionId?: string) => void> = [];
 
   domains!: Domains;
@@ -55,6 +56,7 @@ export class Session implements Transport {
   }
 
   async connect(opts: ConnectOptions = {}): Promise<void> {
+    if (this.isConnected()) return;
     const timeoutMs = opts.timeoutMs ?? 5_000;
 
     if (opts.port) {
@@ -130,14 +132,21 @@ export class Session implements Transport {
     return () => { this.eventListeners = this.eventListeners.filter(x => x !== fn); };
   }
 
-  waitFor<T = unknown>(method: string, predicate?: (params: T) => boolean, timeoutMs = 30_000): Promise<T> {
+  async waitFor<T = unknown>(method: string, predicate?: (params: T) => boolean, timeoutMs = 30_000, targetId?: string): Promise<T> {
+    let targetSessionId: string | undefined;
+    if (targetId !== undefined) {
+      const prevSessionId = this.activeSessionId;
+      targetSessionId = await this.use(targetId);
+      this.activeSessionId = prevSessionId;
+    }
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         unsub();
         reject(new Error(`Timeout waiting for ${method}`));
       }, timeoutMs);
-      const unsub = this.onEvent((m, params) => {
+      const unsub = this.onEvent((m, params, sessionId) => {
         if (m !== method) return;
+        if (targetSessionId !== undefined && sessionId !== targetSessionId) return;
         if (predicate && !predicate(params as T)) return;
         clearTimeout(timer);
         unsub();
@@ -146,9 +155,12 @@ export class Session implements Transport {
     });
   }
 
-  _call(method: string, params: unknown = {}): Promise<unknown> {
+  _call(method: string, params: unknown = {}, timeoutMs = 0): Promise<unknown> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       return Promise.reject(new Error('Not connected. Call session.connect(...) first.'));
+    }
+    if (this.pending.size >= Session.MAX_PENDING) {
+      return Promise.reject(new Error('Too many pending CDP commands'));
     }
     const id = this.nextId++;
     const msg: Record<string, unknown> = { id, method, params: params ?? {} };
@@ -158,6 +170,16 @@ export class Session implements Transport {
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
       this.ws!.send(JSON.stringify(msg));
+
+      if (timeoutMs > 0) {
+        setTimeout(() => {
+          const p = this.pending.get(id);
+          if (p) {
+            this.pending.delete(id);
+            p.reject(new Error(`CDP command timed out after ${timeoutMs}ms: ${method}`));
+          }
+        }, timeoutMs);
+      }
     });
   }
 

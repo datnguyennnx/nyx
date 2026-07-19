@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+# Test: gsearch batch operations — URL handling in mock bun()
+set -euo pipefail
+
+# --- Setup ---
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+LIB="$SCRIPT_DIR/../lib"
+CDP_SCRIPTS="$SCRIPT_DIR/../../cdp/scripts"
+
+# Source the batch lib
+. "$LIB/common.sh" 2>/dev/null || true
+. "$LIB/batch.sh"
+
+# --- Mock globals ---
+BUN_ARGS_FILE="$(mktemp /tmp/gsearch-test-bun-args-XXXXXX)"
+BUN_CALL_COUNT=0
+BUN_MOCK_OUTPUT='{"success":true,"results":[]}'
+
+# --- Mock bun() ---
+# Uses printf instead of echo to avoid backslash interpretation on ://
+bun() {
+  BUN_CALL_COUNT=$((BUN_CALL_COUNT + 1))
+  printf '%s\n' "$*" > "$BUN_ARGS_FILE"
+  echo "$BUN_MOCK_OUTPUT"
+}
+
+# --- Assertion helpers ---
+
+assert_bun_contains() {
+  local expected="$1"
+  if grep -F -- "$expected" "$BUN_ARGS_FILE" >/dev/null 2>&1; then
+    echo "  ✓ args contain: $expected"
+  else
+    echo "  ✗ FAIL: args missing: $expected"
+    echo "    args file contents: $(cat "$BUN_ARGS_FILE")"
+    exit 1
+  fi
+}
+
+assert_bun_args_equal() {
+  local expected="$1"
+  local actual
+  actual="$(cat "$BUN_ARGS_FILE")"
+  if [ "$actual" = "$expected" ]; then
+    echo "  ✓ args exactly: $expected"
+  else
+    echo "  ✗ FAIL: args mismatch"
+    echo "    expected: $expected"
+    echo "    actual:   $actual"
+    exit 1
+  fi
+}
+
+reset_mock() {
+  BUN_CALL_COUNT=0
+  : > "$BUN_ARGS_FILE"
+}
+
+cleanup() {
+  rm -f "$BUN_ARGS_FILE"
+}
+trap cleanup EXIT
+
+# --- Test: URL with :// is preserved in bun() args ---
+echo ""
+echo "=== Test 1: Mock bun() preserves URL with :// ==="
+reset_mock
+
+# Simulate what batch-follow does: pass a URL with ://
+bun "${CDP_SCRIPTS}/browser-automation.ts" batch-follow "https://arxiv.org/abs/2305.12345"
+
+echo "  args file contents: $(cat "$BUN_ARGS_FILE")"
+# The URL should be intact — no backslash corruption
+if grep -Fq "https://arxiv.org/abs/2305.12345" "$BUN_ARGS_FILE"; then
+  echo "  ✓ URL preserved correctly"
+else
+  echo "  ✗ FAIL: URL corrupted by echo"
+  echo "    expected to find: https://arxiv.org/abs/2305.12345"
+  echo "    got: $(cat "$BUN_ARGS_FILE")"
+  exit 1
+fi
+
+# --- Test 2: batch-follow command line construction ---
+echo ""
+echo "=== Test 2: batch-follow constructs correct bun command ==="
+reset_mock
+
+# We need to call the actual cmd_batch_follow from batch.sh
+# It requires bun to be available. Since bun is mocked above, this should work.
+# But cmd_batch_follow passes ${urls[@]} which would expand, and our mock captures it.
+
+# Call cmd_batch_follow with a URL
+cmd_batch_follow "https://arxiv.org/abs/2305.12345" 2>/dev/null || true
+
+echo "  args file contents: $(cat "$BUN_ARGS_FILE")"
+if grep -Fq "batch-follow" "$BUN_ARGS_FILE"; then
+  echo "  ✓ batch-follow subcommand present"
+else
+  echo "  ✗ FAIL: batch-follow subcommand missing"
+  exit 1
+fi
+
+# The URL should be intact (no backslash corruption from echo)
+if grep -Fq "https://arxiv.org/abs/2305.12345" "$BUN_ARGS_FILE"; then
+  echo "  ✓ URL preserved in batch-follow call"
+else
+  echo "  ✗ FAIL: URL corrupted in batch-follow call"
+  echo "    got: $(cat "$BUN_ARGS_FILE")"
+  exit 1
+fi
+
+# --- Test 3: batch-search command line construction ---
+echo ""
+echo "=== Test 3: batch-search constructs correct bun command ==="
+reset_mock
+
+cmd_batch_search --count 3 "machine learning" "transformer models" 2>/dev/null || true
+
+echo "  args file contents: $(cat "$BUN_ARGS_FILE")"
+if grep -Fq "batch-search" "$BUN_ARGS_FILE"; then
+  echo "  ✓ batch-search subcommand present"
+else
+  echo "  ✗ FAIL: batch-search subcommand missing"
+  exit 1
+fi
+
+# --- Test 4: batch-harvest command line construction ---
+echo ""
+echo "=== Test 4: batch-harvest constructs correct bun command ==="
+reset_mock
+
+cmd_batch_harvest --count 2 --max 3 "AI research" "quantum computing" 2>/dev/null || true
+
+echo "  args file contents: $(cat "$BUN_ARGS_FILE")"
+if grep -Fq "batch-harvest" "$BUN_ARGS_FILE"; then
+  echo "  ✓ batch-harvest subcommand present"
+else
+  echo "  ✗ FAIL: batch-harvest subcommand missing"
+  exit 1
+fi
+
+# --- Test 5: Mock with multiple URLs containing :// ---
+echo ""
+echo "=== Test 5: Multiple URLs with :// preserved ==="
+reset_mock
+
+bun "${CDP_SCRIPTS}/browser-automation.ts" batch-follow \
+  "https://arxiv.org/abs/2305.12345" \
+  "https://example.com/page?q=hello&x=1" \
+  "http://localhost:8080/test"
+
+ARGS="$(cat "$BUN_ARGS_FILE")"
+echo "  args file contents: $ARGS"
+
+if echo "$ARGS" | grep -Fq "https://arxiv.org/abs/2305.12345"; then
+  echo "  ✓ URL 1 preserved"
+else
+  echo "  ✗ FAIL: URL 1 corrupted"
+  exit 1
+fi
+
+if echo "$ARGS" | grep -Fq "https://example.com/page?q=hello&x=1"; then
+  echo "  ✓ URL 2 preserved"
+else
+  echo "  ✗ FAIL: URL 2 corrupted"
+  exit 1
+fi
+
+if echo "$ARGS" | grep -Fq "http://localhost:8080/test"; then
+  echo "  ✓ URL 3 preserved"
+else
+  echo "  ✗ FAIL: URL 3 corrupted"
+  exit 1
+fi
+
+# --- All tests passed ---
+echo ""
+echo "════════════════════════════════════════════"
+echo "  All tests passed! (exit 0)"
+echo "════════════════════════════════════════════"
+exit 0

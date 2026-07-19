@@ -153,7 +153,7 @@ _scan_ports() {
   local -a pids
   local port
   for port in 9222 9223 9224 9225; do
-    (_probe_one "$port") &
+    (_probe_one "$port" >/dev/null 2>&1) &
     pids[$port]=$!
   done
   for i in $(seq 1 30); do
@@ -206,17 +206,15 @@ ensure_browser() {
     return 0
   fi
 
-  # 3. Real browser running but no CDP — open inspect page for their specific browser
+  # 3. Real browser running but no CDP — skip: chrome://inspect does NOT enable CDP.
+  #    Fall through so caller launches fresh isolated instance with --remote-debugging-port.
   local real_line real_pid real_app
   real_line=$(_detect_real_browser_pid)
-  real_pid=$(printf '%s' "$real_line" | cut -d'|' -f1)
-  real_app=$(printf '%s' "$real_line" | cut -d'|' -f2)
+  real_pid=$(printf '%s' "$real_line" | cut -d"|" -f1)
+  real_app=$(printf '%s' "$real_line" | cut -d"|" -f2)
   if [ -n "$real_pid" ] && kill -0 "$real_pid" 2>/dev/null; then
-    local url
-    url=$(_inspect_url "$real_app")
-    open -a "$real_app" "$url" 2>/dev/null || open "$url" 2>/dev/null || true
-    printf '{"tool":"gsearch","error":"no_cdp","detail":"%s running without CDP","hint":"Opened %s for you — toggle switch ON (one-time)","action":"toggle_cdp"}\n' "$real_app" "$url" >&2
-    exit 2
+    printf '{"tool":"gsearch","warning":"browser_without_cdp","detail":"%s running without --remote-debugging-port, launching isolated instance"}\n' "$real_app" >&2
+    return 1
   fi
 
   # 4. No browser at all

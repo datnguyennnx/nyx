@@ -5,7 +5,6 @@ set -euo pipefail
 
 # --- config ---
 GSEARCH_CDP_PORT="${GSEARCH_CDP_PORT:-9222}"
-GSEARCH_ALLOW_REAL="${GSEARCH_ALLOW_REAL:-}"
 GSEARCH_TOKEN_DIR="${GSEARCH_TOKEN_DIR:-/tmp/gsearch-tokens}"
 
 # --- source libs ---
@@ -19,6 +18,9 @@ if [ -L "$SELF" ]; then
 fi
 SCRIPT_DIR="$(cd "$(dirname "$SELF")" && pwd)"
 LIB="$SCRIPT_DIR/../lib"
+CDP_SCRIPTS="$SCRIPT_DIR/../../cdp/scripts"
+export CDP_SCRIPTS
+
 . "$LIB/common.sh"
 . "$LIB/actions.sh"
 
@@ -28,6 +30,8 @@ case "${1:-}" in
   follow)     shift; cmd_follow "$@" ;;
   screenshot) shift; cmd_screenshot "$@" ;;
   scrape)     shift; cmd_scrape "$@" ;;
+  batch)      shift; cmd_batch "$@" ;;
+  pdftotext)  shift; cmd_pdftotext "$@" ;;
   *)
     # default: search mode
     cmd_search "$@"
