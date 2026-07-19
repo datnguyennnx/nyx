@@ -48,24 +48,22 @@ install() {
   echo "  gsearch --count 2 \"effect-ts\""
 }
 
-push() {
-  echo "--- Pushing opencode config to dotfiles ---"
-  sync_dir "$HOME/.config/opencode" "$DOTFILES/opencode" ".config/opencode → dotfiles"
-
-  echo ""
-  echo "--- Pushing agents skills to dotfiles ---"
-  sync_dir "$HOME/.agents" "$DOTFILES/agents" ".agents → dotfiles"
-
-  echo ""
-  echo "Push complete."
-}
-
 case "${1:-}" in
   install|--install|-i) install ;;
-  push|--push|-p)       push ;;
   *)
     echo "Usage: $(basename "$0") <command>"
-    echo "  install  Sync dotfiles → ~/.config/opencode + ~/.agents (first-time setup)"
-    echo "  push     Sync ~/.config/opencode + ~/.agents → dotfiles (save changes)"
+    echo "  install  Sync repo  → ~/.config/opencode + ~/.agents"
     ;;
 esac
+
+# ══════════════════════════════════════════════════════════════
+# NOTE: One-direction sync only
+# ══════════════════════════════════════════════════════════════
+#
+# This repo (nyx) is the SINGLE SOURCE OF TRUTH.
+# All sync is one direction: repo → global (~/.config/opencode, ~/.agents).
+#
+# To apply changes:  ./bootstrap.sh install
+#
+# NEVER sync from global back to repo. If you modified files in
+# ~/.config/opencode or ~/.agents, copy them manually to this repo.
