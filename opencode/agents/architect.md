@@ -22,11 +22,6 @@ Fallback (critical rules if skill fails):
 - Prefer the domain's standard typed/modular patterns over raw imperative patterns for effectful or stateful code
 - Separate handoff table rows per atomic change (file, location, change, primitive, rationale)
 
-# Web Aggregation
-You have `webfetch` and `websearch` for gathering external information. Use when:
-- `websearch` — find docs, patterns, or architectural references
-- `webfetch` — read a specific URL (spec, article, API docs)
-
 # On Spawn
 1. `skill()` load domain skills
 2. `read` target files

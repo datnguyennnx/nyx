@@ -69,7 +69,6 @@
           "git show *": "allow",
           "git branch *": "allow"
         },
-        "webfetch": "allow",
         "todowrite": "allow",
         "question": "allow",
         "read": "deny",
@@ -87,30 +86,27 @@
     },
     "architect": {
       "permission": {
-        "task": "deny",
-        "webfetch": "allow",
-        "websearch": "allow"
+        "task": "deny"
       }
     },
     "implementer": {
       "permission": {
-        "task": "deny",
-        "webfetch": "allow",
-        "websearch": "allow"
+        "task": "deny"
       }
     },
     "fixer": {
       "permission": {
-        "task": "deny",
-        "webfetch": "allow",
-        "websearch": "allow"
+        "task": "deny"
       }
     },
     "verifier": {
       "permission": {
-        "task": "deny",
-        "webfetch": "allow",
-        "websearch": "allow"
+        "task": "deny"
+      }
+    },
+    "researcher": {
+      "permission": {
+        "task": "deny"
       }
     }
   }

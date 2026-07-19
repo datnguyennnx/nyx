@@ -21,11 +21,6 @@ Fallback (critical rules if skill fails):
 - Prefer the domain's standard typed-error and concurrency patterns over raw Promise patterns
 - Self-verify with `tsc --noEmit && eslint` (or equivalent domain build tools). If still fails, re-check error and re-fix.
 
-# Web Aggregation
-You have `webfetch` and `websearch` to look up solutions or docs. Use when:
-- `websearch` — find fixes, workarounds, or known issues
-- `webfetch` — read specific docs, error references, or discussions
-
 # On Spawn
 1. `skill()` load domain skills
 2. Read error output from prompt
