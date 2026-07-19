@@ -19,6 +19,7 @@ The user says ANY of these phrases → you MUST load this skill and use gsearch 
 3. Use `gsearch follow <url>` to read any full page
 4. Use `gsearch batch follow <url1> <url2> ...` for multiple pages
 5. Use `gsearch batch harvest --count N --max M "q1" "q2" ...` for full research pipelines
+6. Use `gsearch follow --offset N --max M` for incremental reading of long pages (when content.truncated is true, request the next chunk)
 
 ### What you must NOT do:
 
@@ -34,7 +35,7 @@ gsearch launches a real Chrome browser via CDP. It executes JavaScript, bypasses
 
 **Under the hood:** browser-harness-js is a single-threaded REPL. Shell `&` does NOT parallelize — it queues at the server. gsearch batch commands create multiple CDP tabs within one invocation for true parallelism.
 
-**PDFs are handled automatically.** arXiv PDFs convert to abstract page HTML. Others get Chrome viewer extraction. Fallback: `gsearch pdftotext <url>`.
+**PDFs are handled automatically.** arXiv PDFs convert to abstract page HTML. Others get Chrome viewer extraction (15,000 character cap). For academic papers or any PDF where you need the full text, skip Chrome viewer — use `gsearch pdftotext <url>` directly. It has no character cap and extracts the complete paper text. Never use batch follow for academic papers you intend to read in full — you'll only get the first 15k characters.
 
 ## Required First Pass
 
@@ -62,6 +63,18 @@ gsearch bash commands call `cdp/scripts/browser-automation.ts` for browser opera
 
 See `agents/skills/cdp/SKILL.md` for browser automation reference.
 
+## Design Rationale
+
+**15k cap is information-theoretically calibrated.** Academic text entropy is ~1.4–1.7 bits/char. A coherent idea unit (one complete section: Methods, Results) spans 3k–12k chars. The 15k boundary captures 1–2 such units — enough for semantic coherence, bounded for aggregation precision. Beyond this, mutual information I(Source;Chunk) follows Zipf-Mandelbrot diminishing returns, and LLM "Lost in the Middle" degradation (Liu et al. 2023) reduces retrieval by 20–40%.
+
+**Tree mapping for traceability.** Each extraction is a morphism URL → Content with labeled provenance:
+```text
+follow (forgetful functor)     — 15k cap, fast scan
+pdftotext (faithful functor)   — full text, no cap
+chunk → Tree&lt;Section&gt;        — natural transformation preserving section boundaries
+```
+Every content node carries `{source_url, method, offset, length}`. All transformations compose deterministically — aggregators can trace any chunk back to source through a commuting diagram of morphisms. This is a DAG of functors, not a pipeline of opaque steps.
+
 ## Playbook
 
 1. **Launch first.** `gsearch launch`, one time. All commands auto-connect after.
@@ -73,8 +86,9 @@ See `agents/skills/cdp/SKILL.md` for browser automation reference.
 7. **Never shell-background (`&`) gsearch commands.** It queues at the REPL.
 8. **Never open `chrome://inspect/`.** It does NOT enable CDP. Use `gsearch launch`.
 9. **Check `_error` fields in batch results.** That's how you know what failed and why.
-10. **Use `gsearch pdftotext <url>` for PDFs** when Chrome viewer can't extract.
+10. **Use `gsearch pdftotext <url>` for academic papers or full-text PDFs** — it has no 15,000-character cap and extracts the complete document. Use batch follow only when you need a preview or abstract. If Chrome viewer extraction fails on a non-academic PDF, pdftotext is also the fallback.
 11. **Use gsearch for ALL web access.** When the user says "gsearch" or asks you to research, use gsearch commands for ALL web access — gsearch search, gsearch follow, gsearch batch harvest. Do NOT fall back to webfetch or other general-purpose fetch tools. The user chose gsearch for CDP-powered browser automation (JS rendering, anti-bot bypass, parallel tabs), not raw HTTP fetching.
+12. **Use `--offset`/`--max` for incremental reading** — follow and batch follow now return structured output with `{content, total_length, truncated, sections}`. When `truncated` is true, request the next chunk with `--offset <current_offset + max>`.
 
 ## The Traps You Will Hit
 
@@ -121,10 +135,12 @@ gsearch batch harvest "Fed rate July 2026" "ECB monetary policy" "Japan Nikkei"
 
 **What happens:** Chrome renders PDF as canvas — `document.querySelector()` returns empty.
 
-**Fix:** arXiv PDFs auto-convert (no action needed). Other PDFs get Chrome viewer extraction. If `_error: "pdf_textlayer_empty"`, use:
+**Fix:** arXiv PDFs auto-convert (no action needed) — but you only get the abstract (~15k chars max). For the full paper text, use `gsearch pdftotext <url>` directly. Other PDFs get Chrome viewer extraction (also capped at 15k chars). If `_error: "pdf_textlayer_empty"`, use:
 ```bash
 gsearch pdftotext "https://example.com/paper.pdf"
 ```
+
+**Key rule for aggregators:** batch follow caps content at 15,000 characters per page. pdftotext has NO cap. If you need the full document, reach for pdftotext first, not batch follow.
 
 ### Trap 5: The Dead-Tab Trap
 
@@ -158,6 +174,37 @@ gsearch pdftotext "https://example.com/paper.pdf"
 
 **Rationale:** webfetch sends a raw HTTP request. It cannot execute JavaScript, cannot bypass Cloudflare, and returns whatever the server sends — often an empty shell or a captcha page. gsearch follow launches a real Chrome tab, renders the page, executes JS, and extracts visible text. For arXiv abstracts, SSRN papers, Google Scholar profiles — any real website — gsearch follow is what you need.
 
+### Trap 8: The 15k-Char-Cap Trap
+
+**You think:** "I'll use batch follow to read this academic paper — it'll return the full text."
+
+**What happens:** `batch follow` and `follow` cap extracted content at **15,000 characters per page**. Academic papers routinely exceed this (a typical 10-page paper is ~30,000-50,000 chars). You get the first few pages, then silence. No error, no warning — just truncated content.
+
+**Detect:** The paper's content ends abruptly mid-section. No `_error` field is set because 15k chars passes the quality gate.
+
+**Fix for HTML pages:** Use `gsearch follow <url> --offset 15000 --max 15000` to get the next chunk. The `truncated` field in the output tells you if more content is available. Build the full document tree by iterating:
+```bash
+# Chunk 1: offset=0, max=15000
+gsearch follow <url> --offset 0 --max 15000 --pretty
+# Chunk 2: offset=15000, max=15000 (if truncated=true)
+gsearch follow <url> --offset 15000 --max 15000 --pretty
+```
+
+**Fix for PDFs:** Use `gsearch pdftotext "https://arxiv.org/pdf/xxxx.xxxxx.pdf"` instead. It has no character cap and extracts the full document:
+
+```bash
+# BAD — truncated at 15k chars
+gsearch batch follow "https://arxiv.org/pdf/2401.12345.pdf"
+
+# GOOD — full paper text, no cap
+gsearch pdftotext "https://arxiv.org/pdf/2401.12345.pdf"
+```
+
+**Rule of thumb:**
+- Need a preview / abstract? → batch follow (15k is fine)
+- Need the full academic paper? → pdftotext (no cap)
+- Need an HTML page beyond 15k? → follow with --offset pagination (check `truncated` field)
+
 ## Decision Tree
 
 ```
@@ -166,12 +213,15 @@ Topic to research?
 │        ├─ One fact → gsearch "query" → pick URL → gsearch follow <url>
 │        └─ Broad → gsearch batch harvest --count 5 --max 3 "q1" "q2" "q3"
 ├─ No → Have URLs? → gsearch batch follow url1 url2 url3
-└─ No → Need discovery? → gsearch batch search --count 5 "q1" "q2"
+├─ No → Need discovery? → gsearch batch search --count 5 "q1" "q2"
+└─ Already read? Use --offset for next chunk:
+         gsearch follow <url> --offset 15000 --max 15000
 
 URL is a PDF?
-├─ arXiv PDF → auto-converted (works automatically)
-├─ Other PDF → Chrome viewer extracts. If _error → gsearch pdftotext <url>
-└─ Not PDF → normal extraction
+├─ Academic paper where you need full text → gsearch pdftotext <url> (no 15k cap)
+├─ arXiv PDF (abstract only needed) → auto-converted to abstract HTML (~15k chars)
+├─ Other PDF → Chrome viewer extracts (15k cap). If _error → gsearch pdftotext <url>
+└─ Not PDF → normal extraction (15k cap, use --offset to paginate)
 ```
 
 ## Rationalization Table
@@ -182,8 +232,10 @@ URL is a PDF?
 | "chrome://inspect enables CDP" | `gsearch launch` — auto-starts CDP |
 | "3 similar queries give thorough coverage" | Each query must be a different dimension |
 | "PDFs extract like HTML" | arXiv PDFs auto-convert. Others → `gsearch pdftotext` |
+| "I'll use batch follow for this academic paper" | Use `gsearch pdftotext` — batch follow caps at 15k chars, pdftotext has no cap and returns the full paper |
 | "A dead URL crashes the whole batch" | No — tabs are isolated. Failed tabs get `_error` |
 | "I will use webfetch to read this paper" | Use `gsearch follow <url>` — the user chose gsearch for CDP-powered browser automation. webfetch cannot render JS or bypass anti-bot. |
+| "I hit the 15k cap mid-article" | Use `gsearch follow <url> --offset 15000 --max 15000` to get the next chunk. Check `truncated` field to know if more exists. |
 
 ## Checklist
 
@@ -194,8 +246,9 @@ URL is a PDF?
 5. Did you check `_error` fields? (Tells you which pages failed.)
 6. Did arXiv PDFs return content? (They should auto-convert.)
 7. For PDF `_error` → did you try `gsearch pdftotext`?
-8. Is `pages_read > pages_skipped`? (If not, find better sources.)
-9. Did you use gsearch commands (search/follow/batch) for ALL web access, not webfetch? (If you used webfetch, the user did not ask for it — redo with gsearch.)
+8. For academic papers where you need full text → did you use `gsearch pdftotext` instead of batch follow? (batch follow caps at 15k chars, pdftotext has no cap)
+9. Is `pages_read > pages_skipped`? (If not, find better sources.)
+10. Did you use gsearch commands (search/follow/batch) for ALL web access, not webfetch? (If you used webfetch, the user did not ask for it — redo with gsearch.)
 
 ## Environment Variables
 

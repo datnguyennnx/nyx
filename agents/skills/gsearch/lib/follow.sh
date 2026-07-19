@@ -2,11 +2,14 @@
 # shellcheck disable=all
 
 cmd_follow() {
-  [ $# -ge 1 ] || die_usage "Usage: gsearch follow <url> [--selector S] [--json-url] [--raw] [--settle MS] [--wait M]"
-  local url="" selector="article, main, [role=main]" json_url=false raw=false settle=0 wait="networkIdle"
+  [ $# -ge 1 ] || die_usage "Usage: gsearch follow <url> [--selector S] [--json-url] [--raw] [--offset N] [--max N] [--settle MS] [--wait M]"
+  local url="" selector="article, main, [role=main]" json_url=false raw=false pretty=false offset=0 max=15000 settle=0 wait="networkIdle"
   while [ $# -gt 0 ]; do
     case "$1" in
       --selector) [ $# -ge 2 ] || die_usage; selector="$2"; shift 2 ;;
+      --offset)   [ $# -ge 2 ] || die_usage; is_num "$2" || die_usage; offset="$2"; shift 2 ;;
+      --max)      [ $# -ge 2 ] || die_usage; is_num "$2" || die_usage; max="$2"; shift 2 ;;
+      --pretty)   pretty=true; shift ;;
       --settle)   [ $# -ge 2 ] || die_usage; is_num "$2" || die_usage; settle="$2"; shift 2 ;;
       --wait)     [ $# -ge 2 ] || die_usage; case "$2" in networkIdle|almostIdle|load) ;; *) die_usage ;; esac; wait="$2"; shift 2 ;;
       --json-url) json_url=true; shift ;; --raw) raw=true; shift ;;
@@ -21,7 +24,7 @@ cmd_follow() {
   ensure_bhjs
 
   CDP_SCRIPTS="${CDP_SCRIPTS:-$(cd "$(dirname "$BASH_SOURCE")/../../cdp/scripts" && pwd)}"
-  local out; out=$(bun "${CDP_SCRIPTS}/browser-automation.ts" follow "$url" --selector "$selector" --timeout "30000" --port "$GSEARCH_CDP_PORT" --raw 2>&1) || {
+  local out; out=$(bun "${CDP_SCRIPTS}/browser-automation.ts" follow "$url" --selector "$selector" --offset "$offset" --max "$max" --timeout "30000" --port "$GSEARCH_CDP_PORT" $($pretty && echo --pretty) --raw 2>&1) || {
     printf '{"success":false,"url":%s,"error":%s}\n' "$(json_str "$url")" "$(json_str "$out")" >&2; exit 2
   }
   if $raw; then printf '%s\n' "$out"

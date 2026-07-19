@@ -35,7 +35,7 @@ Returns:
 
 The `_query` field tags each result with its source query so you can trace provenance. Results from different queries that share the same URL are merged (first occurrence wins).
 
-## `gsearch batch follow [--selector S] url1 url2 ...`
+## `gsearch batch follow [--selector S] [--offset N] [--max M] [--pretty] url1 url2 ...`
 
 Reads N URLs in parallel. Each URL gets its own CDP tab. Pages load concurrently in the browser.
 
@@ -49,7 +49,42 @@ gsearch batch follow \
 
 **PDF handling is automatic.** arXiv URLs (`arxiv.org/pdf/...`) are rewritten to `arxiv.org/abs/...` before tab creation — the abstract page is HTML. Other PDFs are loaded in Chrome's PDF viewer and text extraction is attempted after 3s.
 
-Returns `[{url, content, _error?}]`. Content is capped at 15000 characters per page.
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--offset N` | 0 | Character offset to start reading from. Start at 0, then increment by --max to paginate |
+| `--max M` | 15000 | Max characters to return per page. Set to -1 for unlimited (caution: large pages) |
+| `--pretty` | off | Pretty-print JSON output |
+
+**New output format** (structured content tree):
+```json
+{
+  "url": "https://...",
+  "content": "extracted text from offset to offset+max...",
+  "total_length": 45320,
+  "returned_length": 15000,
+  "offset": 0,
+  "truncated": true,
+  "sections": [
+    {"heading": "Introduction", "level": 1, "offset": 0},
+    {"heading": "Methods", "level": 2, "offset": 3200}
+  ]
+}
+```
+
+The `truncated` field tells you whether more content is available. The `sections` array provides a table of contents extracted from h1/h2/h3 elements. Each section has its character offset in the full document, enabling aggregators to build a navigation tree.
+
+Incremental reading example:
+```bash
+# First chunk
+gsearch batch follow "https://long-article.com" --offset 0 --max 15000
+
+# If truncated is true, get next chunk
+gsearch batch follow "https://long-article.com" --offset 15000 --max 15000
+
+# Continue until truncated is false
+```
+
+Returns `[{url, content, total_length, returned_length, offset, truncated, sections, _error?}]`. Content is capped at 15000 characters per page. Use `--max -1` for unlimited content. Use `--pretty` to format JSON with indentation.
 
 | `_error` | Meaning | What to do |
 |----------|---------|------------|
@@ -92,7 +127,7 @@ Returns:
 }
 ```
 
-`pages_read` counts URLs that returned valid content. `pages_skipped` counts PDFs, connection errors, and low-quality content. If `pages_skipped` is high, your queries may be returning too many paywalled or PDF sources.
+`pages_read` counts URLs that returned valid content. `pages_skipped` counts PDFs, connection errors, and low-quality content. If `pages_skipped` is high, your queries may be returning too many paywalled or PDF sources. Use `--pretty` with `gsearch follow` and `gsearch batch follow` to format JSON output with indentation for human readability.
 
 ## `gsearch pdftotext <url>`
 
@@ -123,7 +158,7 @@ gsearch --count 5 "Fed interest rate"
 
 `--count N` — max results (default 10). Use this for narrow lookups where you only need one or two results.
 
-## `gsearch follow <url> [--selector S] [--raw] [--settle MS]`
+## `gsearch follow <url> [--selector S] [--offset N] [--max M] [--pretty] [--raw] [--settle MS]`
 
 Reads a single page. Options:
 
@@ -133,6 +168,9 @@ Reads a single page. Options:
 | `--raw` | off | Output raw text without JSON wrapper |
 | `--settle MS` | 0 | Extra wait time for JS-rendered content |
 | `--wait M` | `networkIdle` | Lifecycle event to wait for |
+| `--offset N` | 0 | Character offset to start reading from |
+| `--max M` | 15000 | Max characters to return. Set to -1 for unlimited |
+| `--pretty` | off | Pretty-print JSON output |
 
 ## `gsearch screenshot <url> [--output FILE]`
 

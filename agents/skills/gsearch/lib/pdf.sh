@@ -1,7 +1,7 @@
-# gsearch pdftotext — PDF text extraction via Node.js
+# gsearch pdftotext — PDF text extraction via Bun/TypeScript
 # shellcheck disable=all
 
-# — pdftotext: download PDF + extract text via Node.js script
+# gsearch pdftotext — PDF text extraction via Bun/TypeScript script
 cmd_pdftotext() {
   [ $# -ge 1 ] || die_usage "Usage: gsearch pdftotext <pdf-url>"
   local url="$1"; shift
@@ -21,7 +21,7 @@ cmd_pdftotext() {
   fi
 
   local text
-  text=$(curl -sL --max-time 30 "$url" | node "$extractor" 2>/dev/null) || {
+  text=$(curl -sL --max-time 30 "$url" | bun "$extractor" 2>/dev/null) || {
     local exit_code=$?
     if [ "$exit_code" -eq 1 ]; then
       printf '{"error":"pdf_extraction_failed","detail":"No text could be extracted from PDF"}\n' >&2
@@ -30,5 +30,5 @@ cmd_pdftotext() {
     fi
     exit 2
   }
-  printf '{"url":"%s","content":%s}\n' "$(printf '%s' "$url" | node -e 'process.stdout.write(JSON.stringify(require("fs").readFileSync(0,"utf8").trim()))')" "$(printf '%s' "$text" | node -e 'process.stdout.write(JSON.stringify(require("fs").readFileSync(0,"utf8").trim()))')"
+  printf '{"url":%s,"content":%s}\n' "$(printf '%s' "$url" | bun -e 'process.stdout.write(JSON.stringify(require("fs").readFileSync(0,"utf8").trim()))')" "$(printf '%s' "$text" | bun -e 'process.stdout.write(JSON.stringify(require("fs").readFileSync(0,"utf8").trim()))')"
 }

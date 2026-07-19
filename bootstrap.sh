@@ -31,6 +31,7 @@ check_deps() {
     "/Applications/Vivaldi.app/Contents/MacOS/Vivaldi" \
     "/Applications/Arc.app/Contents/MacOS/Arc" \
     "/Applications/Thorium.app/Contents/MacOS/Thorium" \
+    "/Applications/Dia.app/Contents/MacOS/Dia" \
     "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
     "$HOME/Applications/Chromium.app/Contents/MacOS/Chromium" \
     "$HOME/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" \

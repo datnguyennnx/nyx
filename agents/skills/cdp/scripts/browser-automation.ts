@@ -53,6 +53,10 @@ export interface ParsedArgs {
   maxPages: number;
   port: number;
   raw: boolean;
+  offset: number;
+  maxLen: number;
+  pretty: boolean;
+  stream: boolean;
 }
 
 // ─── Pure Helper Snippets ────────────────────────────────────────────────
@@ -91,6 +95,102 @@ export function qualityGateCode(): string {
   ].join('');
 }
 
+/**
+ * extractionCode: Pure — returns a self-executing browser function that extracts
+ * structured content. Returns JSON with content, total_length, truncated flag,
+ * and section boundaries. All processing happens in-browser — single CDP round-trip.
+ */
+export function extractionCode(offset: number, maxLen: number, url: string, selector?: string): string {
+  const urlJson = JSON.stringify(url);
+  const sel = JSON.stringify(selector || 'article, main, [role=main]');
+  return `(function(){
+    var root=document.querySelector(${sel})||document.body;
+    if(!root){return JSON.stringify({url:${urlJson},content:"",total_length:0,returned_length:0,offset:${offset},truncated:false,sections:[]});}
+    var fullText=root.innerText||root.textContent||"";
+    var totalLen=fullText.length;
+    var off=${offset};
+    var max=${maxLen};
+    if(off<0){off=0;}
+    var end=max<0?totalLen:Math.min(off+max,totalLen);
+    var content=off<totalLen?fullText.slice(off,end):"";
+    
+    // Quality gate — only fires for initial read (offset===0)
+    var isJunk=off===0&&(content.length<80||
+      /This site can't be reached/i.test(content)||
+      /ERR_CONNECTION/i.test(content)||
+      /404 Not Found/i.test(content)||
+      /^\\s*$/.test(content)||
+      content==="Read More \\u00bb"||
+      (content.length<100&&content.indexOf("\\"")<0));
+    
+    // Section detection from full text
+    var headings=root.querySelectorAll("h1,h2,h3");
+    var sections=[];
+    for(var i=0;i<headings.length;i++){
+      var h=headings[i];
+      var hText=(h.innerText||"").trim();
+      if(hText&&hText.length>1){
+        var idx=fullText.indexOf(hText);
+        if(idx>=0){
+          sections.push({heading:hText,level:parseInt(h.tagName[1]),offset:idx});
+        }
+      }
+    }
+    
+    return JSON.stringify({
+      url:${urlJson},
+      content:isJunk?"":content,
+      _error:isJunk?"low_quality_content":undefined,
+      total_length:totalLen,
+      returned_length:content.length,
+      offset:off,
+      truncated:max>=0&&totalLen>(off+max),
+      sections:sections
+    });
+  })()`;
+}
+
+// ─── Content Cache ──────────────────────────────────────────────
+// Disk-based cache keyed by (url, offset, max). Avoids re-fetching.
+// Cache location: /tmp/gsearch-cache/<sha256>.json
+// TTL: 1 hour (files older than this are re-fetched)
+
+const CACHE_DIR = '/tmp/gsearch-cache';
+const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+
+function cacheKey(url: string, offset: number, max: number): string {
+  const crypto = require('crypto');
+  return crypto.createHash('sha256').update(`${url}|${offset}|${max}`).digest('hex');
+}
+
+function cacheGet(url: string, offset: number, max: number): string | null {
+  try {
+    const fs = require('fs');
+    const key = cacheKey(url, offset, max);
+    const path = `${CACHE_DIR}/${key}.json`;
+    if (!fs.existsSync(path)) return null;
+    const stat = fs.statSync(path);
+    if (Date.now() - stat.mtimeMs > CACHE_TTL_MS) {
+      fs.unlinkSync(path); // expired
+      return null;
+    }
+    return fs.readFileSync(path, 'utf8');
+  } catch {
+    return null; // cache miss on any error
+  }
+}
+
+function cacheSet(url: string, offset: number, max: number, data: string): void {
+  try {
+    const fs = require('fs');
+    const key = cacheKey(url, offset, max);
+    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+    fs.writeFileSync(`${CACHE_DIR}/${key}.json`, data, 'utf8');
+  } catch {
+    // Cache write failure is non-fatal
+  }
+}
+
 // ─── Full Command JS Generators (Pure) ───────────────────────────────────
 
 /**
@@ -101,52 +201,61 @@ export function qualityGateCode(): string {
  */
 export function followCode(
   url: string,
+  offset: number,
+  maxLen: number,
+  timeout: number,
+  raw: boolean,
   selector: string,
-  timeoutMs: number,
-  port: number,
+  port: number
 ): string {
-  const conn = connectCode(port);
-  const sel = JSON.stringify(selector);
   const urlJson = JSON.stringify(url);
-
-  // Extraction expression for runtime evaluation
-  const extractExpr = `document.querySelector(${sel})?.innerText||document.body?.innerText||''`;
+  const sel = JSON.stringify(selector);
+  const extractFunc = extractionCode(offset, maxLen, url, selector);
 
   return [
-    conn,
-    'const __tab=await session.Target.createTarget({url:"about:blank",background:true});',
-    'await session.Target.attachToTarget({targetId:__tab.targetId,flatten:true});',
-    'await session.use(__tab.targetId);',
+    'return (async function(){',
+    'var errors=[];var loadError=null;var tab=null;',
+    'try{',
+    `if(!session.isConnected()){try{await session.connect({port:${port}})}catch(e){throw new Error("CDP connect: "+e.message);}}`,
+    // Create tab with about:blank — no navigation yet
+    `tab=await session.Target.createTarget({url:"about:blank",background:true});`,
+    'await session.Target.attachToTarget({targetId:tab.targetId,flatten:true});',
+    'await session.use(tab.targetId);',
     'await session.Page.enable();',
     'await session.Page.setLifecycleEventsEnabled({enabled:true});',
-    'await session.Page.navigate({url:' + urlJson + '});',
-    'let content="";let loadError=null;let isJunk=false;',
-    'try{await Promise.race([',
-    '(async()=>{',
-    'for(let i=0;i<50;i++){',
-    'try{const r=await session.Runtime.evaluate({expression:"document.readyState",returnByValue:true});',
-    'if(r.result&&r.result.value==="complete")break;',
-    'if(r.result&&r.result.value==="interactive"&&i>15)break;',
-    '}catch(e){loadError=e.message;break;}',
-    'await new Promise(r=>setTimeout(r,200));',
+    // Register listener BEFORE navigating (CAN'T miss the event)
+    `var navPromise=session.waitFor("Page.lifecycleEvent",function(p){return p.name==="networkIdle";},${timeout});`,
+    // Single navigation — events already flowing
+    `await session.Page.navigate({url:${urlJson}});`,
+    'try{await navPromise;}catch(e){loadError="nav_timeout: "+e.message;}',
+    // Fallback: poll readyState if waitFor timed out
+    'if(loadError){',
+    'for(var i=0;i<50;i++){',
+    'try{var rs=await session.Runtime.evaluate({expression:"document.readyState",returnByValue:true});if(rs.result&&rs.result.value==="complete"){loadError=null;break;}}catch(ex){}',
+    'await new Promise(function(r){setTimeout(r,200);});',
     '}',
-    'if(!loadError){',
-    'const r=await session.Runtime.evaluate({expression:' +
-      JSON.stringify(extractExpr) +
-      ',returnByValue:true});',
-    'content=(r.result&&r.result.value)||"";',
     '}',
-    qualityGateCode(),
-    '})(),',
-    'new Promise((_,reject)=>setTimeout(()=>reject(new Error("tab_timeout")),' +
-      timeoutMs +
-      '))',
-    ']);}catch(e){loadError=e.message;}',
-    'try{await session.Target.closeTarget({targetId:__tab.targetId});}catch(e){}',
-    'return JSON.stringify({url:' +
-      urlJson +
-      ',content:isJunk?"":content,...(loadError?{_error:loadError}:{})});',
-  ].join('');
+    // PDF detection
+    'if(tab.type==="pdf"){',
+    'await new Promise(function(r){setTimeout(r,3000);});',
+    'try{var r=await session.Runtime.evaluate({expression:"document.body?.innerText||document.querySelector(\'embed\')?.shadowRoot?.textContent||\'\'",returnByValue:true});var content=(r.result&&r.result.value)||"";var result={content:content,total_length:content.length,returned_length:content.length,offset:' + offset + ',truncated:false,sections:[]};}catch(e){loadError="pdf_extraction_failed: "+e.message;var result={content:"",total_length:0,returned_length:0,offset:' + offset + ',truncated:false,sections:[]};}',
+    '}else{',
+    // Structured extraction — only after page is ready
+    `var r=await session.Runtime.evaluate({expression:${JSON.stringify(extractFunc)},returnByValue:true});`,
+    'var result=JSON.parse((r.result&&r.result.value)||"{}");',
+    'if(result._error){loadError=result._error;}',
+    '}',
+    // Close tab
+    'try{await session.Target.closeTarget({targetId:tab.targetId});}catch(e){}',
+    // Return
+    'if(loadError){result._error=loadError;}',
+    `return JSON.stringify(result);`,
+    '}catch(e){',
+    'try{if(tab)await session.Target.closeTarget({targetId:tab.targetId});}catch(ex){}',
+    `return JSON.stringify({content:"",total_length:0,returned_length:0,offset:${offset},truncated:false,sections:[],_error:"exception: "+e.message});`,
+    '}',
+    '})()'
+  ].join('\n');
 }
 
 /**
@@ -159,6 +268,8 @@ export function batchFollowCode(
   selector: string,
   timeoutMs: number,
   port: number,
+  offset: number,
+  maxLen: number,
 ): string {
   const conn = connectCode(port);
   const urlsJson = JSON.stringify(urls);
@@ -167,7 +278,7 @@ export function batchFollowCode(
   // JS snippet for per-tab extraction (uses `tab`, `selector`, `timeoutMs` in scope)
   const extractTabCode = [
     'await session.use(tab.targetId);',
-    'let content="";let loadError=null;let isJunk=false;',
+    'let content="";let loadError=null;',
     'try{await Promise.race([',
     '(async()=>{',
     'if(tab.type==="pdf"){',
@@ -176,27 +287,23 @@ export function batchFollowCode(
     'expression:"document.body?.innerText||document.querySelector(\\"embed\\")?.shadowRoot?.textContent||\\"\\"",',
     'returnByValue:true});',
     'content=(r.result&&r.result.value)||"";',
-    '}catch(e){loadError="pdf_extraction_failed: "+e.message;}',
+    'let totalLen=content.length;',
+    'let sections=[];',
+    'let truncated=maxLen>0&&totalLen>(offset+maxLen);',
+    'var dataObj={url:tab.originalUrl||tab.fetchUrl,content:content,truncated,total_length:totalLen,returned_length:content.length,offset,sections:sections};',
+    'results.push(dataObj);',
+    '}catch(e){loadError="pdf_extraction_failed: "+e.message;results.push({url:tab.originalUrl||tab.fetchUrl,content:"",_error:loadError});}',
     '}else{',
-    'for(let i=0;i<50;i++){',
-    'try{const r=await session.Runtime.evaluate({expression:"document.readyState",returnByValue:true});',
-    'if(r.result&&r.result.value==="complete")break;',
-    'if(r.result&&r.result.value==="interactive"&&i>15)break;',
-    '}catch(e){loadError=e.message;break;}',
-    'await new Promise(r=>setTimeout(r,200));',
+    'const expr="(function(){var root=document.querySelector(\\""+selector+"\\")||document.body;if(!root)return JSON.stringify({content:\\"\\",total_length:0,sections:[]});var fullText=root.innerText||root.textContent||\\"\\";var totalLen=fullText.length;var off="+offset+";var max="+maxLen+";var end=max<0?totalLen:Math.min(off+max,totalLen);var content=off<totalLen?fullText.slice(off,end):\\"\\";var isJunk=off===0&&(content.length<80||/This site can\'t be reached/i.test(content)||/ERR_CONNECTION/i.test(content)||/404 Not Found/i.test(content)||/^\\\\s*$/.test(content)||content===\\"Read More \\\\u00bb\\"||(content.length<100&&content.indexOf(\\"\\\\\\"\\")<0));var headings=root.querySelectorAll(\\"h1,h2,h3\\");var sections=[];for(var i=0;i<headings.length;i++){var h=headings[i];var hText=(h.innerText||\\"\\").trim();if(hText&&hText.length>1){var idx=fullText.indexOf(hText);if(idx>=0){sections.push({heading:hText,level:parseInt(h.tagName[1]),offset:idx});}}}return JSON.stringify({content:isJunk?\\"\\":content,total_length:totalLen,returned_length:content.length,offset:off,truncated:max>=0&&totalLen>(off+max),sections:sections});})()";',
+    'var r=await session.Runtime.evaluate({expression:expr,returnByValue:true});',
+    'var parsed=JSON.parse((r.result&&r.result.value)||"{}");',
+    'var dataObj={url:tab.originalUrl||tab.fetchUrl,content:parsed.content||"",total_length:parsed.total_length||0,returned_length:parsed.returned_length||0,offset:parsed.offset||0,truncated:parsed.truncated||false,sections:parsed.sections||[]};',
+    'if(parsed._error)dataObj._error=parsed._error;',
+    'results.push(dataObj);',
     '}',
-    'if(!loadError){',
-    'const r=await session.Runtime.evaluate({',
-    'expression:"document.querySelector("+JSON.stringify(selector)+")?.innerText||document.body?.innerText||\\"\\"",',
-    'returnByValue:true});',
-    'content=(r.result&&r.result.value)||"";',
-    '}',
-    '}',
-    qualityGateCode(),
     '})(),',
     'new Promise((_,reject)=>setTimeout(()=>reject(new Error("tab_timeout")),timeoutMs))',
     ']);}catch(e){loadError=e.message;}',
-    'results.push({url:tab.originalUrl||tab.fetchUrl,content:isJunk?"":content,...(loadError?{_error:loadError}:{})});',
   ].join('');
 
   return [
@@ -204,6 +311,8 @@ export function batchFollowCode(
     'const urls=' + urlsJson + ';',
     'const selector=' + selJson + ';',
     'const timeoutMs=' + timeoutMs + ';',
+    'var offset=' + offset + ';',
+    'var maxLen=' + maxLen + ';',
     'const processed=urls.map(function(url){',
     'const pdfMatch=url.match(/(\\/pdf\\/|\\.pdf$)/i);',
     'if(pdfMatch&&pdfMatch[1]==="/pdf/"){',
@@ -489,19 +598,24 @@ function findBrowserHarness(): string {
 function runBrowserHarness(
   jsCode: string,
 ): { stdout: string; stderr: string; exitCode: number } {
-  const binary = findBrowserHarness();
-  const result = spawnSync(binary, [], {
-    input: jsCode,
-    encoding: 'utf-8',
-    maxBuffer: 10 * 1024 * 1024, // 10MB
-    timeout: 120000, // 2 min
-  });
-
-  return {
-    stdout: result.stdout?.trim() || '',
-    stderr: result.stderr?.trim() || '',
-    exitCode: result.status ?? 1,
-  };
+  const cp = require('child_process');
+  const timeoutMs = 60000; // 60s max
+  try {
+    const result = cp.spawnSync('browser-harness-js', [], {
+      input: jsCode,
+      timeout: timeoutMs,
+      maxBuffer: 10 * 1024 * 1024, // 10MB max output
+      encoding: 'utf8',
+      env: { ...process.env }
+    });
+    return {
+      stdout: (result.stdout || '').trim(),
+      stderr: (result.stderr || '').trim(),
+      exitCode: result.status ?? -1
+    };
+  } catch (e: any) {
+    return { stdout: '', stderr: `runBrowserHarness error: ${e.message}`, exitCode: -1 };
+  }
 }
 
 // ─── CLI Parsing ─────────────────────────────────────────────────────────
@@ -541,6 +655,10 @@ export function parseArgs(argv: string[]): ParsedArgs {
     maxPages: 5,
     port: 9222,
     raw: false,
+    offset: 0,
+    maxLen: 15000,
+    pretty: false,
+    stream: false,
   };
 
   let i = 1;
@@ -555,14 +673,25 @@ export function parseArgs(argv: string[]): ParsedArgs {
     } else if (arg === '--count' && i + 1 < argv.length) {
       args.count = parseInt(argv[i + 1], 10);
       i += 2;
-    } else if (arg === '--max' && i + 1 < argv.length) {
-      args.maxPages = parseInt(argv[i + 1], 10);
-      i += 2;
     } else if (arg === '--port' && i + 1 < argv.length) {
       args.port = parseInt(argv[i + 1], 10);
       i += 2;
+    } else if (arg === '--offset' && i + 1 < argv.length) {
+      args.offset = parseInt(argv[i + 1], 10);
+      i += 2;
+    } else if (arg === '--max' && i + 1 < argv.length) {
+      const val = parseInt(argv[i + 1], 10);
+      args.maxPages = val;
+      args.maxLen = val;
+      i += 2;
+    } else if (arg === '--pretty') {
+      args.pretty = true;
+      i += 1;
     } else if (arg === '--raw') {
       args.raw = true;
+      i += 1;
+    } else if (arg === '--stream') {
+      args.stream = true;
       i += 1;
     } else if (arg.startsWith('--')) {
       console.error('Unknown option: ' + arg);
@@ -580,47 +709,134 @@ export function parseArgs(argv: string[]): ParsedArgs {
 // ─── Command Handlers ────────────────────────────────────────────────────
 
 function cmdFollow(args: ParsedArgs): void {
-  const url = args.positional[0];
-  const js = followCode(url, args.selector, args.timeout, args.port);
+  // arXiv normalization
+  let url = args.positional[0];
+  const pdfMatch = url.match(/(\/pdf\/|\.pdf$)/i);
+  if (pdfMatch && pdfMatch[1] === '/pdf/') {
+    url = url.replace(/\/pdf\/(.+)/, '/abs/$1').replace(/\.pdf$/, '');
+  }
+
+  // ★ Check cache first
+  const cached = cacheGet(url, args.offset, args.maxLen);
+  if (cached) {
+    let output = cached;
+    if (args.pretty) {
+      try { output = JSON.stringify(JSON.parse(cached), null, 2); } catch(e) {}
+    }
+    if (args.raw) {
+      console.log(output);
+    } else {
+      console.log(JSON.stringify({ success: true, url, data: output }));
+    }
+    return;
+  }
+
+  const js = followCode(url, args.offset, args.maxLen, args.timeout, args.raw, args.selector, args.port);
   const { stdout, stderr, exitCode } = runBrowserHarness(js);
 
   if (exitCode !== 0) {
-    const errMsg = stderr || stdout || 'unknown error';
-    console.error(
-      JSON.stringify({ success: false, url, error: errMsg }),
-    );
-    process.exit(2);
+    if (stdout) console.log(stdout);
+    else console.log(JSON.stringify({ content: "", total_length: 0, _error: stderr?.trim?.() || "follow_failed" }));
+    return;
+  }
+
+  // ★ Save to cache
+  cacheSet(url, args.offset, args.maxLen, stdout);
+
+  let output = stdout;
+  if (args.pretty && stdout) {
+    try {
+      output = JSON.stringify(JSON.parse(stdout), null, 2);
+    } catch(e) {
+      output = stdout;
+    }
   }
 
   if (args.raw) {
-    console.log(stdout);
+    console.log(output);
   } else {
-    console.log(JSON.stringify({ success: true, url, data: stdout }));
+    console.log(JSON.stringify({ success: true, url, data: output }));
   }
 }
 
 function cmdBatchFollow(args: ParsedArgs): void {
-  const js = batchFollowCode(
-    args.positional,
-    args.selector,
-    args.timeout,
-    args.port,
-  );
-  const { stdout, stderr, exitCode } = runBrowserHarness(js);
+  // Session health check — close stale tabs before starting
+  try {
+    const connectJs = `return (async function(){
+      if(!session.isConnected()){try{await session.connect({port:${args.port}})}catch(e){}}
+      if(session.isConnected()){
+        var targets=await session.Target.getTargets();
+        for(var t of targets.targetInfos||[]){
+          if(t.url==="about:blank"||t.url.startsWith("chrome://")||t.url.startsWith("devtools://")) continue;
+          try{await session.Target.closeTarget({targetId:t.targetId});}catch(e){}
+        }
+      }
+      return "ok";
+    })()`;
+    const cp = require('child_process');
+    cp.spawnSync('browser-harness-js', [], { input: connectJs, timeout: 10000, encoding: 'utf8' });
+  } catch(e) {}
 
-  if (exitCode !== 0) {
-    const errMsg = stderr || stdout || 'unknown error';
-    console.error(
-      JSON.stringify({
-        tool: 'gsearch',
-        error: 'batch_follow_failed',
-        detail: errMsg,
-      }),
-    );
-    process.exit(2);
+  // ★ Split URLs into cached (instant) and uncached (fetch)
+  const cachedResults: string[] = [];
+  const uncachedUrls: string[] = [];
+  for (const url of args.positional) {
+    const cached = cacheGet(url, args.offset, args.maxLen);
+    if (cached) {
+      cachedResults.push(cached);
+    } else {
+      uncachedUrls.push(url);
+    }
   }
 
-  console.log(stdout);
+  let fetchedResults: string[] = [];
+  if (uncachedUrls.length > 0) {
+    const js = batchFollowCode(
+      uncachedUrls,
+      args.selector,
+      args.timeout,
+      args.port,
+      args.offset,
+      args.maxLen,
+    );
+    const { stdout, stderr, exitCode } = runBrowserHarness(js);
+
+    if (exitCode !== 0) {
+      console.error(
+        JSON.stringify({
+          tool: 'gsearch',
+          error: 'batch_follow_failed',
+          detail: stderr || stdout || 'unknown error',
+        }),
+      );
+      process.exit(2);
+    }
+
+    // ★ Parse and cache each result
+    try {
+      const parsed = JSON.parse(stdout);
+      if (Array.isArray(parsed)) {
+        for (const item of parsed) {
+          cacheSet(item.url || uncachedUrls[0], args.offset, args.maxLen, JSON.stringify(item));
+        }
+      }
+    } catch(e) {}
+    fetchedResults = [stdout];
+  }
+
+  // ★ Combine cached + fetched into a single JSON array
+  const combined = JSON.stringify([...cachedResults.map(r => { try { return JSON.parse(r); } catch(e) { return { content: r }; } }), ...fetchedResults.flatMap(r => { try { return JSON.parse(r); } catch(e) { return []; } })]);
+
+  let output = combined;
+  if (args.pretty) {
+    try {
+      output = JSON.stringify(JSON.parse(combined), null, 2);
+    } catch(e) {
+      output = combined;
+    }
+  }
+
+  console.log(output);
 }
 
 function cmdSearch(args: ParsedArgs): void {

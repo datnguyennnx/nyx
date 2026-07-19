@@ -28,17 +28,20 @@ cmd_batch_search() {
 
 # — batch follow: multiple URLs in parallel tabs, returns combined content
 cmd_batch_follow() {
-  local selector="article, main, [role=main]" raw=false
+  local selector="article, main, [role=main]" raw=false pretty=false offset=0 max=15000
   while [ $# -gt 0 ]; do
     case "$1" in
       --selector) [ $# -ge 2 ] || die_usage; selector="$2"; shift 2 ;;
+      --offset)   [ $# -ge 2 ] || die_usage; is_num "$2" || die_usage; offset="$2"; shift 2 ;;
+      --max)      [ $# -ge 2 ] || die_usage; is_num "$2" || die_usage; max="$2"; shift 2 ;;
+      --pretty)   pretty=true; shift ;;
       --raw) raw=true; shift ;;
       --) shift; break ;;
       -*) die_usage "gsearch batch follow: unknown option: $1" ;;
       *) break ;;
     esac
   done
-  [ $# -ge 1 ] || die_usage "Usage: gsearch batch follow [--selector S] url1 url2 ..."
+  [ $# -ge 1 ] || die_usage "Usage: gsearch batch follow [--selector S] [--offset N] [--max M] [--pretty] url1 url2 ..."
 
   # Rewrite arXiv PDF URLs to abstract pages before passing to browser-automation.ts
   local urls=()
@@ -54,7 +57,7 @@ cmd_batch_follow() {
   done
 
   local raw_out
-  raw_out=$(bun "${CDP_SCRIPTS}/browser-automation.ts" batch-follow "${urls[@]}" --selector "$selector" --timeout 15000 --port "$GSEARCH_CDP_PORT" 2>&1) || {
+  raw_out=$(bun "${CDP_SCRIPTS}/browser-automation.ts" batch-follow "${urls[@]}" --selector "$selector" --offset "$offset" --max "$max" --timeout 15000 --port "$GSEARCH_CDP_PORT" $($pretty && echo --pretty) 2>&1) || {
     printf '{"tool":"gsearch","error":"batch_follow_failed","detail":%s}\n' "$(json_str "$raw_out")" >&2
     exit 2
   }
@@ -67,17 +70,19 @@ cmd_batch_follow() {
 #   Phase 1: parallel search (all queries → dedup → rank by snippet length)
 #   Phase 2: parallel follow (top N unique URLs → extract content)
 cmd_batch_harvest() {
-  local count=5 max_pages=5
+  local count=5 max_pages=5 max_per_topic=5
   while [ $# -gt 0 ]; do
     case "$1" in
       --count) is_num "$2" || die_usage; count="$2"; shift 2 ;;
       --max)   is_num "$2" || die_usage; max_pages="$2"; shift 2 ;;
+      --maxN)  is_num "$2" || die_usage; max_per_topic="$2"; shift 2 ;;
+      --topics) shift ;;  # remaining positional args are topics (already the default)
       --) shift; break ;;
       -*) die_usage "gsearch batch harvest: unknown option: $1" ;;
       *) break ;;
     esac
   done
-  [ $# -ge 1 ] || die_usage "Usage: gsearch batch harvest [--count N] [--max M] query1 query2 ..."
+  [ $# -ge 1 ] || die_usage "Usage: gsearch batch harvest [--count N] [--max M] [--maxN N] [--topics] query1 query2 ..."
 
   local raw
   raw=$(bun "${CDP_SCRIPTS}/browser-automation.ts" batch-harvest "$@" --count "$count" --max "$max_pages" --timeout 15000 --port "$GSEARCH_CDP_PORT" 2>&1) || {

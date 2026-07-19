@@ -71,9 +71,9 @@ test('qualityGateCode references content and loadError (scope correctness)', () 
 
 // ─── followCode ───────────────────────────────────────────────────────────
 
-test('followCode contains createTarget, Page.navigate, Runtime.evaluate, closeTarget', () => {
-  const code = followCode('http://example.com', 'body', 15000, 9222);
-  expect(code).toContain('createTarget');
+test('followCode contains Target.createTarget, Page.navigate, Runtime.evaluate, closeTarget', () => {
+  const code = followCode('http://example.com', 0, -1, 30000, false, 'article, main, [role=main]', 9222);
+  expect(code).toContain('Target.createTarget');
   expect(code).toContain('Page.navigate');
   expect(code).toContain('Runtime.evaluate');
   expect(code).toContain('closeTarget');
@@ -81,13 +81,13 @@ test('followCode contains createTarget, Page.navigate, Runtime.evaluate, closeTa
 
 test('followCode URL is properly JSON-stringified', () => {
   const url = "http://example.com/path?q=1&x='test'";
-  const code = followCode(url, 'body', 15000, 9222);
+  const code = followCode(url, 0, -1, 30000, false, 'body', 9222);
   expect(code).toContain(JSON.stringify(url));
 });
 
 test('followCode selector appears in the generated extraction expression', () => {
   const selector = 'main.content > p';
-  const code = followCode('http://example.com', selector, 15000, 9222);
+  const code = followCode('http://example.com', 0, -1, 30000, false, selector, 9222);
   // The selector is embedded via JSON.stringify then re-stringified for
   // Runtime.evaluate; the raw selector string still appears in the output.
   expect(code).toContain('main.content > p');
@@ -95,23 +95,23 @@ test('followCode selector appears in the generated extraction expression', () =>
 
 test('followCode timeout is embedded as a numeric literal', () => {
   const timeout = 30000;
-  const code = followCode('http://example.com', 'body', timeout, 9222);
+  const code = followCode('http://example.com', 0, -1, timeout, false, 'body', 9222);
   expect(code).toContain(String(timeout));
 });
 
-test('followCode uses connectCode (output contains session.connect)', () => {
-  const code = followCode('http://example.com', 'body', 15000, 9222);
+test('followCode uses session.connect (output contains session.connect)', () => {
+  const code = followCode('http://example.com', 0, -1, 15000, false, 'body', 9222);
   expect(code).toContain('session.connect');
 });
 
 test('followCode extracts with document.querySelector fallback', () => {
-  const code = followCode('http://example.com', 'body', 15000, 9222);
+  const code = followCode('http://example.com', 0, -1, 15000, false, 'body', 9222);
   expect(code).toContain('document.querySelector');
-  expect(code).toContain('document.body?.innerText');
+  expect(code).toContain('session.Runtime.evaluate');
 });
 
 test('followCode closes tab in try/catch', () => {
-  const code = followCode('http://example.com', 'body', 15000, 9222);
+  const code = followCode('http://example.com', 0, -1, 15000, false, 'body', 9222);
   expect(code).toContain('closeTarget');
   // closeTarget is wrapped in try{}catch(e){}
   const closeIdx = code.indexOf('closeTarget');
@@ -282,8 +282,8 @@ test('qualityGateCode is pure: always returns identical string (===)', () => {
 });
 
 test('followCode is pure: same args return identical string (===)', () => {
-  expect(followCode('http://x.com', 'body', 15000, 9222))
-    .toBe(followCode('http://x.com', 'body', 15000, 9222));
+  expect(followCode('http://x.com', 0, -1, 15000, false, 'body', 9222))
+    .toBe(followCode('http://x.com', 0, -1, 15000, false, 'body', 9222));
 });
 
 test('batchSearchCode is pure: same args return identical string (===)', () => {
@@ -307,8 +307,8 @@ test('batchHarvestCode is pure: same args return identical string (===)', () => 
 });
 
 test('no cross-call contamination: different args produce independent results', () => {
-  const a = followCode('http://a.com', 'body', 10000, 9222);
-  const b = followCode('http://b.com', 'main', 20000, 9223);
+  const a = followCode('http://a.com', 0, -1, 10000, false, 'body', 9222);
+  const b = followCode('http://b.com', 0, -1, 20000, false, 'main', 9223);
   expect(a).not.toBe(b);
   expect(a).toContain('http://a.com');
   expect(b).toContain('http://b.com');
@@ -322,7 +322,7 @@ test('generated JS does not contain GOOGLE_* TypeScript constants', () => {
   const codes = [
     ['connectCode', connectCode(9222)],
     ['qualityGateCode', qualityGateCode()],
-    ['followCode', followCode('http://x.com', 'body', 15000, 9222)],
+    ['followCode', followCode('http://x.com', 0, -1, 15000, false, 'body', 9222)],
     ['batchFollowCode', batchFollowCode(['http://x.com'], 'body', 15000, 9222)],
     ['batchSearchCode', batchSearchCode(['q'], 5, 9222)],
     ['searchCode', searchCode('q', 5, 9222)],
@@ -344,7 +344,7 @@ test('generated JS does not leak other TypeScript identifiers into browser scope
   const codes: string[] = [
     connectCode(9222),
     qualityGateCode(),
-    followCode('http://x.com', 'body', 15000, 9222),
+    followCode('http://x.com', 0, -1, 15000, false, 'body', 9222),
     batchFollowCode(['http://x.com'], 'body', 15000, 9222),
     batchSearchCode(['q'], 5, 9222),
     searchCode('q', 5, 9222),
