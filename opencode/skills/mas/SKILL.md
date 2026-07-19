@@ -24,6 +24,18 @@ If you find yourself thinking "this is simple enough to skip discovery" or "I ca
 | Changes need compilation verification before shipping | Documentation or non-code config |
 | Parallel execution would save time (independent tasks exist) | Strictly sequential single-domain work |
 
+## Pre-Flight Checks
+
+Before any agent spawn, run these checks. Halt on failure.
+
+| # | Check | On failure |
+|---|-------|------------|
+| 1 | Load `mas` skill | Retry; if still fails → escalate |
+| 2 | Confirm `node --version` and complexity-score.mjs exists | Escalate — node or script missing |
+| 3 | Recursion lock: confirm all 7 sub-agents have `task: deny` | Halt + escalate |
+
+The 7 sub-agents are: discovery, architect, implementer, fixer, verifier, research, synthesis.
+
 ## How to Diagnose Failures (not just fix them)
 
 ### Failure: Level N+1 fails with type errors that Level N introduced
@@ -32,7 +44,7 @@ If you find yourself thinking "this is simple enough to skip discovery" or "I ca
 
 **Root cause:** Level N output was not verified before Level N+1 started. The GATE ran on each task individually, but no cross-level contract check was done.
 
-**Fix:** Before spawning Level N+1, verify that Level N's outputs (type signatures, exports, interfaces) are compatible with Level N+1's declared imports. Run `tsc --noEmit` on the combined output of all completed levels before spawning the next.
+**Fix:** Apply the per-level combined GATE (see reference/decomposition.md). Before spawning Level N+1, run project build verification and linting on the combined output of all completed levels. If cross-level type errors exist, spawn fixer (max 3-4 attempts with diversity) before proceeding.
 
 **Prevention:** If you know a task changes a shared interface, add a `P1` edge (exporter → importer). The script will put the exporter in an earlier level.
 
@@ -48,7 +60,7 @@ If you find yourself thinking "this is simple enough to skip discovery" or "I ca
 
 ### Failure: GATE passes but the output doesn't match requirements
 
-**Symptom:** `tsc --noEmit` and `eslint` both pass. The diff looks reasonable. But the user says "this doesn't do what I asked."
+**Symptom:** Build verification and linting both pass. The diff looks reasonable. But the user says "this doesn't do what I asked."
 
 **Root cause:** Requirements coverage was not verified. The GATE checks compilation quality, not functional completeness. A feature that compiles perfectly can still be the wrong feature.
 
@@ -70,6 +82,16 @@ If you find yourself thinking "this is simple enough to skip discovery" or "I ca
 
 **Prevention:** Track `hitl_rounds`. At round 4, pause and ask the user to clarify or abort. Do not auto-continue past 3.
 
+### Failure: Fixer weakens the gate instead of fixing the output
+
+**Symptom:** Fixer returns "passed" but the build config (e.g., tsconfig.json, .eslintrc, Cargo.toml, pyproject.toml) has been relaxed (strict → false, rules downgraded from error to warn).
+
+**Root cause:** The fixer found it easier to weaken the gate criteria than to fix the actual code. This is a documented failure mode in autonomous repair systems (arXiv 2605.01471).
+
+**Fix:** Capture baseline build config before fixer starts. Diff after each iteration. If strictness weakened, halt and escalate — do NOT auto-retry. See reference/interaction.md for detection rules.
+
+**Prevention:** The GATE configuration must be immutable from the fixer's perspective. Fixer can only modify target files, not build configuration.
+
 ## The Traps You Will Hit
 
 **Trap 1: Scheduling from intuition instead of the script**
@@ -89,9 +111,9 @@ Discovery returns "no coupling found" for a pair. You classify it as `P5` (paral
 
 **Trap 3: Averaging the GATE**
 
-`tsc` fails with 2 type errors. `eslint` passes. You think "almost there" and ship. But the GATE is binary — a single type error means broken code. There is no "close enough."
+Build verification fails. Linting passes. You think "almost there" and ship. But the GATE is binary — a single type error means broken code. There is no "close enough."
 
-**Rule:** `tsc --noEmit && eslint` must both exit 0. Not "mostly 0." Not "close to 0."
+**Rule:** Project build verification and linting must both exit 0. Not "mostly 0." Not "close to 0."
 
 **Trap 4: Re-decomposing on every feedback**
 
@@ -125,9 +147,9 @@ Fixer fails. You modify its prompt and re-run. It fails again on a different err
 
 1. Spawn all tasks in `level[0]` in one turn (parallel)
 2. Wait for ALL to return
-3. Run `tsc --noEmit && eslint` on combined output
+3. Run project build verification and linting on the combined output of ALL completed levels (not per-task). If cross-level type errors exist, halt — do not spawn next level. Spawn fixer (max 3-4 attempts with diversity) before proceeding.
 4. If pass, proceed to `level[1]` with accumulated context
-5. If fail, spawn fixer (max 2), then escalate
+5. If fail, spawn fixer (max 3-4 with diversity), then escalate
 6. Repeat for each level
 
 ## Rationalization Table
@@ -137,7 +159,7 @@ Fixer fails. You modify its prompt and re-run. It fails again on a different err
 | "I'll estimate complexity — it's just 2 files" | Run the script. It validates file overlap and detects cycles you missed |
 | "I know the codebase, I can skip discovery" | Discovery produces citations, not knowledge. The script needs evidence, not your memory |
 | "No coupling found for this pair = parallel-safe" | Only explicit `P5` with positive confirmation = parallel. Absence of evidence is not evidence of absence |
-| "tsc passed with one warning, close enough" | `tsc --noEmit` is pass/fail. A warning is still a diagnostic — fix it or it blocks |
+| "tsc passed with one warning, close enough" | Build verification is pass/fail. A diagnostic (warning or error) means it fails — fix it or it blocks |
 | "I'll re-decompose since the user changed the approach" | Classify: approach change → architect. Scope change → re-decompose. Don't re-decompose for every word |
 | "Fixer failed once, I'll tweak the prompt and retry" | Fixer gets 2 tries. After that, escalate — the issue is structural |
 | "I'll use `explore` for discovery, it's faster" | `explore` doesn't produce structured citations. Use `discovery` — it's built for evidence contracts |
@@ -161,8 +183,8 @@ Fixer fails. You modify its prompt and re-run. It fails again on a different err
 - Every requirement has a matching diff hunk
 
 ### Gate compliance
-- `tsc --noEmit` exited 0 — binary pass, not "almost"
-- `eslint` exited 0 — binary pass, not "almost"
+- Build verification exited 0 — binary pass, not "almost"
+- Linting exited 0 — binary pass, not "almost"
 - Fixer ran at most 2 times per failure — if 2 failures, escalate
 
 ### Delegation hygiene
@@ -170,6 +192,7 @@ Fixer fails. You modify its prompt and re-run. It fails again on a different err
 - Every `task()` prompt included a SKILLS list for domain context
 - `complexity-score.mjs` ran and returned `levels` — you did not estimate
 - `hitl_rounds` < 4 — at 4th, pause and ask user
+- Fixer baseline config captured before iteration 1 (assertion weakening guard active)
 
 ## Reference Files
 
@@ -183,6 +206,6 @@ Reference files (in `reference/`) are pure instruction content with no YAML fron
 
 | Topic | File |
 |---|---|
-| Edge classification (P1-P6), delta weights, concurrent-writer safety | `reference/decomposition.md` |
+| Edge classification (P1-P6), delta weights, concurrent-writer safety, plan validation, per-level GATE | `reference/decomposition.md` |
 | Feedback classification, interrupts, frustration detection | `reference/interaction.md` |
 | Soft confidence formula, citation quality, conflict detection | `reference/verification.md` |

@@ -69,8 +69,47 @@ Every P1-P4/P6 edge MUST reference a discovery citation (file:line). No citation
 
 **Ambiguous**: no evidence of coupling AND no evidence ruling it out → default SEQUENTIAL (not P5). Discovery must positively confirm absence for P5.
 
+## Plan Validation Before Execution
+
+Before spawning level-0 implementers, validate the plan:
+
+1. **Structural validation**: Run `tsc --noEmit` on any interfaces, types, or shared declarations the architect produced (or equivalent for non-TS domains). If structural validation fails, re-spawn architect — do not proceed with an invalid plan.
+2. **Dependency completeness**: Verify every task's declared `edges[]` has a matching downstream task. No orphan edges.
+3. **File disjointness**: Verify no two tasks in the same level declare overlapping file sets. (Already enforced by the script — re-verify after any edge changes.)
+
+Rationale: A.DOT planner research (IBM, arXiv 2603.14229) shows 14.8% correctness improvement from dual validation before execution. Catches the most expensive class of error (wrong plan) before any code is written.
+
+## Per-Level Combined GATE
+
+After all implementers in a level return:
+
+1. Run project build verification and linting on the combined output of ALL completed levels (not per-task). The specific tools (e.g., tsc+eslint for TypeScript, cargo check+clippy for Rust) are determined by the project's tech stack, detected via the spawn prompt's SKILLS list and project files.
+2. If any type error crosses level boundaries (e.g., level 0 changes a type, level 1 uses it wrong), the combined GATE catches it.
+3. If combined GATE fails, do NOT spawn the next level. Spawn fixer for affected files (max 3-4 attempts with diversity), then re-run combined GATE.
+4. Only proceed to the next level when combined GATE passes on all completed output.
+
+This prevents cross-level contract breakage — the most common multi-level failure pattern (see SKILL.md Failure #1).
+
 # Concurrent-Writer Safety
 implementer/fixer NEVER parallel-same-worktree. If splitByDomain requires parallel domain writes, each parallel implementer MUST run in separate git worktree; merge sequentially after per-worktree verification.
 
 # False-Independence Anti-Patterns
 Shared types, DB migrations, shared module/layer boundaries, cross-domain type drift, same-file parallel edits → all sequential.
+
+## Tech Stack Detection
+
+The MAS agents determine the project's tech stack from:
+1. The SKILLS list in the spawn prompt (domain-specific tooling knowledge)
+2. Project files (package.json, Cargo.toml, pyproject.toml, etc.)
+3. The agent's knowledge of common verification tooling per stack
+
+Common stacks:
+| Stack | Build verification | Linting | Test |
+|-------|-------------------|---------|------|
+| TypeScript/JS | tsc --noEmit | eslint | jest/vitest |
+| Rust | cargo check | clippy | cargo test |
+| Python | mypy/pyright | ruff/flake8 | pytest |
+| Go | go build | go vet | go test |
+| Java | javac/mvn compile | checkstyle | mvn test |
+
+The orchestrator does NOT hardcode any specific tool. Each spawned agent uses its SKILLS list and project context to select the appropriate verification tools.

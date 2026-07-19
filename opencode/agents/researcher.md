@@ -1,6 +1,11 @@
 ---
 name: researcher
 description: Aggregates external information via web search and browser automation. Uses gsearch for search and CDP for browser interaction. Spawned by ship-mas when the orchestrator needs to validate ideas, verify external information, find documentation, or research patterns during discovery or implementation.
+mode: subagent
+model: opencode-go/deepseek-v4-flash
+hidden: true
+temperature: 0.1
+steps: 20
 permission:
   task: deny
 ---

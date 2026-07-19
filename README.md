@@ -1,6 +1,6 @@
 # nyx
 
-Two-layer architecture: a stateless orchestrator (ship-mas) applies evidence-gated, deterministic decomposition over task graphs, then delegates execution to generic LLM agents with bounded retry and a binary mechanical verification GATE. No JSON manifests. No plugin engine. Built on OpenCode's staged topology (read-only researchers → synthesis → single writer → test → review).
+Seven-agent topology: **discovery**, **architect**, **implementer**, **fixer**, **verifier**, **research**, **synthesis**. Two-layer architecture: a stateless orchestrator (ship-mas) applies evidence-gated, deterministic decomposition over task graphs, then delegates execution to generic LLM agents with bounded retry and a stack-agnostic mechanical verification GATE. No JSON manifests. No plugin engine. Built on OpenCode's staged topology (read-only researchers → synthesis → single writer → test → review).
 
 ## Quick Start
 
@@ -33,10 +33,13 @@ User → ship-mas
   │ The Ladder — Kahn's algorithm on evidence-cited edges:
   │   levels = complexity-score.mjs output
   │ for each level in levels:
+  │   Plan validated? (sanity check on evidence completeness, file disjointness)
   │   spawn all level tasks in parallel same-turn
-  │   GATE: tsc --noEmit && eslint (binary — never averaged)
-  │   FAIL → fixer (max 2) → ESCALATE
+  │   GATE: project build verification and linting with tools determined by tech stack
+  │         (binary — never averaged)
+  │   FAIL → fixer (3-4 iterations with diversity, assertion weakening detection) → ESCALATE
   │   PASS → soft confidence (framing only, never affects ship)
+  │   Semantic Gate (Layer 2): requirements-to-hunk mapping after binary GATE passes
   └─ HITL: pure presentation — no questions, no approval gate
        (diff + confidence shown to user; no feedback loop)
 ```
@@ -137,11 +140,19 @@ The script also outputs informational routing flags from aggregate scores — th
  | `splitByDomain` ($D_{JS} > 0.15$) | Split by domain before scheduling |
 | `splitByFileCluster` ($H_n > 0.70$) | Split by cluster before scheduling |
 
+### Integrity Formula
+
+Per-level hunk integrity after GATE:
+
+$$C_{gj} = 1 - \frac{\text{unmatched\_hunks}}{\text{total\_hunks}}$$
+
+Where $C_{gj}$ measures alignment between GATE output and task requirements at level $j$. Unmatched hunks are code changes present but not covered by any requirement citation. Used to detect hallucination and scope creep.
+
 ### Soft Confidence
 
-Computed only after binary GATE passes. Framing only — never affects ship/no-ship:
+Computed only after binary GATE passes (stack-agnostic — uses whichever verification tools were selected by tech stack detection). Framing only — never affects ship/no-ship:
 
-$$C_{\text{soft}} = \frac{1}{2}\left(\frac{\text{cited}}{\text{total}} + \frac{\text{integrity}}{100}\right)$$
+$$C_{\text{soft}} = \frac{1}{2}\left(\frac{\text{cited}}{\text{total}} + \frac{C_{gj}}{100}\right)$$
 
 | Score | Level | Framing |
 |---|---|---|
@@ -150,13 +161,38 @@ $$C_{\text{soft}} = \frac{1}{2}\left(\frac{\text{cited}}{\text{total}} + \frac{\
 | $< 0.50$ | LOW | Low citation coverage |
 
 
+## Graduated Verdicts
+
+Binary GATE (pass/fail) still determines ship/no-ship. However, after binary GATE passes and semantic gate runs, a graduated verdict provides advisory signal:
+
+| Verdict | Condition | Meaning |
+|---|---|---|
+| **PASS** | Binary GATE pass, $C_{gj} \geq 0.8$ | Full integrity — no caveats |
+| **CONDITIONAL** | Binary GATE pass, $0.5 \leq C_{gj} < 0.8$ | Ship allowed but flagged — review untraced hunks |
+| **REJECT** | Binary GATE pass, $C_{gj} < 0.5$ | Level fails despite binary pass — semantic integrity too low |
+
+Graduated verdicts are **advisory only** — they inform HITL presentation and soft confidence but do not override the binary GATE. The binary GATE blocks unconditionally; graduated verdicts refine the framing when binary GATE passes.
+
 ## Invariants
 
 - The orchestrator never analyzes code or data — every analytical task is delegated to a spawned agent
 - No file modified by two parallel tasks (disjointness proven by script; separate git worktrees for parallel writers)
 - Every agent has domain context (`skill()` before file access)
 - No code ships without compilation (binary GATE — never averaged with soft signals)
-- No infinite loops (fix ≤ 2)
+- No infinite loops (fixer: 3-4 iterations with diversity, then ESCALATE)
 - HITL is pure presentation — no questions, no approval gate
 - Pre-flight recursion lock: all sub-agents have `task: deny`
 - Cross-cutting concerns (security, testing, a11y, perf) flagged automatically — never silently skipped
+
+## Red Lines
+
+These are hard constraints — violations halt execution immediately:
+
+1. **Plan Validation**: Every level must pass a sanity check (evidence completeness, file disjointness, no dangling citations) before any task in that level spawns. A failed plan validation is a hard abort — not a retry.
+
+2. **Per-level Combined GATE**: Each level's verification runs as a single combined GATE after all parallel tasks return. Individual task-level gates are not evaluated in isolation — the level passes or fails as a unit.
+
+3. **Assertion Weakening Detection**: Before fixer iteration 1, capture a baseline config (compiler flags, lint rules, test framework). After each fixer iteration, diff the baseline against current configuration. Any removal or relaxation of assertions (rule downgrades, flag removals, test skips) triggers immediate ESCALATE — the fixer must not weaken guardrails.
+
+4. **Semantic Gate (Layer 2)**: After binary GATE passes, a semantic gate maps requirements to hunks. Every hunk must trace to at least one requirement citation. Untraced hunks drop integrity per $C_{gj}$ formula. A level with $C_{gj} < 0.5$ at semantic gate fails the level despite a passing binary GATE.
+

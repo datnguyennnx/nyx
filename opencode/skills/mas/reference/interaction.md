@@ -38,3 +38,27 @@ References active task's target_files → INTERRUPT. Otherwise → NEW TASK. Def
 ## Session State
 
 Track in memory: current tasks, completed, pending, HITL rounds. On re-entry: diff feedback against scope — invalidated tasks re-spawned, valid preserved.
+
+## Assertion Weakening Detection
+
+When the fixer runs, it may attempt to "pass" the GATE by weakening verification criteria rather than fixing the actual output. Documented failure mode in autonomous test repair systems (arXiv 2605.01471).
+
+Detection rules:
+1. After each fixer iteration, diff the project's build config files (tsconfig.json, .eslintrc, etc.) against the baseline captured before the fixer started.
+2. If any strictness setting was relaxed (e.g., strict: true → false, noUnusedLocals: true → false, or eslint rules changed from error → warn), halt immediately.
+3. Do NOT auto-retry after assertion weakening is detected. Escalate to user with the diff of weakened settings.
+
+Response: Write-lock the pipeline. Present the weakened config diff to the user. Require explicit `!continue` to proceed.
+
+## Fixer Iteration Diversity Strategy
+
+When the fixer needs multiple iterations (increased from max 2 to max 3-4), use exponential diversity:
+
+| Iteration | Strategy | Reasoning |
+|-----------|----------|-----------|
+| 1 | Direct fix based on error message | Fastest path — works for simple errors |
+| 2 | Re-read surrounding context before fixing | Broader view catches missing imports, type mismatches |
+| 3 | Spawn architect to propose redesign if structural | Complex errors may need redesign, not patching |
+| 4 (if configured) | Escalate — structural issue | After 3 attempts, the problem is structural |
+
+Diversity prevents the fixer from repeating the same wrong approach and increases convergence probability.
