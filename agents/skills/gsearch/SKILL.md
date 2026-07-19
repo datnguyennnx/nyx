@@ -5,7 +5,7 @@ compatibility: "Bun and Chromium required (auto-installed on first run). gsearch
 ---
 
 
-## ⚡ When This Skill Activates
+##  When This Skill Activates
 
 The user says ANY of these phrases → you MUST load this skill and use gsearch commands:
 - "/gsearch", "gsearch", "/gsearch skill"

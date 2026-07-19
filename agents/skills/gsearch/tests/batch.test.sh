@@ -29,9 +29,9 @@ bun() {
 assert_bun_contains() {
   local expected="$1"
   if grep -F -- "$expected" "$BUN_ARGS_FILE" >/dev/null 2>&1; then
-    echo "  ✓ args contain: $expected"
+    echo "  OK args contain: $expected"
   else
-    echo "  ✗ FAIL: args missing: $expected"
+    echo "  FAIL FAIL: args missing: $expected"
     echo "    args file contents: $(cat "$BUN_ARGS_FILE")"
     exit 1
   fi
@@ -42,9 +42,9 @@ assert_bun_args_equal() {
   local actual
   actual="$(cat "$BUN_ARGS_FILE")"
   if [ "$actual" = "$expected" ]; then
-    echo "  ✓ args exactly: $expected"
+    echo "  OK args exactly: $expected"
   else
-    echo "  ✗ FAIL: args mismatch"
+    echo "  FAIL FAIL: args mismatch"
     echo "    expected: $expected"
     echo "    actual:   $actual"
     exit 1
@@ -72,9 +72,9 @@ bun "${CDP_SCRIPTS}/browser-automation.ts" batch-follow "https://arxiv.org/abs/2
 echo "  args file contents: $(cat "$BUN_ARGS_FILE")"
 # The URL should be intact — no backslash corruption
 if grep -Fq "https://arxiv.org/abs/2305.12345" "$BUN_ARGS_FILE"; then
-  echo "  ✓ URL preserved correctly"
+  echo "  OK URL preserved correctly"
 else
-  echo "  ✗ FAIL: URL corrupted by echo"
+  echo "  FAIL FAIL: URL corrupted by echo"
   echo "    expected to find: https://arxiv.org/abs/2305.12345"
   echo "    got: $(cat "$BUN_ARGS_FILE")"
   exit 1
@@ -94,17 +94,17 @@ cmd_batch_follow "https://arxiv.org/abs/2305.12345" 2>/dev/null || true
 
 echo "  args file contents: $(cat "$BUN_ARGS_FILE")"
 if grep -Fq "batch-follow" "$BUN_ARGS_FILE"; then
-  echo "  ✓ batch-follow subcommand present"
+  echo "  OK batch-follow subcommand present"
 else
-  echo "  ✗ FAIL: batch-follow subcommand missing"
+  echo "  FAIL FAIL: batch-follow subcommand missing"
   exit 1
 fi
 
 # The URL should be intact (no backslash corruption from echo)
 if grep -Fq "https://arxiv.org/abs/2305.12345" "$BUN_ARGS_FILE"; then
-  echo "  ✓ URL preserved in batch-follow call"
+  echo "  OK URL preserved in batch-follow call"
 else
-  echo "  ✗ FAIL: URL corrupted in batch-follow call"
+  echo "  FAIL FAIL: URL corrupted in batch-follow call"
   echo "    got: $(cat "$BUN_ARGS_FILE")"
   exit 1
 fi
@@ -118,9 +118,9 @@ cmd_batch_search --count 3 "machine learning" "transformer models" 2>/dev/null |
 
 echo "  args file contents: $(cat "$BUN_ARGS_FILE")"
 if grep -Fq "batch-search" "$BUN_ARGS_FILE"; then
-  echo "  ✓ batch-search subcommand present"
+  echo "  OK batch-search subcommand present"
 else
-  echo "  ✗ FAIL: batch-search subcommand missing"
+  echo "  FAIL FAIL: batch-search subcommand missing"
   exit 1
 fi
 
@@ -133,9 +133,9 @@ cmd_batch_harvest --count 2 --max 3 "AI research" "quantum computing" 2>/dev/nul
 
 echo "  args file contents: $(cat "$BUN_ARGS_FILE")"
 if grep -Fq "batch-harvest" "$BUN_ARGS_FILE"; then
-  echo "  ✓ batch-harvest subcommand present"
+  echo "  OK batch-harvest subcommand present"
 else
-  echo "  ✗ FAIL: batch-harvest subcommand missing"
+  echo "  FAIL FAIL: batch-harvest subcommand missing"
   exit 1
 fi
 
@@ -153,23 +153,23 @@ ARGS="$(cat "$BUN_ARGS_FILE")"
 echo "  args file contents: $ARGS"
 
 if echo "$ARGS" | grep -Fq "https://arxiv.org/abs/2305.12345"; then
-  echo "  ✓ URL 1 preserved"
+  echo "  OK URL 1 preserved"
 else
-  echo "  ✗ FAIL: URL 1 corrupted"
+  echo "  FAIL FAIL: URL 1 corrupted"
   exit 1
 fi
 
 if echo "$ARGS" | grep -Fq "https://example.com/page?q=hello&x=1"; then
-  echo "  ✓ URL 2 preserved"
+  echo "  OK URL 2 preserved"
 else
-  echo "  ✗ FAIL: URL 2 corrupted"
+  echo "  FAIL FAIL: URL 2 corrupted"
   exit 1
 fi
 
 if echo "$ARGS" | grep -Fq "http://localhost:8080/test"; then
-  echo "  ✓ URL 3 preserved"
+  echo "  OK URL 3 preserved"
 else
-  echo "  ✗ FAIL: URL 3 corrupted"
+  echo "  FAIL FAIL: URL 3 corrupted"
   exit 1
 fi
 

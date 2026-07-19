@@ -18,10 +18,10 @@ fail=0
 assert_eq() {
   local expected="$1" actual="$2" label="${3:-}"
   if [ "$actual" = "$expected" ]; then
-    echo "  ✓ $label"
+    echo "  OK $label"
     pass=$((pass + 1))
   else
-    echo "  ✗ FAIL: $label"
+    echo "  FAIL FAIL: $label"
     echo "    expected: $expected"
     echo "    actual:   $actual"
     fail=$((fail + 1))
@@ -31,10 +31,10 @@ assert_eq() {
 assert_run_0() {
   local label="${2:-$1}"
   if eval "$1" 2>/dev/null; then
-    echo "  ✓ $label"
+    echo "  OK $label"
     pass=$((pass + 1))
   else
-    echo "  ✗ FAIL: $label (expected exit 0)"
+    echo "  FAIL FAIL: $label (expected exit 0)"
     fail=$((fail + 1))
   fi
 }
@@ -42,15 +42,15 @@ assert_run_0() {
 assert_run_1() {
   local label="${2:-$1}"
   if eval "$1" 2>/dev/null; then
-    echo "  ✗ FAIL: $label (expected exit 1, got exit 0)"
+    echo "  FAIL FAIL: $label (expected exit 1, got exit 0)"
     fail=$((fail + 1))
   else
     local rc=$?
     if [ $rc -eq 1 ]; then
-      echo "  ✓ $label"
+      echo "  OK $label"
       pass=$((pass + 1))
     else
-      echo "  ✗ FAIL: $label (expected exit 1, got exit $rc)"
+      echo "  FAIL FAIL: $label (expected exit 1, got exit $rc)"
       fail=$((fail + 1))
     fi
   fi
@@ -165,10 +165,10 @@ test_die_usage_exit() {
   ( die_usage "test msg" 2>/dev/null; ) && return 1 || return 0
 }
 if test_die_usage_exit; then
-  echo "  ✓ die_usage exits with 1"
+  echo "  OK die_usage exits with 1"
   pass=$((pass + 1))
 else
-  echo "  ✗ FAIL: die_usage exit code is not 1"
+  echo "  FAIL FAIL: die_usage exit code is not 1"
   fail=$((fail + 1))
 fi
 
@@ -179,10 +179,10 @@ test_die_usage_msg() {
   [ "$captured" = "expected test message" ]
 }
 if test_die_usage_msg; then
-  echo "  ✓ die_usage prints message to stderr"
+  echo "  OK die_usage prints message to stderr"
   pass=$((pass + 1))
 else
-  echo "  ✗ FAIL: die_usage stderr message mismatch"
+  echo "  FAIL FAIL: die_usage stderr message mismatch"
   fail=$((fail + 1))
 fi
 

@@ -19,10 +19,10 @@ fail=0
 assert_eq() {
   local expected="$1" actual="$2" label="${3:-}"
   if [ "$actual" = "$expected" ]; then
-    echo "  ✓ $label"
+    echo "  OK $label"
     pass=$((pass + 1))
   else
-    echo "  ✗ FAIL: $label"
+    echo "  FAIL FAIL: $label"
     echo "    expected: $expected"
     echo "    actual:   $actual"
     fail=$((fail + 1))
@@ -32,10 +32,10 @@ assert_eq() {
 assert_contains() {
   local needle="$1" haystack="$2" label="${3:-}"
   if echo "$haystack" | grep -Fq -- "$needle"; then
-    echo "  ✓ $label"
+    echo "  OK $label"
     pass=$((pass + 1))
   else
-    echo "  ✗ FAIL: $label"
+    echo "  FAIL FAIL: $label"
     echo "    expected to find: $needle"
     echo "    in: $haystack"
     fail=$((fail + 1))
@@ -45,10 +45,10 @@ assert_contains() {
 assert_not_contains() {
   local needle="$1" haystack="$2" label="${3:-}"
   if echo "$haystack" | grep -Fq -- "$needle"; then
-    echo "  ✗ FAIL: $label (found: $needle)"
+    echo "  FAIL FAIL: $label (found: $needle)"
     fail=$((fail + 1))
   else
-    echo "  ✓ $label"
+    echo "  OK $label"
     pass=$((pass + 1))
   fi
 }
@@ -56,10 +56,10 @@ assert_not_contains() {
 assert_file_contains() {
   local needle="$1" file="$2" label="${3:-}"
   if grep -Fq -- "$needle" "$file"; then
-    echo "  ✓ $label"
+    echo "  OK $label"
     pass=$((pass + 1))
   else
-    echo "  ✗ FAIL: $label"
+    echo "  FAIL FAIL: $label"
     echo "    expected to find in $file: $needle"
     fail=$((fail + 1))
   fi
@@ -73,10 +73,10 @@ echo ""
 echo "=== Test 1: Function definition ==="
 
 if declare -F cmd_search >/dev/null 2>&1; then
-  echo "  ✓ cmd_search function exists"
+  echo "  OK cmd_search function exists"
   pass=$((pass + 1))
 else
-  echo "  ✗ FAIL: cmd_search function not found"
+  echo "  FAIL FAIL: cmd_search function not found"
   fail=$((fail + 1))
 fi
 
@@ -107,14 +107,14 @@ SEARCH_FILE="$LIB/search.sh"
 if [ -f "$SEARCH_FILE" ]; then
   count=$(grep -c 'browser-automation.ts' "$SEARCH_FILE" 2>/dev/null || echo 0)
   if [ "$count" -gt 0 ]; then
-    echo "  ✓ search.sh references browser-automation.ts ($count times)"
+    echo "  OK search.sh references browser-automation.ts ($count times)"
     pass=$((pass + 1))
   else
-    echo "  ✗ FAIL: search.sh does not reference browser-automation.ts"
+    echo "  FAIL FAIL: search.sh does not reference browser-automation.ts"
     fail=$((fail + 1))
   fi
 else
-  echo "  ✗ FAIL: search.sh not found at $SEARCH_FILE"
+  echo "  FAIL FAIL: search.sh not found at $SEARCH_FILE"
   fail=$((fail + 1))
 fi
 
@@ -203,10 +203,10 @@ test_die_on_no_args() {
   ( cmd_search 2>/dev/null; ) && return 1 || return 0
 }
 if test_die_on_no_args; then
-  echo "  ✓ 4d: cmd_search with no args exits 1 (die_usage)"
+  echo "  OK 4d: cmd_search with no args exits 1 (die_usage)"
   pass=$((pass + 1))
 else
-  echo "  ✗ FAIL: 4d: cmd_search with no args did not exit 1"
+  echo "  FAIL FAIL: 4d: cmd_search with no args did not exit 1"
   fail=$((fail + 1))
 fi
 
@@ -218,10 +218,10 @@ test_die_on_bad_count() {
   ( cmd_search --count abc "query" 2>/dev/null; ) && return 1 || return 0
 }
 if test_die_on_bad_count; then
-  echo "  ✓ 4e: --count abc exits 1 (die_usage)"
+  echo "  OK 4e: --count abc exits 1 (die_usage)"
   pass=$((pass + 1))
 else
-  echo "  ✗ FAIL: 4e: --count abc did not exit 1"
+  echo "  FAIL FAIL: 4e: --count abc did not exit 1"
   fail=$((fail + 1))
 fi
 
@@ -233,10 +233,10 @@ test_die_on_unknown_opt() {
   ( cmd_search --bogus "query" 2>/dev/null; ) && return 1 || return 0
 }
 if test_die_on_unknown_opt; then
-  echo "  ✓ 4f: --bogus exits 1 (die_usage)"
+  echo "  OK 4f: --bogus exits 1 (die_usage)"
   pass=$((pass + 1))
 else
-  echo "  ✗ FAIL: 4f: --bogus did not exit 1"
+  echo "  FAIL FAIL: 4f: --bogus did not exit 1"
   fail=$((fail + 1))
 fi
 
