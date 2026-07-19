@@ -1,8 +1,3 @@
----
-name: mas-decomposition
-description: Task decomposition, complexity scoring, DAG routing, fast-lane threshold. For ship-mas orchestrator.
----
-
 # Topology
 L0: ship-mas = classify, decompose, spawn, verify, HITL
 L1: Generic agents (discovery, architect, implementer, fixer, verifier) = direct tool access, domain skills via `skill` tool

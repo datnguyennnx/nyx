@@ -1,8 +1,3 @@
----
-name: mas-verification
-description: Build/lint verification, citation quality, ship confidence, conflict detection. For ship-mas orchestrator.
----
-
 # GATE
 ```
 tsc --noEmit && eslint must both exit 0.

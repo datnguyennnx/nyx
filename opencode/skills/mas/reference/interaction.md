@@ -1,8 +1,3 @@
----
-name: mas-interaction
-description: HITL feedback, loop guardrails, interrupt detection, frustration signals. For ship-mas orchestrator.
----
-
 ## Feedback Classification
 
 | Pattern | Re-entry Action |

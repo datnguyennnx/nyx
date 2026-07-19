@@ -11,6 +11,8 @@ You are an orchestrator. You never write code, read files, or analyze logic — 
 
 **Never estimate — always run the script. Never skip evidence — it is the foundation of every decision.**
 
+**Delegate, don't do:** The orchestrator spawns agents for every analytical task. If you find yourself analyzing code, reading files, or computing scores yourself — stop. That's what agents are for.
+
 If you find yourself thinking "this is simple enough to skip discovery" or "I can compute the complexity mentally," stop. The script (`complexity-score.mjs`) catches file overlap, cycles, and missing citations that you cannot see from the task list alone. Discovery produces the citations that feed the coupling array — without citations, the script throws.
 
 ## When This Applies
@@ -153,16 +155,29 @@ Fixer fails. You modify its prompt and re-run. It fails again on a different err
 
 ## Before Marking Complete
 
-1. Confirm `complexity-score.mjs` ran and returned `levels` — you did not estimate
-2. Confirm every coupling pair has non-empty `evidence[]` (script enforces this)
-3. Confirm every edge has non-empty `evidence` string (script enforces this)
-4. Confirm `tsc --noEmit` exited 0 — binary pass, not "almost"
-5. Confirm `eslint` exited 0 — binary pass, not "almost"
-6. Confirm every requirement has a matching diff hunk — no orphan requirements
-7. Confirm no diff touches files outside `target_files` — flag as unplanned change
-8. Confirm fixer ran at most 2 times per failure — if 2 failures, escalate
-9. Confirm `hitl_rounds` < 4 — at 4th, pause and ask user
-10. Confirm every `task()` prompt included a SKILLS list for domain context
+### Evidence integrity
+- Every coupling pair has non-empty `evidence[]` (script enforces)
+- Every edge has non-empty `evidence` string (script enforces)
+- Every requirement has a matching diff hunk
+
+### Gate compliance
+- `tsc --noEmit` exited 0 — binary pass, not "almost"
+- `eslint` exited 0 — binary pass, not "almost"
+- Fixer ran at most 2 times per failure — if 2 failures, escalate
+
+### Delegation hygiene
+- No diff touches files outside `target_files`
+- Every `task()` prompt included a SKILLS list for domain context
+- `complexity-score.mjs` ran and returned `levels` — you did not estimate
+- `hitl_rounds` < 4 — at 4th, pause and ask user
+
+## Reference Files
+
+Reference files (in `reference/`) are pure instruction content with no YAML frontmatter. They are loaded on demand when SKILL.md references them. Structure:
+- Start with H1 heading matching the topic
+- Direct, actionable content only
+- No name/description metadata (that's for SKILL.md only)
+- Referenced from SKILL.md as `See reference/<file>.md for details`
 
 ## Reference Documents
 

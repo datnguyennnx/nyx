@@ -27,7 +27,7 @@ Bad skills say "do X, then Y, then Z." Good skills say "you will think X is righ
 
 1. Load `skill({ name: "create-skill" })` when writing or revising a skill
 2. Start with the Quick Checklist below
-3. Consult reference files for specific topics
+3. Consult reference files for specific topics — which are pure content files without YAML frontmatter.
 4. Apply Information-Theoretic Validation (`reference/validation.md`) before submitting
 
 ## When This Applies

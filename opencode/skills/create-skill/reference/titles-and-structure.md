@@ -67,6 +67,14 @@ The bulk of the skill (60%+ of content). Contains traps, failure patterns, ratio
 
 Binary items only. Every item must be pass/fail with no interpretation needed. The agent runs through this before declaring done.
 
+### Reference Files: Content Only, No Metadata
+
+Reference files (in the `references/` folder) are pure content files. Unlike SKILL.md, they have NO YAML frontmatter. They are not entry points — they are instruction supplements loaded on demand. Structure them as plain markdown with:
+- H1 heading matching the file's topic
+- Direct, actionable content
+- No name/description frontmatter (wasted tokens)
+- Referenced explicitly from SKILL.md: `See references/<file>.md for details`
+
 ## Information Architecture
 
 ### Temporal ordering

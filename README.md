@@ -23,22 +23,25 @@ Syncs `opencode/` → `~/.config/opencode` and `agents/` → `~/.agents`. Then l
 ```
 User → ship-mas
   │ classify intent
-  │ pre-flight checks
-  │ structure scan (ls/find/rg)
+  │ pre-flight checks (recursion lock, structure scan)
   │ evidence gathering (MANDATORY unless Fast Lane):
-  │   spawn discovery → cross-file coupling report with file:line citations
+  │   spawn discovery agent → cross-file coupling report with file:line citations
   │   every file pair accounted for (evidence or explicit "none found")
-  │ decompose: build input from evidence → complexity-score.mjs
-  │   script stdout { H_norm, D_JS, I_norm, C_T, routing, levels } is AUTHORITATIVE
-  │   script throws if coupling/edge evidence is missing or same-level files overlap
-  │ for each level in levels (Kahn's algorithm on edges):
+  │ decompose → complexity-score.mjs:
+  │   {"H_norm","D_JS","I_norm","C_T","routing","levels"}
+  │   validates evidence completeness (missing citations → throws)
+  │ The Ladder — Kahn's algorithm on evidence-cited edges:
+  │   levels = complexity-score.mjs output
+  │ for each level in levels:
   │   spawn all level tasks in parallel same-turn
   │   GATE: tsc --noEmit && eslint (binary — never averaged)
   │   FAIL → fixer (max 2) → ESCALATE
   │   PASS → soft confidence (framing only, never affects ship)
-  └─ HITL: GATE result + diff + confidence
-       approve → ship | feedback → re-enter (max 3)
+  └─ HITL: pure presentation — no questions, no approval gate
+       (diff + confidence shown to user; no feedback loop)
 ```
+
+*The orchestrator never analyzes — it delegates every analytical task to spawned agents.*
 
 ## Workflow: Discover
 
@@ -48,13 +51,13 @@ User → ship-mas
   │ pre-flight checks
   │ structure scan
   │ count files in scope
-  │ ≤ 15 files → single explore agent → present
+  │ ≤ 15 files → single discovery agent → present
   │ > 15 files → fan out:
   │   cluster by top-level directory (structural only, no coupling claim)
   │   build tasks[] per cluster → **MANDATORY** complexity-score.mjs call
   │     (validates cluster structure, enforces deterministic boundaries)
-  │   spawn one explore agent per cluster (all same-level, parallel)
-  │   reconcile cross-cluster findings → single synthesized report
+  │   spawn one discovery agent per cluster (all same-level, parallel)
+  │   spawn SYNTHESIS agent — reconciles cross-cluster findings
   └─ present to user
 ```
 
@@ -67,7 +70,7 @@ Every edge between tasks MUST cite a discovery-verified file:line reference. The
 - **Same-level tasks** with overlapping file sets → throws
 - **Cycles** in DAG edges → throws
 
-No citation → no assignment. Ambiguous cases (no evidence found, no evidence ruling out) default to **sequential** — not parallel-safe. Parallel-safe (P5) requires a positive confirmation of absence from discovery.
+No citation → no assignment. The discovery agent produces citations — the orchestrator does not analyze; it delegates evidence gathering. Ambiguous cases (no evidence found, no evidence ruling out) default to **sequential** — not parallel-safe. Parallel-safe (P5) requires a positive confirmation of absence from discovery.
 
 ## Mathematical Model
 
@@ -109,7 +112,7 @@ $$C(T) = \frac{H_n + D_{JS} + I_{\text{norm}}}{k},\quad k \in [1,3]$$
 
 ### Scheduling (Level Sets)
 
-Scheduling is driven by topological levels from Kahn's algorithm over evidence-cited DAG edges, not by global routing flags. `edges[]` encode directional dependencies (P1-P4) and same-file constraints (P6). P5 pairs produce no edge.
+Scheduling is driven by topological levels (computed by complexity-score.mjs via Kahn's algorithm over evidence-cited DAG edges), not by global routing flags. `edges[]` encode directional dependencies (P1-P4) and same-file constraints (P6). P5 pairs produce no edge. The orchestrator consumes these scheduling outputs — it never computes them; every analytical computation is delegated.
 
 Level $L_k$ contains all tasks whose longest incoming path has length $k$. Tasks in the same level are **parallel-safe** (file disjointness proven, any overlap causes a script-level error). Tasks across levels are **sequential** — the orchestrator issues all $L_k$ tasks in one model turn, waits for all to return, then starts $L_{k+1}$.
 
@@ -149,9 +152,11 @@ $$C_{\text{soft}} = \frac{1}{2}\left(\frac{\text{cited}}{\text{total}} + \frac{\
 
 ## Invariants
 
+- The orchestrator never analyzes code or data — every analytical task is delegated to a spawned agent
 - No file modified by two parallel tasks (disjointness proven by script; separate git worktrees for parallel writers)
 - Every agent has domain context (`skill()` before file access)
 - No code ships without compilation (binary GATE — never averaged with soft signals)
-- No infinite loops (fix ≤ 2, HITL ≤ 3)
+- No infinite loops (fix ≤ 2)
+- HITL is pure presentation — no questions, no approval gate
 - Pre-flight recursion lock: all sub-agents have `task: deny`
 - Cross-cutting concerns (security, testing, a11y, perf) flagged automatically — never silently skipped
