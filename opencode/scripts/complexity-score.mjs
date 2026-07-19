@@ -12,19 +12,14 @@
 // {
 //   "tasks": [{ "id": string, "delta": number, "files": string[] }],
 //   "domains": { [taskId: string]: string },
-//   "coupling": [{                        // feeds aggregate C(T) score
-//     "a": taskId, "b": taskId,
-//     "sharedSymbols": number,
-//     "evidence": string[]
-//   }],
-//   "edges": [{                           // feeds schedule (level sets)
-//     "from": taskId, "to": taskId,
-//     "reason": string,
-//     "evidence": string
-//   }]
+//   "coupling": [{ "a": taskId, "b": taskId, "sharedSymbols": number, "evidence": string[] }],
+//   "edges": [{ "from": taskId, "to": taskId, "reason": string, "evidence": string }],
+//   "graph": {
+//     "adjacency": [[0,1,0],[1,0,1],[0,1,0]]  // N×N binary symmetric matrix, optional
+//   }
 // }
 //
-// OUTPUT: { H_norm, D_JS, I_norm_coupling_proxy, C_T, routing, levels }
+// OUTPUT: { H_norm, D_JS, I_norm_coupling_proxy, C_T, C_min_norm, Q, avg_conductance, C_total, routing, levels }
 //   levels: string[][] — level[0] tasks have no upstream deps and can be
 //   spawned in parallel; level[1] tasks depend only on level[0], etc.
 
@@ -94,6 +89,200 @@ function couplingProxy(coupling, tasks) {
   return Math.min(1, total / Math.max(1, maxPairs * 3));
 }
 
+function buildAdjacency(tasks, edges, coupling) {
+  const n = tasks.length;
+  const adj = Array.from({ length: n }, () => Array(n).fill(0));
+  for (const e of edges) {
+    const i = tasks.findIndex(t => t.id === e.from);
+    const j = tasks.findIndex(t => t.id === e.to);
+    if (i !== -1 && j !== -1) { adj[i][j] = 1; adj[j][i] = 1; }
+  }
+  for (const c of coupling) {
+    const i = tasks.findIndex(t => t.id === c.a);
+    const j = tasks.findIndex(t => t.id === c.b);
+    if (i !== -1 && j !== -1) { adj[i][j] = 1; adj[j][i] = 1; }
+  }
+  return adj;
+}
+
+function minCut(adj) {
+  const n = adj.length;
+  if (n <= 1) return 0;
+  
+  // Total weight for normalization
+  let totalWeight = 0;
+  for (let i = 0; i < n; i++)
+    for (let j = i + 1; j < n; j++)
+      totalWeight += adj[i][j];
+  if (totalWeight === 0) return 0;
+  
+  // Copy adjacency since we'll modify it
+  const g = adj.map(row => [...row]);
+  const vertices = Array.from({length: n}, (_, i) => [i]);
+  let best = Infinity;
+  
+  for (let phase = 0; phase < n - 1; phase++) {
+    const weights = new Array(n).fill(0);
+    const added = new Array(n).fill(false);
+    let prev = -1;
+    
+    for (let i = 0; i < n - phase; i++) {
+      // Pick most tightly connected vertex not yet added
+      let sel = -1;
+      for (let v = 0; v < n; v++) {
+        if (!added[v] && (sel === -1 || weights[v] > weights[sel])) {
+          sel = v;
+        }
+      }
+      if (sel === -1) break;
+      
+      added[sel] = true;
+      if (i === n - phase - 1) {
+        // Last vertex — update best cut
+        best = Math.min(best, weights[sel]);
+        
+        // Merge sel into prev
+        for (let j = 0; j < n; j++) {
+          if (j !== sel && j !== prev) {
+            g[prev][j] += g[sel][j];
+            g[j][prev] += g[j][sel];
+          }
+        }
+        g[prev][sel] = 0;
+        g[sel][prev] = 0;
+        vertices[sel] = [];
+      }
+      
+      prev = sel;
+      
+      // Update weights for remaining vertices
+      for (let v = 0; v < n; v++) {
+        if (!added[v]) {
+          weights[v] += g[sel][v];
+        }
+      }
+    }
+  }
+  
+  return totalWeight > 0 ? Math.min(1, Math.max(0, best / totalWeight)) : 0;
+}
+
+function modularity(adj, levels) {
+  const n = adj.length;
+  if (n === 0 || levels.length === 0) return 0;
+  
+  // Build community assignment from levels
+  const community = {};
+  for (let l = 0; l < levels.length; l++) {
+    for (const id of levels[l]) {
+      community[id] = l;
+    }
+  }
+  
+  // Map task IDs to indices
+  const ids = [];
+  for (const level of levels) {
+    for (const id of level) {
+      ids.push(id);
+    }
+  }
+  
+  // Compute degree of each node
+  const degrees = new Array(n).fill(0);
+  let totalEdges = 0;
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      degrees[i] += adj[i][j];
+      if (j > i) totalEdges += adj[i][j];
+    }
+  }
+  
+  if (totalEdges === 0) return 0;
+  
+  const m2 = 2 * totalEdges;
+  let Q = 0;
+  
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      // Check if i and j are in the same community
+      const ci = community[ids[i]];
+      const cj = community[ids[j]];
+      if (ci !== undefined && ci === cj) {
+        Q += adj[i][j] - (degrees[i] * degrees[j]) / m2;
+      }
+    }
+  }
+  
+  return m2 > 0 ? Q / m2 : 0;
+}
+
+function avgConductance(adj, levels) {
+  const n = adj.length;
+  if (n === 0 || levels.length <= 1) return 0;
+  
+  // Map task IDs to indices
+  const ids = [];
+  for (const level of levels) {
+    for (const id of level) {
+      ids.push(id);
+    }
+  }
+  
+  // Build community membership
+  const community = {};
+  for (let l = 0; l < levels.length; l++) {
+    for (const id of levels[l]) {
+      community[id] = l;
+    }
+  }
+  
+  // Compute degree of each node
+  const degrees = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      degrees[i] += adj[i][j];
+    }
+  }
+  
+  let totalCond = 0;
+  let validClusters = 0;
+  
+  for (let l = 0; l < levels.length; l++) {
+    const cluster = levels[l];
+    if (cluster.length === 0) continue;
+    
+    // Cut: edges from cluster to outside
+    let cut = 0;
+    let vol = 0;
+    const outsideVol = {vol: 0};
+    
+    // Compute total volume and volume of all other vertices
+    let totalVol = 0;
+    for (let i = 0; i < n; i++) totalVol += degrees[i];
+    
+    for (const id of cluster) {
+      const i = ids.indexOf(id);
+      if (i === -1) continue;
+      vol += degrees[i];
+      for (let j = 0; j < n; j++) {
+        if (community[ids[j]] !== l) {
+          cut += adj[i][j];
+        }
+      }
+    }
+    
+    const outsideVolVal = totalVol - vol;
+    const minVol = Math.min(vol, outsideVolVal);
+    
+    if (minVol > 0) {
+      totalCond += cut / minVol;
+      validClusters++;
+    }
+  }
+  
+  return validClusters > 0 ? totalCond / validClusters : 0;
+}
+
 // Kahn's algorithm — level sets. Tasks with indegree 0 go in level[0].
 // A task advances to a level once all incoming edges are resolved.
 function computeLevels(tasks, edges) {
@@ -137,7 +326,7 @@ function computeLevels(tasks, edges) {
     const stuck = ids.filter((id) => !visited.has(id));
     throw new Error(
       `Cycle detected in DAG edges — cannot schedule: ${stuck.join(", ")}. ` +
-      `Re-check P1-P4 edge directions.`
+      `Re-check P-BLOCKING edge directions.`
     );
   }
 
@@ -165,7 +354,7 @@ function checkFileOverlap(tasks, levels) {
 }
 
 function main() {
-  const { tasks, domains = {}, coupling = [], edges = [] } = loadInput();
+  const { tasks, domains = {}, coupling = [], edges = [], graph = {} } = loadInput();
   if (!Array.isArray(tasks) || tasks.length === 0) {
     throw new Error("tasks[] is required and must be non-empty");
   }
@@ -180,27 +369,48 @@ function main() {
   const k = Math.max(1, activeFlags.filter(Boolean).length);
   const C_T = (H_norm + D_JS + I_norm) / k;
 
+  // ---------- Hybrid ensemble metrics ----------
+  const adj = graph.adjacency || buildAdjacency(tasks, edges, coupling);
+  // Validate adjacency dimensions
+  if (adj.length !== tasks.length || adj.some(row => row.length !== tasks.length)) {
+    throw new Error(`graph.adjacency must be ${tasks.length}×${tasks.length}`);
+  }
+
+  const C_min_norm = minCut(adj);
   const levels = computeLevels(tasks, edges);
+  const Q = modularity(adj, levels);
+  const avg_cond = avgConductance(adj, levels);
+
+  // Default weights (learnable from empirical validation)
+  const alpha = 0.4, beta = 0.3, gamma = 0.2, delta = 0.1;
+  const clamped_Q = Math.min(1, Math.max(-0.5, Q));
+  const C_total = alpha * C_min_norm + beta * (1 - clamped_Q) + gamma * avg_cond + delta * C_T;
+  const C_total_clamped = Math.min(1, Math.max(0, C_total));
+
+  // ---------- File overlap check ----------
   const fileConflicts = checkFileOverlap(tasks, levels);
   if (fileConflicts.length > 0) {
     throw new Error(
       `File overlap between same-level (parallel) tasks: ` +
       JSON.stringify(fileConflicts) +
-      `. Add a P6 edge (same file -> sequential) between these tasks in the ` +
+      `. Add a P-WRITE edge (same file -> sequential) between these tasks in the ` +
       `input, or re-split so they don't share files, then re-run.`
     );
   }
 
   const routing = {
-    fastLane: C_T < 0.25 && tasks.length === 1,
+    fastLane: C_total_clamped < 0.25 && tasks.length === 1,
     splitByFileCluster: H_norm > 0.7,
     splitByDomain: D_JS > 0.15,
-    // Informational only — levels[] drives actual scheduling
     sequentialRequired: I_norm > 0 || edges.length > 0,
     parallelSafe: I_norm === 0 && discoveryRan && edges.length === 0,
   };
 
-  console.log(JSON.stringify({ H_norm, D_JS, I_norm_coupling_proxy: I_norm, C_T, routing, levels }, null, 2));
+  console.log(JSON.stringify({
+    H_norm, D_JS, I_norm_coupling_proxy: I_norm, C_T,
+    C_min_norm, Q, avg_conductance: avg_cond, C_total: C_total_clamped,
+    routing, levels
+  }, null, 2));
 }
 
 main();

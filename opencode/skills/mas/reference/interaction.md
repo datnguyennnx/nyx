@@ -1,3 +1,21 @@
+# Meta-Cognitive Assessment
+
+## Difficulty Assessment
+
+Before any interaction with spawned agents, classify the overall task difficulty. This feeds the Meta-Cognition Gate (see reference/verification.md):
+
+| Factor | Simple | Medium | Complex |
+|--------|--------|--------|---------|
+| Target files | ≤2 | 3-5 | >5 |
+| Dependencies | ≤1 | 2-3 | >3 |
+| Description length | <200 chars | 200-500 chars | >500 chars |
+| Domains | 1 | 2 | 3+ |
+| Cross-team? | No | No | Yes |
+
+The orchestrator performs this assessment once, at task ingestion, and uses it to select the pipeline depth (see verification.md Meta-Cognition Gate).
+
+---
+
 ## Feedback Classification
 
 | Pattern | Re-entry Action |
@@ -12,6 +30,32 @@
 
 Max 3 feedback loops. At 4th: pause, ask user. Preserve history. Flag scope creep. Always HITL confirm before re-spawn.
 
+## Human Handoff Decision Framework
+
+When uncertainty about the correct next action exceeds thresholds, the orchestrator must decide between analyzing more and asking the user. Use this decision matrix:
+
+| Condition | Action |
+|-----------|--------|
+| Uncertainty > 0.7 AND steps < 3 | Analyze more — spawn an additional discovery/analysis agent |
+| Uncertainty > 0.7 AND steps ≥ 3 | **ASK USER** — present findings, options, and recommendation |
+| Uncertainty < 0.3 | Proceed (satisficing) — confidence is sufficient |
+| Uncertainty 0.3-0.7 | One more analysis step, then re-evaluate against same matrix |
+
+**Uncertainty estimation** (heuristic, computed by orchestrator):
+
+```
+uncertainty = 1 - mean(soft_confidence_across_completed_tasks)
+```
+
+If no tasks completed yet, estimate from:
+- Proportion of `edges[]` without strong evidence (thin citations)
+- Number of unresolved discovery pairs (pairs where discovery returned "not checked")
+- C_total value from complexity-score.mjs (C_total > 0.5 → higher uncertainty)
+
+**Steps counter**: Each spawned agent invocation increments the step counter for the current decision context. Steps reset when a decision is reached.
+
+This framework prevents the orchestrator from either (a) spinning indefinitely without resolution or (b) prematurely interrupting the user with low-confidence questions.
+
 ## Interrupt Classification
 
 | Signal | Action |
@@ -22,6 +66,7 @@ Max 3 feedback loops. At 4th: pause, ask user. Preserve history. Flag scope cree
 | `!quick` prefix | Force fast-lane |
 | `!stop` / `!cancel` | Abort pipeline, preserve stash |
 | Frustration signal | Write-lock, route to clarification |
+| Uncertainty > 0.7 AND steps ≥ 3 | Halt current, ASK USER (handoff) |
 
 ## Frustration Detection
 

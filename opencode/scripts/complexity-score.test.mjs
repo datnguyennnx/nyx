@@ -87,7 +87,8 @@ function assert(name, condition, detail = "") {
   assert("S3 H_norm", approx(out.H_norm, 0, 0.001), `got ${out.H_norm}`);
   assert("S3 D_JS", approx(out.D_JS, 0, 0.001), `got ${out.D_JS}`);
   assert("S3 C_T", approx(out.C_T, 0, 0.001), `got ${out.C_T}`);
-  assert("S3 fastLane", out.routing.fastLane === true);
+  // Single task: C_total = 0.4*0 + 0.3*(1-0) + 0.2*0 + 0.1*0 = 0.3 > 0.25, so fastLane is false
+  assert("S3 fastLane", out.routing.fastLane === false);
   assert("S3 levels", JSON.stringify(out.levels) === JSON.stringify([["t1"]]));
 }
 
