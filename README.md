@@ -105,8 +105,8 @@ Three orthogonal dimensions:
 
 | Dimension | Formula | Meaning |
 |---|---|---|
-| Normalized entropy | $H_n = -\frac{\sum p_i \log_2 p_i}{\log_2 \|V\|}$ | Work distribution |
-| Cross-domain divergence | $D_{JS} = \frac{1}{2}D_{KL}(A\|M) + \frac{1}{2}D_{KL}(B\|M)$ | Domain separation |
+| Normalized entropy | $H_n = -\frac{\sum p_i \log_2 p_i}{\log_2 \lVert V \rVert}$ | Work distribution |
+| Cross-domain divergence | $D_{JS} = \frac{1}{2}D_{KL}(A \parallel M) + \frac{1}{2}D_{KL}(B \parallel M)$ | Domain separation |
 | Coupling proxy | $I_{\text{norm}} = \min\!\left(1, \frac{\text{totalShared}}{\max(1, \text{maxPairs} \cdot 3)}\right)$ | Evidence-gated heuristic (NOT Shannon mutual information) |
 
 Composite:
@@ -135,7 +135,7 @@ The script also outputs informational routing flags from aggregate scores — th
 
 | Condition | Action |
 |---|---|
-| $C(T) < 0.25$ AND $\|V\| = 1$ | Fast Lane |
+| $C(T) < 0.25$ AND $\lVert V \rVert = 1$ | Fast Lane |
 | `!quick` prefix | Force Fast Lane |
  | `splitByDomain` ($D_{JS} > 0.15$) | Split by domain before scheduling |
 | `splitByFileCluster` ($H_n > 0.70$) | Split by cluster before scheduling |
