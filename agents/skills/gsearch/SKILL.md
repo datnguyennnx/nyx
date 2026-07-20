@@ -1,7 +1,7 @@
 ---
 name: gsearch
 description: "Search Google + read web pages + extract PDFs. Parallel multi-tab batch operations. arXiv PDFs auto-convert to abstract pages. Use ONLY when you need web research — not for local file operations or system administration."
-compatibility: "Bun and Chromium required (auto-installed on first run). gsearch launch starts isolated Chrome at /tmp/gsearch-profile."
+compatibility: "Bun required (Chrome or Dia)"
 ---
 
 
@@ -44,7 +44,7 @@ gsearch launch
 # → {"success":true,"pid":...,"port":9222}
 ```
 
-Starts isolated Chromium at `/tmp/gsearch-profile` with `--remote-debugging-port=9222`. Run once. Your real browser is never touched.
+Starts isolated browser (Chrome or Dia) at `/tmp/gsearch-profile` with `--remote-debugging-port=9222`. Run once. Your real browser is never touched.
 
 ## Reference Documents
 

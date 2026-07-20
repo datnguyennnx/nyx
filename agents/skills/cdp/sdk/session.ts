@@ -6,9 +6,13 @@
  * Target.sendMessageToTarget envelopes).
  *
  * Detection priority:
- *  1. DevToolsActivePort file scan (standard Chrome/Chromium)
- *  2. HTTP port scan on 9222-9225 (Dia, Arc, Vivaldi, Opera — browsers
- *     that don't write DevToolsActivePort but serve /json/version)
+ *  1. DevToolsActivePort file scan (Chrome, Dia)
+ *  2. HTTP check on port 9222 (custom Chrome/Dia instances)
+ *
+ * Dia auto-allow: on macOS, if the WS-open stalls past autoAllowDelayMs and
+ * the browser is Dia, the SDK fires a Return keystroke (osascript) to dismiss
+ * Dia's "Allow debugging connection?" prompt — no manual click needed.
+ * Requires macOS Accessibility permission; otherwise falls back to timeoutMs.
  */
 
 import { bindDomains, type Domains, type Transport } from './generated.ts';
@@ -27,6 +31,16 @@ export type ConnectOptions = {
   port?: number;
   /** Per-candidate WS-open timeout in ms. Default 5000. */
   timeoutMs?: number;
+  /** Opt OUT of auto-dismissing Dia's "Allow debugging connection?" prompt.
+   *  On by default (macOS, Dia only): when the WS-open stalls past
+   *  autoAllowDelayMs, the SDK fires a Return at the Dia process via osascript,
+   *  so connect needs no manual click — a no-op for every other browser.
+   *  Set false to disable. Requires macOS Accessibility permission. */
+  autoAllow?: boolean;
+  /** ms after WS creation before auto-dismissing Dia's prompt. Default 600. */
+  autoAllowDelayMs?: number;
+  /** Override max agent tabs for this session. Default Infinity (no limit). */
+  maxAgentTabs?: number;
 };
 
 export type DetectedBrowser = {
@@ -44,41 +58,121 @@ export class Session implements Transport {
   private pending = new Map<number, Pending>();
   private activeSessionId: string | undefined;
   static MAX_PENDING = 1000;
+  static MAX_AGENT_TABS = Infinity;
   private eventListeners: Array<(method: string, params: unknown, sessionId?: string) => void> = [];
+
+  /** Agent-tab registry: tracks targetIds created via createTarget(). */
+  private agentTabs = new Map<string, string | undefined>();
+  /** Max agent tabs for this instance (defaults to static MAX_AGENT_TABS — Infinity = no limit). */
+  private maxAgentTabs: number;
+
+  /** Serialized close queue — each closeTab waits for the previous one. */
+  private closeQueue: Promise<void> = Promise.resolve();
+
+  /** Pre-call observer, invoked before each CDP call if recordCalls is true. */
+  private callObserver?: (method: string, params: unknown) => void;
+  /** When true and a callObserver is set, invoke it before every CDP call. */
+  private recordCalls = false;
+
+  /**
+   * Reconnect guard. Set to true while a reconnect is in-flight.
+   * Prevents infinite reconnect loops: if the WS is still dead
+   * after one reconnect attempt, give up and surface the error.
+   */
+  private _reconnecting = false;
+
+  /**
+   * Dedup for concurrent connect() calls. When multiple _call()
+   * calls detect a dead WS simultaneously, this promise ensures
+   * only one _connect() runs and all others wait for the same
+   * result — no racing, no orphan WS connections.
+   */
+  private connectPromise?: Promise<void>;
+
+  /** On by default: connect() auto-dismisses Dia's "Allow debugging connection?"
+   *  prompt (macOS, via osascript Return) — a no-op for every other browser.
+   *  Persisted so reconnects inherit the setting. */
+  autoAllow = true;
 
   domains!: Domains;
 
-  constructor() {
+  constructor(opts?: { autoAllow?: boolean; maxAgentTabs?: number; recordCalls?: boolean }) {
+    if (opts?.autoAllow !== undefined) this.autoAllow = opts.autoAllow;
+    if (opts?.recordCalls !== undefined) this.recordCalls = opts.recordCalls;
+    this.maxAgentTabs = opts?.maxAgentTabs ?? Session.MAX_AGENT_TABS;
     this.domains = bindDomains(this);
     for (const k of Object.keys(this.domains) as (keyof Domains)[]) {
       (this as any)[k] = this.domains[k];
     }
   }
 
+  /**
+   * Connect to a CDP-enabled browser.
+   *
+   * Auto-detects running Chromium browsers if no opts are given.
+   * Dedups concurrent calls via connectPromise — if a reconnect
+   * is already in flight, new callers ride on it instead of
+   * triggering a second one.
+   */
   async connect(opts: ConnectOptions = {}): Promise<void> {
     if (this.isConnected()) return;
+    // Dedup: another reconnect is already in-flight — wait for it
+    if (this.connectPromise) {
+      await this.connectPromise;
+      return;
+    }
+
+    this.connectPromise = this._connect(opts);
+    try {
+      await this.connectPromise;
+    } catch (e) {
+      this.connectPromise = undefined;
+      throw e;
+    }
+    this.connectPromise = undefined;
+  }
+
+  /**
+   * Internal connect — the actual connection logic.
+   * Extracted so connect() can dedup callers via connectPromise.
+   */
+  private async _connect(opts: ConnectOptions = {}): Promise<void> {
     const timeoutMs = opts.timeoutMs ?? 5_000;
+    const autoAllowDelayMs = opts.autoAllowDelayMs ?? 600;
+    if (opts.autoAllow !== undefined) this.autoAllow = opts.autoAllow;
+    if (opts.maxAgentTabs !== undefined) this.maxAgentTabs = opts.maxAgentTabs;
 
     if (opts.port) {
       const wsUrl = await discoverByPort(opts.port);
-      await this.openWs(wsUrl, timeoutMs);
+      const name = this.autoAllow ? await browserNameFor(opts, wsUrl) : undefined;
+      await this.openWs(wsUrl, timeoutMs, { autoAllow: this.autoAllow, name, autoAllowDelayMs });
       return;
     }
     if (opts.wsUrl || opts.profileDir) {
       const wsUrl = await resolveWsUrl(opts);
-      await this.openWs(wsUrl, timeoutMs);
+      const name = this.autoAllow ? await browserNameFor(opts, wsUrl) : undefined;
+      await this.openWs(wsUrl, timeoutMs, { autoAllow: this.autoAllow, name, autoAllowDelayMs });
       return;
     }
 
     const browsers = await detectBrowsers();
     if (browsers.length === 0) {
-      const help = buildNoBrowserHelp();
-      throw new Error(help);
+      throw new Error(
+        `No running browser with remote debugging detected.\n\n` +
+        `How to enable:\n` +
+        `  Chrome:  open chrome://inspect/#remote-debugging → toggle ON\n` +
+        `  Dia:     dia://inspect/#remote-debugging → toggle ON\n` +
+        `  Terminal: <browser> --remote-debugging-port=9222\n\n` +
+        `Or pass options explicitly:\n` +
+        `  session.connect({ port: 9222 })\n` +
+        `  session.connect({ wsUrl: "ws://127.0.0.1:9222/devtools/browser/<id>" })\n` +
+        `  session.connect({ profileDir: "/path/to/profile" })`
+      );
     }
     const errors: string[] = [];
     for (const b of browsers) {
       try {
-        await this.openWs(b.wsUrl, timeoutMs);
+        await this.openWs(b.wsUrl, timeoutMs, { autoAllow: this.autoAllow, name: b.name, autoAllowDelayMs });
         return;
       } catch (e) {
         errors.push(`  ${b.name} @ ${b.wsUrl}: ${e instanceof Error ? e.message : e}`);
@@ -91,47 +185,245 @@ export class Session implements Transport {
     );
   }
 
-  private openWs(wsUrl: string, timeoutMs: number): Promise<void> {
+  private openWs(
+    wsUrl: string,
+    timeoutMs: number,
+    allow?: { autoAllow: boolean; name?: string; autoAllowDelayMs: number },
+  ): Promise<void> {
     return new Promise<void>((res, rej) => {
       const ws = new WebSocket(wsUrl);
       let done = false;
+      let allowTried = false;
       const finish = (err?: Error) => {
         if (done) return;
         done = true;
         clearTimeout(timer);
+        if (allowTimer) clearTimeout(allowTimer);
         if (err) { try { ws.close(); } catch { /* ignore */ } rej(err); }
         else res();
       };
       const timer = setTimeout(() => finish(new Error(`timed out after ${timeoutMs}ms`)), timeoutMs);
+      // Dia auto-allow: if WS still CONNECTING after autoAllowDelayMs, dismiss prompt
+      const allowTimer =
+        allow && allow.autoAllow && allow.name === 'Dia' && process.platform === 'darwin'
+          ? setTimeout(() => {
+              if (done || allowTried) return;
+              if (ws.readyState !== WebSocket.CONNECTING) return;
+              allowTried = true;
+              dismissDiaAllowPrompt();
+            }, allow.autoAllowDelayMs)
+          : null;
       ws.addEventListener('open', () => finish());
       ws.addEventListener('error', (e) => finish(new Error(`WS error: ${(e as any)?.message ?? 'connect failed (403 or port closed)'}`)));
       ws.addEventListener('message', (e) => this.onMessage(String(e.data)));
       ws.addEventListener('close', () => {
-        for (const [, p] of this.pending) p.reject(new Error('CDP socket closed'));
-        this.pending.clear();
+        // Only clear pending if this is the active WS — a parallel connect()
+        // could create a phantom WS whose close handler would otherwise nuke
+        // pending entries belonging to the current WS.
+        if (this.ws === ws) {
+          for (const [, p] of this.pending) p.reject(new Error('CDP socket closed'));
+          this.pending.clear();
+        }
         finish(new Error('WS closed before open (403 or port closed)'));
       });
       this.ws = ws;
     });
   }
 
+  /** True when the CDP WebSocket is open and ready. */
   isConnected(): boolean { return this.ws?.readyState === WebSocket.OPEN; }
-  close(): void { this.ws?.close(); }
 
+  /**
+   * Disconnect from the browser and clean up agent tabs.
+   * After calling close(), call connect() to reconnect.
+   */
+  close(): void {
+    // Reset reconnect state so a subsequent connect() starts fresh.
+    this._reconnecting = false;
+    this.connectPromise = undefined;
+    this.cleanupAgentTabs().catch(() => {});
+    this.agentTabs.clear();
+    this.closeQueue = Promise.resolve();
+    this.ws?.close();
+  }
+
+  // ── Agent-tab registry ──────────────────────────────────────────────
+
+  /**
+   * Register a targetId as an agent-managed tab.
+   * Typically called by createTarget() automatically.
+   */
+  registerAgentTab(targetId: string, sessionId?: string): void {
+    this.agentTabs.set(targetId, sessionId);
+  }
+
+  /**
+   * Remove a targetId from the agent-tab registry.
+   * Typically called by closeTab() automatically.
+   */
+  unregisterAgentTab(targetId: string): void {
+    this.agentTabs.delete(targetId);
+  }
+
+  /**
+   * Check whether a targetId is registered as an agent tab.
+   */
+  isAgentTab(targetId: string): boolean {
+    return this.agentTabs.has(targetId);
+  }
+
+  // ── Tab lifecycle ───────────────────────────────────────────────────
+
+  /**
+   * Create a new tab (agent-managed).
+   *
+   * Registers the resulting targetId in the agent-tab registry.
+   * The tab opens in the default browser context, sharing cookies/session with the user.
+   *
+   * Use `session.use(targetId)` after creation to attach and get a sessionId.
+   * Requires an active connection — call connect() first.
+   */
+  async createTarget(params: {
+    url: string;
+    width?: number;
+    height?: number;
+    background?: boolean;
+    newWindow?: boolean;
+    [key: string]: unknown;
+  }): Promise<{ targetId: string; sessionId: string }> {
+    const p = { ...params };
+    if (p.width || p.height) {
+      p.width = p.width || 1280;
+      p.height = p.height || 800;
+    }
+    const result = await this.domains.Target.createTarget(p);
+    const attach = await this.domains.Target.attachToTarget({
+      targetId: result.targetId,
+      flatten: true,
+    });
+    this.registerAgentTab(result.targetId, attach.sessionId);
+    return { targetId: result.targetId, sessionId: attach.sessionId };
+  }
+
+  /**
+   * Close a tab by targetId.
+   *
+   * Uses `window.close()` via Runtime.evaluate first (works on tabs opened
+   * by script, which includes all tabs created via createTarget), then
+   * `Target.closeTarget` to tear down the CDP session.
+   *
+   * Why two steps: `Target.closeTarget` alone succeeds in CDP but some
+   * Some browsers (Dia) don't actually close the tab in the browser
+   * window — the tab strip stays out of sync. `window.close()` triggers the
+   * browser's own tab-close path, which reliably removes the tab. The short
+   * delay gives the browser time to process the close before CDP teardown.
+   *
+   * Close operations are serialized so that the window.close() → delay →
+   * Target.closeTarget sequence for one tab completes before the next begins.
+   * Without serialization, interleaved closes can kill a session before
+   * window.close() takes effect in the browser.
+   *
+   * Requires an active connection — call connect() first.
+   *
+   * @param targetId - The target to close.
+   * @param sessionId - Optional sessionId for Runtime.evaluate.
+   *                    If omitted and target is active, the active session is used.
+   * @param force - Skip the agent-tab registry check. Default false.
+   */
+  async closeTab(targetId: string, sessionId?: string, force?: boolean): Promise<void> {
+    if (!force && !this.agentTabs.has(targetId)) {
+      throw new Error(
+        `Target ${targetId} is not an agent tab. ` +
+        `Use force:true to close anyway, or register it via registerAgentTab().`,
+      );
+    }
+    // If sessionId not provided, look it up from the registry
+    const effectiveSessionId = sessionId ?? this.agentTabs.get(targetId);
+    this.unregisterAgentTab(targetId);
+    const doClose = async () => {
+      if (effectiveSessionId) {
+        try {
+          await this._call('Runtime.evaluate', { expression: 'window.close()' }, { sessionId: effectiveSessionId });
+        } catch { /* session may already be detaching */ }
+        await Bun.sleep(100);
+      }
+      try {
+        await this.domains.Target.closeTarget({ targetId });
+      } catch { /* already gone */ }
+    };
+    // Serialize: each close waits for the previous one to finish.
+    this.closeQueue = this.closeQueue.then(doClose, doClose);
+    return this.closeQueue;
+  }
+
+  /**
+   * Close all registered agent tabs.
+   * Each tab is closed via closeTab() with force=true. Errors are silently
+   * swallowed. The registry is cleared before closing to prevent double-close.
+   */
+  async cleanupAgentTabs(): Promise<void> {
+    const tabs = [...this.agentTabs.entries()];
+    this.agentTabs.clear();
+    for (const [targetId, sessionId] of tabs) {
+      try {
+        await this.closeTab(targetId, sessionId, true);
+      } catch { /* best-effort cleanup */ }
+    }
+  }
+
+  // ── Session management ──────────────────────────────────────────────
+
+  /**
+   * Pick a target and make subsequent calls auto-route to it.
+   * Uses Target.attachToTarget with flatten:true (single-WS, sessionId-on-message).
+   * Requires an active connection — call connect() first.
+   */
   async use(targetId: string): Promise<string> {
     const r = await this._call('Target.attachToTarget', { targetId, flatten: true }) as { sessionId: string };
     this.activeSessionId = r.sessionId;
     return r.sessionId;
   }
 
+  /** Set the active sessionId directly (e.g. one you already attached). */
   setActiveSession(sessionId: string | undefined): void { this.activeSessionId = sessionId; }
+  /** Get the currently active sessionId. */
   getActiveSession(): string | undefined { return this.activeSessionId; }
 
+  /** Get the number of pending CDP commands. */
+  getPendingCount(): number { return this.pending.size; }
+
+  // ── Call observer ───────────────────────────────────────────────────
+
+  /**
+   * Set a pre-call observer that fires before every CDP call.
+   * Only invoked when recordCalls is true. Observer failures never break the
+   * protocol call.
+   */
+  setCallObserver(callback: (method: string, params: unknown) => void): void {
+    this.callObserver = callback;
+  }
+
+  /** Remove the call observer. */
+  clearCallObserver(): void {
+    this.callObserver = undefined;
+  }
+
+  // ── Events ──────────────────────────────────────────────────────────
+
+  /**
+   * Subscribe to all CDP events.
+   * @returns A function that removes this listener when called.
+   */
   onEvent(fn: (method: string, params: unknown, sessionId?: string) => void): () => void {
     this.eventListeners.push(fn);
     return () => { this.eventListeners = this.eventListeners.filter(x => x !== fn); };
   }
 
+  /**
+   * Wait for the next event matching `method` (and optional predicate).
+   * If `targetId` is given, attaches to that target and filters by its
+   * sessionId — critical for avoiding cross-fire in parallel tab use.
+   */
   async waitFor<T = unknown>(method: string, predicate?: (params: T) => boolean, timeoutMs = 30_000, targetId?: string): Promise<T> {
     let targetSessionId: string | undefined;
     if (targetId !== undefined) {
@@ -155,18 +447,62 @@ export class Session implements Transport {
     });
   }
 
-  _call(method: string, params: unknown = {}, timeoutMs = 0): Promise<unknown> {
+  // ── Transport implementation ────────────────────────────────────────
+
+  /**
+   * Execute a CDP command with optional session scoping and timeout.
+   *
+   * Auto-heals: if the WebSocket dropped (transient hiccup, oversized
+   * response, browser restart), reconnects once and retries the call
+   * transparently. If the reconnect also fails, the error propagates.
+   */
+  _call(method: string, params: unknown = {}, timeoutOrOpts?: number | { sessionId?: string; timeoutMs?: number }): Promise<unknown> {
+    // ── Auto-heal ──────────────────────────────────────────────────
+    // If the WebSocket is dead, reconnect once and retry.
+    // A single reconnect attempt prevents transient hiccups from
+    // poisoning every subsequent call with "Not connected."
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      return Promise.reject(new Error('Not connected. Call session.connect(...) first.'));
+      if (this._reconnecting) {
+        return Promise.reject(new Error('Not connected. Call session.connect(...) first.'));
+      }
+      this._reconnecting = true;
+      const cleanup = () => { this._reconnecting = false; };
+      return this.connect().then(() => {
+        cleanup();
+        return this._call(method, params, timeoutOrOpts);
+      }, (e) => {
+        cleanup();
+        throw e;
+      });
     }
+
+    // ── Pending limit ──────────────────────────────────────────────
     if (this.pending.size >= Session.MAX_PENDING) {
       return Promise.reject(new Error('Too many pending CDP commands'));
     }
+
+    // Parse 3rd argument: support legacy `number` (timeout) and new `object`
+    let sessionIdOverride: string | undefined;
+    let timeoutMs = 0;
+    if (typeof timeoutOrOpts === 'number') {
+      timeoutMs = timeoutOrOpts;
+    } else if (timeoutOrOpts) {
+      sessionIdOverride = timeoutOrOpts.sessionId;
+      timeoutMs = timeoutOrOpts.timeoutMs ?? 0;
+    }
+
     const id = this.nextId++;
     const msg: Record<string, unknown> = { id, method, params: params ?? {} };
-    if (this.activeSessionId && !isBrowserLevel(method)) {
-      msg.sessionId = this.activeSessionId;
+    const sid = sessionIdOverride ?? this.activeSessionId;
+    if (sid && !isBrowserLevel(method)) {
+      msg.sessionId = sid;
     }
+
+    // Pre-call observer (best-effort, never breaks the protocol call)
+    if (this.recordCalls && this.callObserver) {
+      try { this.callObserver(method, params); } catch { /* observer must never break protocol */ }
+    }
+
     return new Promise((resolve, reject) => {
       this.pending.set(id, { resolve, reject });
       this.ws!.send(JSON.stringify(msg));
@@ -220,6 +556,36 @@ export async function resolveWsUrl(opts: ConnectOptions): Promise<string> {
   throw new Error('resolveWsUrl needs { wsUrl } or { profileDir }.');
 }
 
+/** Best-effort browser name for the Dia-only auto-allow gate. */
+async function browserNameFor(opts: ConnectOptions, wsUrl: string): Promise<string | undefined> {
+  if (opts.profileDir) {
+    const byDir = getBrowserCandidates().find(c => c.profileDir === opts.profileDir);
+    if (byDir) return byDir.name;
+  }
+  const browsers = await detectBrowsers();
+  return browsers.find(b => b.wsUrl === wsUrl || (opts.port != null && b.port === opts.port))?.name;
+}
+
+/** Dismiss Dia's "Allow debugging connection?" prompt by sending Return to the
+ *  Dia process via osascript (macOS). Dia maps Return -> Allow; bringing Dia
+ *  to front first (best-effort try) covers the switched-away case. Gated on
+ *  name === 'Dia' in openWs, so the process name is hardcoded here. Needs
+ *  macOS Accessibility permission; without it osascript errors and the connect
+ *  just waits on its timeout. Uses Bun.spawnSync for synchronous fire-and-forget. */
+function dismissDiaAllowPrompt(): void {
+  if (process.platform !== 'darwin') return;
+  try {
+    Bun.spawnSync(['osascript',
+      '-e', 'tell application "System Events"',
+      '-e', 'try',
+      '-e', 'set frontmost of process "Dia" to true',
+      '-e', 'end try',
+      '-e', 'tell process "Dia" to keystroke return',
+      '-e', 'end tell',
+    ]);
+  } catch { /* spawn failure — best effort */ }
+}
+
 async function readDevToolsActivePort(profileDir: string): Promise<{ port: number; path: string }> {
   const deadline = Date.now() + 30_000;
   let lastErr: unknown;
@@ -253,7 +619,7 @@ export async function detectBrowsers(): Promise<DetectedBrowser[]> {
   const detected: DetectedBrowser[] = [];
   const seenPorts = new Set<number>();
 
-  // Method 1: DevToolsActivePort file scan (standard Chrome)
+  // 1. DevToolsActivePort file scan (Chrome, Dia)
   for (const { name, profileDir } of getBrowserCandidates()) {
     const parsed = await tryReadDevToolsActivePort(profileDir);
     if (!parsed) continue;
@@ -268,15 +634,24 @@ export async function detectBrowsers(): Promise<DetectedBrowser[]> {
     });
   }
 
-  // Method 2: HTTP port scan (Dia, Arc, Opera, Vivaldi — no DevToolsActivePort)
-  const ports = [9222, 9223, 9224, 9225];
-  const results = await Promise.allSettled(
-    ports.filter(p => !seenPorts.has(p)).map(port => probePort(port))
-  );
-  for (const r of results) {
-    if (r.status === 'fulfilled' && r.value) {
-      detected.push(r.value);
-    }
+  // 2. Check port 9222 directly (custom Chrome/Dia instances, --remote-debugging-port)
+  if (!seenPorts.has(9222)) {
+    try {
+      const resp = await fetch(`http://127.0.0.1:9222/json/version`, {
+        signal: AbortSignal.timeout(800),
+      });
+      if (resp.ok) {
+        const info = await resp.json() as Record<string, string>;
+        detected.push({
+          name: info.Browser || 'Chrome',
+          profileDir: '',
+          port: 9222,
+          wsPath: info.webSocketDebuggerUrl.replace(/^ws:\/\/[^\/]+/, ''),
+          wsUrl: info.webSocketDebuggerUrl,
+          mtimeMs: Date.now(),
+        });
+      }
+    } catch { /* no browser on 9222 */ }
   }
 
   detected.sort((a, b) => b.mtimeMs - a.mtimeMs);
@@ -292,36 +667,16 @@ function getBrowserCandidates(): BrowserCandidate[] {
 
   if (process.platform === 'darwin') {
     const base = `${home}/Library/Application Support`;
-    push('Google Chrome',          `${base}/Google/Chrome`);
-    push('Chromium',               `${base}/Chromium`);
-    push('Microsoft Edge',         `${base}/Microsoft Edge`);
-    push('Brave',                  `${base}/BraveSoftware/Brave-Browser`);
-    push('Arc',                    `${base}/Arc/User Data`);
-    push('Dia',                    `${base}/Dia/User Data`);
-    push('Vivaldi',                `${base}/Vivaldi`);
-    push('Opera',                  `${base}/com.operasoftware.Opera`);
-    push('Comet',                  `${base}/Comet`);
-    push('Google Chrome Canary',   `${base}/Google/Chrome Canary`);
+    push('Google Chrome',        `${base}/Google/Chrome`);
+    push('Dia',                  `${base}/Dia/User Data`);
   } else if (process.platform === 'linux') {
     const cfg = `${home}/.config`;
-    push('Google Chrome',          `${cfg}/google-chrome`);
-    push('Chromium',               `${cfg}/chromium`);
-    push('Microsoft Edge',         `${cfg}/microsoft-edge`);
-    push('Brave',                  `${cfg}/BraveSoftware/Brave-Browser`);
-    push('Vivaldi',                `${cfg}/vivaldi`);
-    push('Opera',                  `${cfg}/opera`);
-    push('Google Chrome Canary',   `${cfg}/google-chrome-unstable`);
+    push('Google Chrome',        `${cfg}/google-chrome`);
+    push('Dia',                  `${cfg}/dia`);
   } else if (process.platform === 'win32') {
     const local = process.env.LOCALAPPDATA ?? `${home}\\AppData\\Local`;
-    push('Google Chrome',          `${local}\\Google\\Chrome\\User Data`);
-    push('Chromium',               `${local}\\Chromium\\User Data`);
-    push('Microsoft Edge',         `${local}\\Microsoft\\Edge\\User Data`);
-    push('Brave',                  `${local}\\BraveSoftware\\Brave-Browser\\User Data`);
-    push('Arc',                    `${local}\\Arc\\User Data`);
-    push('Dia',                    `${local}\\Dia\\User Data`);
-    push('Vivaldi',                `${local}\\Vivaldi\\User Data`);
-    push('Opera',                  `${local}\\Opera Software\\Opera Stable`);
-    push('Google Chrome Canary',   `${local}\\Google\\Chrome SxS\\User Data`);
+    push('Google Chrome',        `${local}\\Google\\Chrome\\User Data`);
+    push('Dia',                  `${local}\\Dia\\User Data`);
   }
   return list;
 }
@@ -342,26 +697,6 @@ async function tryReadDevToolsActivePort(
   }
 }
 
-async function probePort(port: number): Promise<DetectedBrowser | null> {
-  try {
-    const resp = await fetch(`http://127.0.0.1:${port}/json/version`, {
-      signal: AbortSignal.timeout(800),
-    });
-    if (!resp.ok) return null;
-    const info = await resp.json();
-    return {
-      name: cleanBrowserName(info.Browser || `Chromium`),
-      profileDir: '',
-      port,
-      wsPath: info.webSocketDebuggerUrl.replace(/^ws:\/\/[^\/]+/, ''),
-      wsUrl: info.webSocketDebuggerUrl,
-      mtimeMs: Date.now(),
-    };
-  } catch {
-    return null;
-  }
-}
-
 async function discoverByPort(port: number): Promise<string> {
   // Method 1: HTTP /json/version (--remote-debugging-port flag)
   try {
@@ -378,11 +713,7 @@ async function discoverByPort(port: number): Promise<string> {
   const home = process.env.HOME ?? '';
   const candidates = [
     `${home}/Library/Application Support/Dia/User Data`,
-    `${home}/Library/Application Support/Arc/User Data`,
     `${home}/Library/Application Support/Google/Chrome`,
-    `${home}/Library/Application Support/Chromium`,
-    `${home}/Library/Application Support/Microsoft Edge`,
-    `${home}/Library/Application Support/BraveSoftware/Brave-Browser`,
   ];
   for (const dir of candidates) {
     try {
@@ -398,30 +729,4 @@ async function discoverByPort(port: number): Promise<string> {
   throw new Error(`No browser on port ${port}. Enable CDP from chrome://inspect or start with --remote-debugging-port=${port}`);
 }
 
-function cleanBrowserName(raw: string): string {
-  return raw.replace(/^Chrome\//, '').replace(/^Chromium\//, '').trim();
-}
 
-function buildNoBrowserHelp(): string {
-  const home = process.env.HOME ?? '';
-  const known = [];
-  for (const c of getBrowserCandidates()) {
-    known.push(c.name);
-  }
-  const uniq = [...new Set(known)];
-  return [
-    `No running browser with remote debugging detected.`,
-    ``,
-    `How to enable:`,
-    `  Chrome/Edge/Brave: open chrome://inspect/#remote-debugging → toggle ON`,
-    `  Dia: dia://inspect/#remote-debugging → toggle ON`,
-    `  Terminal: <browser> --remote-debugging-port=9222`,
-    ``,
-    `Or pass options explicitly:`,
-    `  session.connect({ port: 9222 })`,
-    `  session.connect({ wsUrl: "ws://127.0.0.1:9222/devtools/browser/<id>" })`,
-    `  session.connect({ profileDir: "/path/to/profile" })`,
-    ``,
-    `Browsers scanned: ${uniq.join(', ')}`,
-  ].join('\n');
-}

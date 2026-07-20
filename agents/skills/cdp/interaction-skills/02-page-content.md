@@ -1,5 +1,12 @@
 # Page content: text · screenshots · PDF · scrolling · shadow DOM · viewport
 
+> Before reaching for these low-level CDP snippets, check if
+> `browser-automation.ts` commands (`follow`, `search`, `batch-follow`,
+> `batch-search`, `batch-harvest`) already cover your use case. Use these
+> interaction skills only when the high-level commands don't support
+> what you need — for example, custom click sequences, multi-step forms,
+> or intercepting network requests.
+
 ## Extract text
 
 ```js

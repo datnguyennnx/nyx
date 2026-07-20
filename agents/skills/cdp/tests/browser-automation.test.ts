@@ -71,12 +71,12 @@ test('qualityGateCode references content and loadError (scope correctness)', () 
 
 // ─── followCode ───────────────────────────────────────────────────────────
 
-test('followCode contains Target.createTarget, Page.navigate, Runtime.evaluate, closeTarget', () => {
+test('followCode contains createTarget, Page.navigate, Runtime.evaluate, closeTab', () => {
   const code = followCode('http://example.com', 0, -1, 30000, false, 'article, main, [role=main]', 9222);
-  expect(code).toContain('Target.createTarget');
+  expect(code).toContain('createTarget');
   expect(code).toContain('Page.navigate');
   expect(code).toContain('Runtime.evaluate');
-  expect(code).toContain('closeTarget');
+  expect(code).toContain('closeTab');
 });
 
 test('followCode URL is properly JSON-stringified', () => {
@@ -112,11 +112,11 @@ test('followCode extracts with document.querySelector fallback', () => {
 
 test('followCode closes tab in try/catch', () => {
   const code = followCode('http://example.com', 0, -1, 15000, false, 'body', 9222);
-  expect(code).toContain('closeTarget');
-  // closeTarget is wrapped in try{}catch(e){}
-  const closeIdx = code.indexOf('closeTarget');
+  expect(code).toContain('closeTab');
+  // closeTab is wrapped in try{}catch(e){}
+  const closeIdx = code.indexOf('closeTab');
   const tryIdx = code.lastIndexOf('try{', closeIdx);
-  const catchIdx = code.indexOf('catch(e)', closeIdx);
+  const catchIdx = code.indexOf('catch(', closeIdx);
   expect(tryIdx).toBeGreaterThan(-1);
   expect(catchIdx).toBeGreaterThan(closeIdx);
 });
@@ -128,7 +128,7 @@ test('batchSearchCode creates tabs and navigates with extraction loop', () => {
   expect(code).toContain('createTarget');
   expect(code).toContain('Page.navigate');
   expect(code).toContain('Runtime.evaluate');
-  expect(code).toContain('closeTarget');
+  expect(code).toContain('closeTab');
 });
 
 test('batchSearchCode uses Set-based dedup (new Set(), .has, .add)', () => {
@@ -179,12 +179,13 @@ test('searchCode contains waitFor("Page.lifecycleEvent"...)', () => {
   expect(code).toMatch(/waitFor\("Page\.lifecycleEvent"/);
 });
 
-test('searchCode closes the tab before returning', () => {
+test('searchCode closes the tab in finally block', () => {
   const code = searchCode('test', 5, 9222);
-  const closeIdx = code.indexOf('closeTarget');
-  const returnIdx = code.indexOf('return r.result.value');
-  expect(closeIdx).toBeGreaterThan(-1);
-  expect(closeIdx).toBeLessThan(returnIdx);
+  expect(code).toContain('closeTab');
+  const finallyIdx = code.indexOf('finally{');
+  const closeIdx = code.indexOf('closeTab');
+  expect(finallyIdx).toBeGreaterThan(-1);
+  expect(closeIdx).toBeGreaterThan(finallyIdx);
 });
 
 // ─── batchFollowCode ──────────────────────────────────────────────────────
@@ -202,7 +203,7 @@ test('batchFollowCode navigates all tabs', () => {
 
 test('batchFollowCode closes all tabs after extraction', () => {
   const code = batchFollowCode(['http://a.com'], 'body', 15000, 9222);
-  const closeIdx = code.indexOf('closeTarget');
+  const closeIdx = code.indexOf('closeTab');
   const evaluateIdx = code.lastIndexOf('Runtime.evaluate');
   expect(closeIdx).toBeGreaterThan(evaluateIdx);
 });

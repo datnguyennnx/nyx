@@ -75,6 +75,10 @@ You think batch-follow on a PDF returns the full document. But content is capped
 You think setting `--max -1` gives you unlimited content. But large pages (100k+ chars) can slow CDP transfer and bloat context. Always use `--offset`/`--max` for incremental reading: start at 0/15000, check `truncated`, then request the next chunk. This keeps each chunk bounded and enables aggregators to build a section tree progressively.
 — `extractionCode()`, `followCode()`
 
+### Trap 7: The Dia-Space Trap
+You think Dia Browser's Spaces (tab groups) isolate your agent to tabs within its own Space. They don't. Spaces exist at the browser UI layer only — CDP sees a flat list of ALL targets across ALL Spaces. Your agent can see, read, and close tabs in ANY Space. The agent-tab registry (session.ts) prevents closing tabs the agent didn't create, but there is no guard against *reading* content from user tabs in other Spaces. For true isolation, use isolated browser contexts (incognito profiles) — not Spaces.
+— `session.ts`, CDP spec
+
 ## Playbook
 
 1. **Launch browser** — `gsearch launch` (isolated Chrome on port 9222)

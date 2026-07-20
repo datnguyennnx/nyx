@@ -29,10 +29,11 @@
  *   batch-search <q1> <q2> ... [--count N] [--port N]
  */
 
-import { spawnSync } from 'child_process';
-import { existsSync } from 'fs';
-import { homedir } from 'os';
-import { resolve } from 'path';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import { existsSync, mkdirSync, readFileSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { resolve } from 'node:path';
 
 // Google Search DOM selectors — site-specific, may need updating.
 // These extract results from Google SERP pages. Known limitation: not generic.
@@ -159,22 +160,20 @@ const CACHE_DIR = '/tmp/gsearch-cache';
 const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
 
 function cacheKey(url: string, offset: number, max: number): string {
-  const crypto = require('crypto');
-  return crypto.createHash('sha256').update(`${url}|${offset}|${max}`).digest('hex');
+  return createHash('sha256').update(`${url}|${offset}|${max}`).digest('hex');
 }
 
 function cacheGet(url: string, offset: number, max: number): string | null {
   try {
-    const fs = require('fs');
     const key = cacheKey(url, offset, max);
     const path = `${CACHE_DIR}/${key}.json`;
-    if (!fs.existsSync(path)) return null;
-    const stat = fs.statSync(path);
+    if (!existsSync(path)) return null;
+    const stat = statSync(path);
     if (Date.now() - stat.mtimeMs > CACHE_TTL_MS) {
-      fs.unlinkSync(path); // expired
+      unlinkSync(path); // expired
       return null;
     }
-    return fs.readFileSync(path, 'utf8');
+    return readFileSync(path, 'utf8');
   } catch {
     return null; // cache miss on any error
   }
@@ -182,10 +181,9 @@ function cacheGet(url: string, offset: number, max: number): string | null {
 
 function cacheSet(url: string, offset: number, max: number, data: string): void {
   try {
-    const fs = require('fs');
     const key = cacheKey(url, offset, max);
-    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
-    fs.writeFileSync(`${CACHE_DIR}/${key}.json`, data, 'utf8');
+    if (!existsSync(CACHE_DIR)) mkdirSync(CACHE_DIR, { recursive: true });
+    writeFileSync(`${CACHE_DIR}/${key}.json`, data, 'utf8');
   } catch {
     // Cache write failure is non-fatal
   }
@@ -214,13 +212,12 @@ export function followCode(
 
   return [
     'return (async function(){',
-    'var errors=[];var loadError=null;var tab=null;',
-    'try{',
+    'var errors=[];var loadError=null;',
     `if(!session.isConnected()){try{await session.connect({port:${port}})}catch(e){throw new Error("CDP connect: "+e.message);}}`,
     // Create tab with about:blank — no navigation yet
-    `tab=await session.Target.createTarget({url:"about:blank",background:true});`,
-    'await session.Target.attachToTarget({targetId:tab.targetId,flatten:true});',
-    'await session.use(tab.targetId);',
+    `var {targetId, sessionId}=await session.createTarget({url:"about:blank",background:true});`,
+    'try{',
+    'await session.use(targetId);',
     'await session.Page.enable();',
     'await session.Page.setLifecycleEventsEnabled({enabled:true});',
     // Register listener BEFORE navigating (CAN'T miss the event)
@@ -235,24 +232,14 @@ export function followCode(
     'await new Promise(function(r){setTimeout(r,200);});',
     '}',
     '}',
-    // PDF detection
-    'if(tab.type==="pdf"){',
-    'await new Promise(function(r){setTimeout(r,3000);});',
-    'try{var r=await session.Runtime.evaluate({expression:"document.body?.innerText||document.querySelector(\'embed\')?.shadowRoot?.textContent||\'\'",returnByValue:true});var content=(r.result&&r.result.value)||"";var result={content:content,total_length:content.length,returned_length:content.length,offset:' + offset + ',truncated:false,sections:[]};}catch(e){loadError="pdf_extraction_failed: "+e.message;var result={content:"",total_length:0,returned_length:0,offset:' + offset + ',truncated:false,sections:[]};}',
-    '}else{',
     // Structured extraction — only after page is ready
     `var r=await session.Runtime.evaluate({expression:${JSON.stringify(extractFunc)},returnByValue:true});`,
     'var result=JSON.parse((r.result&&r.result.value)||"{}");',
     'if(result._error){loadError=result._error;}',
-    '}',
-    // Close tab
-    'try{await session.Target.closeTarget({targetId:tab.targetId});}catch(e){}',
-    // Return
     'if(loadError){result._error=loadError;}',
     `return JSON.stringify(result);`,
-    '}catch(e){',
-    'try{if(tab)await session.Target.closeTarget({targetId:tab.targetId});}catch(ex){}',
-    `return JSON.stringify({content:"",total_length:0,returned_length:0,offset:${offset},truncated:false,sections:[],_error:"exception: "+e.message});`,
+    '}finally{',
+    'session.closeTab(targetId,sessionId).catch(function(){});',
     '}',
     '})()'
   ].join('\n');
@@ -324,9 +311,8 @@ export function batchFollowCode(
     '});',
     'const tabs=[];',
     'for(const p of processed){',
-    'const tab=await session.Target.createTarget({url:"about:blank",background:true});',
-    'await session.Target.attachToTarget({targetId:tab.targetId,flatten:true});',
-    'tabs.push({targetId:tab.targetId,originalUrl:p.originalUrl,fetchUrl:p.fetchUrl,type:p.type});',
+    'const tab=await session.createTarget({url:"about:blank",background:true});',
+    'tabs.push({targetId:tab.targetId,originalUrl:p.originalUrl,fetchUrl:p.fetchUrl,type:p.type,sessionId:tab.sessionId});',
     '}',
     'for(const tab of tabs){',
     'await session.use(tab.targetId);',
@@ -339,7 +325,7 @@ export function batchFollowCode(
     extractTabCode,
     '}',
     'for(const tab of tabs){',
-    'try{await session.Target.closeTarget({targetId:tab.targetId});}catch(e){}',
+    'session.closeTab(tab.targetId,tab.sessionId).catch(function(){});',
     '}',
     'return JSON.stringify(results);',
   ].join('');
@@ -363,9 +349,8 @@ export function batchSearchCode(
     'const count=' + count + ';',
     'const tabs=[];',
     'for(const q of queries){',
-    'const tab=await session.Target.createTarget({url:"about:blank",background:true});',
-    'await session.Target.attachToTarget({targetId:tab.targetId,flatten:true});',
-    'tabs.push({targetId:tab.targetId,query:q});',
+    'const tab=await session.createTarget({url:"about:blank",background:true});',
+    'tabs.push({targetId:tab.targetId,query:q,sessionId:tab.sessionId});',
     '}',
     'for(const tab of tabs){',
     'await session.use(tab.targetId);',
@@ -389,7 +374,7 @@ export function batchSearchCode(
     'for(const item of parsed){item._query=tab.query;allResults.push(item);}',
     '}',
     'for(const tab of tabs){',
-    'try{await session.Target.closeTarget({targetId:tab.targetId});}catch(e){}',
+    'session.closeTab(tab.targetId,tab.sessionId).catch(function(){});',
     '}',
     'const seen=new Set();',
     'const deduped=allResults.filter(function(r){if(seen.has(r.url))return false;seen.add(r.url);return true;});',
@@ -412,9 +397,9 @@ export function searchCode(
   return [
     conn,
     'const count=' + count + ';',
-    'const tab=await session.Target.createTarget({url:"about:blank",background:true});',
-    'await session.Target.attachToTarget({targetId:tab.targetId,flatten:true});',
-    'await session.use(tab.targetId);',
+    'const {targetId, sessionId}=await session.createTarget({url:"about:blank",background:true});',
+    'try{',
+    'await session.use(targetId);',
     'await session.Page.enable();',
     'await session.Page.setLifecycleEventsEnabled({enabled:true});',
     'const ready=session.waitFor("Page.lifecycleEvent",function(p){return p.name==="networkIdle";},30000);',
@@ -426,8 +411,10 @@ export function searchCode(
     "expression:'JSON.stringify([...document.querySelectorAll(\"a.zReHs\")].slice(0,'+count+').map(el=>({title:(el.querySelector(\"h3\")?.textContent||\"\").trim(),url:el.href||\"\",snippet:((el.closest(\"[data-hveid]\")?.textContent||\"\").split(/D\\\\u1ECBch trang n\\\\u00E0y|B\\\\u1EA3n d\\\\u1ECBch trang n\\\\u00E0y/).pop()||\"\").trim().slice(0,200)})))',",
     'returnByValue:true',
     '});',
-    'try{await session.Target.closeTarget({targetId:tab.targetId});}catch(e){}',
     'return r.result.value;',
+    '}finally{',
+    'session.closeTab(targetId,sessionId).catch(function(){});',
+    '}',
   ].join('');
 }
 
@@ -492,9 +479,8 @@ export function batchHarvestCode(
     // Phase 1: Parallel search
     'const searchTabs=[];',
     'for(const q of queries){',
-    'const tab=await session.Target.createTarget({url:"about:blank",background:true});',
-    'await session.Target.attachToTarget({targetId:tab.targetId,flatten:true});',
-    'searchTabs.push({targetId:tab.targetId,query:q});',
+    'const tab=await session.createTarget({url:"about:blank",background:true});',
+    'searchTabs.push({targetId:tab.targetId,query:q,sessionId:tab.sessionId});',
     '}',
     'for(const tab of searchTabs){',
     'await session.use(tab.targetId);',
@@ -518,7 +504,7 @@ export function batchHarvestCode(
     'for(const item of parsed){item._query=tab.query;allSearchResults.push(item);}',
     '}',
     'for(const tab of searchTabs){',
-    'try{await session.Target.closeTarget({targetId:tab.targetId});}catch(e){}',
+    'session.closeTab(tab.targetId,tab.sessionId).catch(function(){});',
     '}',
 
     // Dedup + rank + pick top M
@@ -542,9 +528,8 @@ export function batchHarvestCode(
     '}',
     'const followTabs=[];',
     'for(const item of followItems){',
-    'const tab=await session.Target.createTarget({url:"about:blank",background:true});',
-    'await session.Target.attachToTarget({targetId:tab.targetId,flatten:true});',
-    'followTabs.push({targetId:tab.targetId,url:item.url,originalUrl:item.originalUrl,title:item.title,query:item.query,type:item.type});',
+    'const tab=await session.createTarget({url:"about:blank",background:true});',
+    'followTabs.push({targetId:tab.targetId,url:item.url,originalUrl:item.originalUrl,title:item.title,query:item.query,type:item.type,sessionId:tab.sessionId});',
     '}',
     'for(const tab of followTabs){',
     'await session.use(tab.targetId);',
@@ -557,7 +542,7 @@ export function batchHarvestCode(
     extractTabCode,
     '}',
     'for(const tab of followTabs){',
-    'try{await session.Target.closeTarget({targetId:tab.targetId});}catch(e){}',
+    'session.closeTab(tab.targetId,tab.sessionId).catch(function(){});',
     '}',
 
     // Return result
@@ -598,10 +583,9 @@ function findBrowserHarness(): string {
 function runBrowserHarness(
   jsCode: string,
 ): { stdout: string; stderr: string; exitCode: number } {
-  const cp = require('child_process');
   const timeoutMs = 60000; // 60s max
   try {
-    const result = cp.spawnSync('browser-harness-js', [], {
+    const result = spawnSync('browser-harness-js', [], {
       input: jsCode,
       timeout: timeoutMs,
       maxBuffer: 10 * 1024 * 1024, // 10MB max output
@@ -768,13 +752,12 @@ function cmdBatchFollow(args: ParsedArgs): void {
         var targets=await session.Target.getTargets();
         for(var t of targets.targetInfos||[]){
           if(t.url==="about:blank"||t.url.startsWith("chrome://")||t.url.startsWith("devtools://")) continue;
-          try{await session.Target.closeTarget({targetId:t.targetId});}catch(e){}
+          try{await session.closeTab(t.targetId,undefined,true);}catch(e){}
         }
       }
       return "ok";
     })()`;
-    const cp = require('child_process');
-    cp.spawnSync('browser-harness-js', [], { input: connectJs, timeout: 10000, encoding: 'utf8' });
+    spawnSync('browser-harness-js', [], { input: connectJs, timeout: 10000, encoding: 'utf8' });
   } catch(e) {}
 
   // ★ Split URLs into cached (instant) and uncached (fetch)
@@ -802,14 +785,8 @@ function cmdBatchFollow(args: ParsedArgs): void {
     const { stdout, stderr, exitCode } = runBrowserHarness(js);
 
     if (exitCode !== 0) {
-      console.error(
-        JSON.stringify({
-          tool: 'gsearch',
-          error: 'batch_follow_failed',
-          detail: stderr || stdout || 'unknown error',
-        }),
-      );
-      process.exit(2);
+      console.log(JSON.stringify({ success: false, error: 'batch_follow_failed', detail: stderr || stdout || 'unknown error' }));
+      return;
     }
 
     // ★ Parse and cache each result
@@ -845,14 +822,8 @@ function cmdSearch(args: ParsedArgs): void {
 
   if (exitCode !== 0) {
     const errMsg = stderr || stdout || 'unknown error';
-    console.error(
-      JSON.stringify({
-        tool: 'gsearch',
-        error: 'search_failed',
-        detail: errMsg,
-      }),
-    );
-    process.exit(2);
+    console.log(JSON.stringify({ success: false, error: 'search_failed', detail: errMsg }));
+    return;
   }
 
   console.log(stdout);
@@ -864,14 +835,8 @@ function cmdBatchSearch(args: ParsedArgs): void {
 
   if (exitCode !== 0) {
     const errMsg = stderr || stdout || 'unknown error';
-    console.error(
-      JSON.stringify({
-        tool: 'gsearch',
-        error: 'batch_search_failed',
-        detail: errMsg,
-      }),
-    );
-    process.exit(2);
+    console.log(JSON.stringify({ success: false, error: 'batch_search_failed', detail: errMsg }));
+    return;
   }
 
   console.log(stdout);
@@ -889,14 +854,8 @@ function cmdBatchHarvest(args: ParsedArgs): void {
 
   if (exitCode !== 0) {
     const errMsg = stderr || stdout || 'unknown error';
-    console.error(
-      JSON.stringify({
-        tool: 'gsearch',
-        error: 'batch_harvest_failed',
-        detail: errMsg,
-      }),
-    );
-    process.exit(2);
+    console.log(JSON.stringify({ success: false, error: 'batch_harvest_failed', detail: errMsg }));
+    return;
   }
 
   console.log(stdout);

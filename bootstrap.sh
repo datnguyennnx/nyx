@@ -17,47 +17,26 @@ sync_dir() {
 }
 
 check_deps() {
-  local ok=true
   if ! command -v bun &>/dev/null; then
     echo "  [!] Bun not found. Install: curl -fsSL https://bun.sh/install | bash"
-    ok=false
+    return 1
   fi
-  for c in \
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-    "/Applications/Chromium.app/Contents/MacOS/Chromium" \
-    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge" \
-    "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" \
-    "/Applications/Opera.app/Contents/MacOS/Opera" \
-    "/Applications/Vivaldi.app/Contents/MacOS/Vivaldi" \
-    "/Applications/Arc.app/Contents/MacOS/Arc" \
-    "/Applications/Thorium.app/Contents/MacOS/Thorium" \
-    "/Applications/Dia.app/Contents/MacOS/Dia" \
-    "$HOME/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
-    "$HOME/Applications/Chromium.app/Contents/MacOS/Chromium" \
-    "$HOME/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" \
-    "/usr/bin/google-chrome" "/usr/bin/chromium" "/usr/bin/chromium-browser"; do
-    [ -x "$c" ] && { found="$c"; break; }
-  done
-  if [ -z "$found" ]; then
-    echo "  [!] No Chromium-based browser found."
-    echo "  Install one: brew install --cask google-chrome"
-    echo "  Or: https://www.google.com/chrome/"
-    ok=false
-  fi
-  $ok || echo "  Install missing dependencies and re-run."
-  $ok
+  echo "  bun: found"
 }
 
 install() {
   echo "=== Checking dependencies ==="
-  check_deps || exit 1
+  check_deps || {
+    echo "  Install missing dependencies and re-run."
+    exit 1
+  }
 
   echo ""
   echo "=== Installing opencode config ==="
   sync_dir "$DOTFILES/opencode" "$HOME/.config/opencode" "nyx -> .config/opencode"
 
   echo ""
-  echo "=== Installing agents skills ==="
+  echo "=== Installing agent skills ==="
   sync_dir "$DOTFILES/agents" "$HOME/.agents" "nyx -> .agents"
 
   echo ""
@@ -93,48 +72,32 @@ install() {
   fi
 
   echo ""
-  echo "=== Setting up temp directories ==="
-  mkdir -p /tmp/gsearch-profile /tmp/gsearch-tokens
-  echo "  Created /tmp/gsearch-profile (isolated Chrome profile)"
-  echo "  Created /tmp/gsearch-tokens (port tokens)"
+  echo "=== Setting up temp directory ==="
+  mkdir -p /tmp/gsearch-profile
+  echo "  Created /tmp/gsearch-profile (isolated browser profile)"
 
   echo ""
-  echo "=== Deleting stale skills cache ==="
-  rm -f "$HOME/.agents/skills-lock.json"
-  echo "  Removed skills-lock.json (will regenerate on next start)"
-
+  echo "=== Summary ==="
+  echo "  opencode config:  ~/.config/opencode/"
+  echo "  agent skills:     ~/.agents/"
+  echo "  CLI tools:        ~/.local/bin/{gsearch,browser-harness-js}"
+  echo "  temp directory:   /tmp/gsearch-profile"
   echo ""
-  echo "+===============================================================+"
-  echo "|  Install complete.                                            |"
-  echo "+===============================================================+"
-  echo "|                                                               |"
-  echo "|  What was installed:                                          |"
-  echo "|    nyx/opencode/  ->  ~/.config/opencode/  (opencode config). |"
-  echo "|    nyx/agents/    ->  ~/.agents/           (skills + tools).  |"
-  echo "|    gsearch CLI   ->  ~/.local/bin/gsearch                     |"
-  echo "|    browser-harness-js -> ~/.local/bin/browser-harness-js      |"
-  echo "|                                                               |"
-  echo "|  Quick start:                                                 |"
-  echo "|    1. gsearch launch       (start isolated Chrome)            |"
-  echo "|    2. gsearch --count 2 \"your topic\"  (first search)        |"
-  echo "|                                                               |"
-  echo "|  Run tests:                                                   |"
-  echo "|    gsearch batch search \"test\"                              |"
-  echo "|    bun test ~/.agents/skills/cdp/tests/                       |"
-  echo "|                                                               |"
-  echo "|  Works with: opencode, Claude Code, Codex, Cline, Pi Agent    |"
-  echo "|  (any AI agent can use ~/.agents/skills/ as skill files)      |"
-  echo "|                                                               |"
-  echo "|  To reinstall: ./bootstrap.sh install                         |"
-  echo "|  Source repo:  https://github.com/datnguyennnx/nyx            |"
-  echo "+===============================================================+"
+  echo "  Requires: Google Chrome or Dia installed for browser automation."
+  echo ""
+  echo "  Quick start:"
+  echo "    gsearch launch"
+  echo "    gsearch --count 2 \"your topic\""
+  echo ""
+  echo "  To reinstall: $0 install"
+  echo "  Repo: https://github.com/datnguyennnx/nyx"
 }
 
 case "${1:-}" in
   install|--install|-i) install ;;
   *)
     echo "Usage: $(basename "$0") <command>"
-    echo "  install  Full first-time setup: sync files, link CLI, check deps, create temp dirs. Run once."
+    echo "  install  First-time setup: sync config, skills, link CLI, create temp dir."
     ;;
 esac
 
