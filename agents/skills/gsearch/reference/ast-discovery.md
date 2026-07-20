@@ -314,4 +314,4 @@ When the tree must fit in a limited context window, apply these pruning rules in
 
 ### Reference from other files
 
-The AST pipeline hooks into the batch harvest system described in [`commands.md`](commands.md). The `--ast` flag (when implemented) enables AST extraction alongside content extraction. See the gsearch skill playbook for how to request AST-structured responses.
+The AST pipeline hooks into the batch harvest system described in [`commands.md`](commands.md). The `--ast` flag (planned, not yet implemented) enables AST extraction alongside content extraction. See the gsearch skill playbook for how to request AST-structured responses.

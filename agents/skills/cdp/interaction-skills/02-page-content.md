@@ -97,6 +97,7 @@ while (cur > prev) {
 })).result.value
 
 // Via CDP: enable ShadowDOM in query
+const { root } = await session.DOM.getDocument()
 const { nodeId } = await session.DOM.querySelector({ nodeId: root.nodeId, selector: "my-component" })
 // Get shadow root
 const { nodeId: shadowId } = await session.DOM.describeNode({ nodeId, pierce: true })

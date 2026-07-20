@@ -19,7 +19,7 @@ gsearch launch    # retry
 **"Cannot connect on port 92229222"** — this is a sign of the old port-concatenation bug. The `_scan_ports` function had background processes leaking stdout (two `printf` outputs concatenated into one port string). Fix:
 
 ```bash
-# Check common.sh line 156:
+# Check common.sh line 232:
 grep "probe_one" ~/.agents/skills/gsearch/lib/common.sh
 # Should show: (_probe_one "$port" >/dev/null 2>&1) &
 # If it shows: (_probe_one "$port") &
@@ -54,7 +54,7 @@ If the direct search also returns `[]`, the query genuinely has no results — t
 
 - **PDF URL** → Chrome viewer may not extract text. Try `gsearch pdftotext <url>`.
 - **Paywalled page** → the content quality gate rejected it (< 80 chars). Try a different source.
-- **JavaScript-rendered page** → some SPAs need extra time. For single pages, use `gsearch follow <url> --settle 5000`.
+- **JavaScript-rendered page** → some SPAs need extra time. For single pages, use `gsearch follow <url> --settle 5000` (`--settle` flag, see `follow.sh:35`).
 - **Connection error** → the URL may be temporarily unreachable. Retry later.
 
 **`batch harvest` shows `pages_skipped` nearly equal to `pages_read`** — too many URLs failed or returned low-quality content. Solutions:

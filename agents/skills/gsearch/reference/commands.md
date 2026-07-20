@@ -21,7 +21,7 @@ Runs N queries in parallel CDP tabs. One JS invocation, multiple tabs. Results a
 gsearch batch search --count 5 "Fed rate" "ECB policy" "BOJ decision"
 ```
 
-`--count N` — max results per query (default 5). Each tab loads a Google search result page and extracts `{title, url, snippet}` from the `.zReHs` selector.
+`--count N` — max results per query (default 5). Each tab loads a Google search result page and extracts `{title, url, snippet}` from attribute-based selectors (`a[href]` filtered by hostname, `data-hveid` container) — resilient to Google's class name rotation.
 
 Returns:
 ```json
@@ -47,13 +47,17 @@ gsearch batch follow \
 
 `--selector S` — CSS selector for text extraction (default `article, main, [role=main]`). Falls back to `document.body.innerText` if the selector returns nothing.
 
-**PDF handling is automatic.** arXiv URLs (`arxiv.org/pdf/...`) are rewritten to `arxiv.org/abs/...` before tab creation — the abstract page is HTML. Other PDFs are loaded in Chrome's PDF viewer and text extraction is attempted after 3s.
+**PDF handling is automatic for batch mode only.** `gsearch batch follow` uses `batchFollowCode` (templates.ts:201) which has specific PDF handling: arXiv URLs (`arxiv.org/pdf/...`) are rewritten to `arxiv.org/abs/...` before tab creation — the abstract page is HTML. Other PDFs are loaded in Chrome's PDF viewer and text extraction is attempted after 3s.
+
+`gsearch follow` (single URL) uses `followCode` (templates.ts:149) which has **no PDF-specific handling** — it uses the generic extraction function. For PDFs in single-follow mode, use `gsearch pdftotext <url>` instead.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--offset N` | 0 | Character offset to start reading from. Start at 0, then increment by --max to paginate |
 | `--max M` | 15000 | Max characters to return per page. Set to -1 for unlimited (caution: large pages) |
 | `--pretty` | off | Pretty-print JSON output |
+| `--settle MS` | 0 | Extra settle time in ms after page load for JS-rendered content (SPAs) |
+| `--wait M` | `networkIdle` | Lifecycle event to wait for: `networkIdle` (default), `almostIdle`, or `load` |
 
 **New output format** (structured content tree):
 ```json
@@ -107,6 +111,8 @@ gsearch batch harvest --count 5 --max 3 \
 |------|---------|-------------|
 | `--count N` | 5 | Max results per search query |
 | `--max M` | 5 | Max URLs to read in phase 2 |
+| `--maxN N` | — | Max results per topic for batch harvest |
+| `--topics` | off | Explicit topic flag for batch harvest |
 
 Returns:
 ```json
@@ -158,7 +164,7 @@ gsearch --count 5 "Fed interest rate"
 
 `--count N` — max results (default 10). Use this for narrow lookups where you only need one or two results.
 
-## `gsearch follow <url> [--selector S] [--offset N] [--max M] [--pretty] [--raw] [--settle MS]`
+## `gsearch follow <url> [--selector S] [--offset N] [--max M] [--pretty] [--raw]`
 
 Reads a single page. Options:
 
@@ -166,11 +172,12 @@ Reads a single page. Options:
 |------|---------|-------------|
 | `--selector S` | `article, main, [role=main]` | CSS selector for text |
 | `--raw` | off | Output raw text without JSON wrapper |
-| `--settle MS` | 0 | Extra wait time for JS-rendered content |
-| `--wait M` | `networkIdle` | Lifecycle event to wait for |
 | `--offset N` | 0 | Character offset to start reading from |
 | `--max M` | 15000 | Max characters to return. Set to -1 for unlimited |
 | `--pretty` | off | Pretty-print JSON output |
+| `--settle MS` | 0 | Extra settle time in ms after page load for JS-rendered content (SPAs) |
+| `--wait M` | `networkIdle` | Lifecycle event to wait for: `networkIdle` (default), `almostIdle`, or `load` |
+| `--json-url` | off | Treat the URL as a JSON source |
 
 ## `gsearch screenshot <url> [--output FILE]`
 

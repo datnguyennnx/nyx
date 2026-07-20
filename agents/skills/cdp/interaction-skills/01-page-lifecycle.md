@@ -15,7 +15,7 @@ await session.connect({ wsUrl: "ws://127.0.0.1:9222/..." })
 await session.connect({ profileDir: "/path/to/Chrome" })
 ```
 
-If auto-detect fails → `chrome://inspect/#remote-debugging` → tick "Discover network targets" → Allow.
+If auto-detect fails → open `chrome://inspect/#remote-debugging` (Chrome) or `dia://inspect/#remote-debugging` (Dia) → tick "Discover network targets" → Allow. The `session.connect()` error message (templates.ts:169) lists both URLs.
 
 ## Create tab + navigate
 
@@ -32,6 +32,8 @@ await ready
 // Page is ready. Evaluate, screenshot, etc.
 await session.Target.closeTarget({ targetId: t.targetId })  // cleanup
 ```
+
+> **Note:** In modern browser-harness-js, use `session.createTarget(url)` (templates.ts:169) which combines `Target.createTarget` + `Target.attachToTarget` in one call and auto-registers the tab. The raw CDP calls above bypass the agent-tab registry, which means `session.closeTab()` with default `force:false` will reject with "Target is not an agent tab". Use `session.createTarget()` unless you have a specific reason to use the raw CDP calls.
 
 Wait strategies: `"networkIdle"` (500ms quiet, default), `"networkAlmostIdle"` (250ms), `"load"`.
 

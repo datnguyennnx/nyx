@@ -6,16 +6,23 @@
  * Target.sendMessageToTarget envelopes).
  *
  * Detection priority:
- *  1. DevToolsActivePort file scan (Chrome, Dia)
- *  2. HTTP check on port 9222 (custom Chrome/Dia instances)
+ *  1. DevToolsActivePort file scan (Google Chrome, Dia)
+ *  2. HTTP check on port 9222 (custom browser instances)
  *
  * Dia auto-allow: on macOS, if the WS-open stalls past autoAllowDelayMs and
  * the browser is Dia, the SDK fires a Return keystroke (osascript) to dismiss
  * Dia's "Allow debugging connection?" prompt — no manual click needed.
  * Requires macOS Accessibility permission; otherwise falls back to timeoutMs.
+ *
+ * Version tracking: static Session.version exposes SDK version. After connect(),
+ * browserVersion gives the detected browser version. isStale() checks whether
+ * the daemon/binary version is stale relative to the SDK version at connect time.
  */
 
+import { execFile } from 'child_process';
 import { bindDomains, type Domains, type Transport } from './generated.ts';
+
+const VERSION = '0.8.0';
 
 type Pending = {
   resolve: (v: unknown) => void;
@@ -50,9 +57,14 @@ export type DetectedBrowser = {
   wsPath: string;
   wsUrl: string;
   mtimeMs: number;
+  /** Browser version string from /json/version (only available via HTTP detection). */
+  version?: string;
 };
 
 export class Session implements Transport {
+  /** Current SDK version string. */
+  static get version(): string { return VERSION; }
+
   private ws?: WebSocket;
   private nextId = 1;
   private pending = new Map<number, Pending>();
@@ -96,6 +108,11 @@ export class Session implements Transport {
 
   domains!: Domains;
 
+  /** Browser version string detected at connect time (e.g. "Chrome/131.0.6778.109"). */
+  private _browserVersion?: string;
+  /** SDK version at the time connect() succeeded. Used by isStale(). */
+  private _connectedAtVersion?: string;
+
   constructor(opts?: { autoAllow?: boolean; maxAgentTabs?: number; recordCalls?: boolean }) {
     if (opts?.autoAllow !== undefined) this.autoAllow = opts.autoAllow;
     if (opts?.recordCalls !== undefined) this.recordCalls = opts.recordCalls;
@@ -106,10 +123,22 @@ export class Session implements Transport {
     }
   }
 
+  /** The browser version detected at connect time, if available. */
+  get browserVersion(): string | undefined { return this._browserVersion; }
+
+  /**
+   * Check if the connected daemon/browser is stale relative to this SDK version.
+   * Returns true when the SDK version has changed since connect() was called,
+   * indicating the browser process should be restarted for compatibility.
+   */
+  isStale(): boolean {
+    return this._connectedAtVersion !== undefined && this._connectedAtVersion !== VERSION;
+  }
+
   /**
    * Connect to a CDP-enabled browser.
    *
-   * Auto-detects running Chromium browsers if no opts are given.
+   * Auto-detects running browser instances if no opts are given.
    * Dedups concurrent calls via connectPromise — if a reconnect
    * is already in flight, new callers ride on it instead of
    * triggering a second one.
@@ -146,12 +175,14 @@ export class Session implements Transport {
       const wsUrl = await discoverByPort(opts.port);
       const name = this.autoAllow ? await browserNameFor(opts, wsUrl) : undefined;
       await this.openWs(wsUrl, timeoutMs, { autoAllow: this.autoAllow, name, autoAllowDelayMs });
+      this._connectedAtVersion = VERSION;
       return;
     }
     if (opts.wsUrl || opts.profileDir) {
       const wsUrl = await resolveWsUrl(opts);
       const name = this.autoAllow ? await browserNameFor(opts, wsUrl) : undefined;
       await this.openWs(wsUrl, timeoutMs, { autoAllow: this.autoAllow, name, autoAllowDelayMs });
+      this._connectedAtVersion = VERSION;
       return;
     }
 
@@ -173,6 +204,9 @@ export class Session implements Transport {
     for (const b of browsers) {
       try {
         await this.openWs(b.wsUrl, timeoutMs, { autoAllow: this.autoAllow, name: b.name, autoAllowDelayMs });
+        // Capture browser version from the detected browser entry (populated via HTTP /json/version)
+        if (b.version) this._browserVersion = b.version;
+        this._connectedAtVersion = VERSION;
         return;
       } catch (e) {
         errors.push(`  ${b.name} @ ${b.wsUrl}: ${e instanceof Error ? e.message : e}`);
@@ -566,23 +600,25 @@ async function browserNameFor(opts: ConnectOptions, wsUrl: string): Promise<stri
   return browsers.find(b => b.wsUrl === wsUrl || (opts.port != null && b.port === opts.port))?.name;
 }
 
-/** Dismiss Dia's "Allow debugging connection?" prompt by sending Return to the
- *  Dia process via osascript (macOS). Dia maps Return -> Allow; bringing Dia
- *  to front first (best-effort try) covers the switched-away case. Gated on
- *  name === 'Dia' in openWs, so the process name is hardcoded here. Needs
- *  macOS Accessibility permission; without it osascript errors and the connect
- *  just waits on its timeout. Uses Bun.spawnSync for synchronous fire-and-forget. */
+/**
+ * Dismiss Dia's "Allow debugging connection?" prompt by sending Return to the
+ * Dia process via osascript (macOS). Dia maps Return -> Allow; bringing Dia
+ * to front first (best-effort try) covers the switched-away case. Gated on
+ * name === 'Dia' in openWs, so the process name is hardcoded here. Needs
+ * macOS Accessibility permission; without it osascript errors and the connect
+ * just waits on its timeout. Uses child_process.execFile (Node.js-compatible)
+ * for async fire-and-forget — works in both Bun and Node.js. */
 function dismissDiaAllowPrompt(): void {
   if (process.platform !== 'darwin') return;
   try {
-    Bun.spawnSync(['osascript',
+    execFile('osascript', [
       '-e', 'tell application "System Events"',
       '-e', 'try',
       '-e', 'set frontmost of process "Dia" to true',
       '-e', 'end try',
       '-e', 'tell process "Dia" to keystroke return',
       '-e', 'end tell',
-    ]);
+    ], (err) => { /* ignore — best effort */ });
   } catch { /* spawn failure — best effort */ }
 }
 
@@ -619,7 +655,7 @@ export async function detectBrowsers(): Promise<DetectedBrowser[]> {
   const detected: DetectedBrowser[] = [];
   const seenPorts = new Set<number>();
 
-  // 1. DevToolsActivePort file scan (Chrome, Dia)
+  // 1. DevToolsActivePort file scan (Google Chrome, Dia)
   for (const { name, profileDir } of getBrowserCandidates()) {
     const parsed = await tryReadDevToolsActivePort(profileDir);
     if (!parsed) continue;
@@ -634,7 +670,7 @@ export async function detectBrowsers(): Promise<DetectedBrowser[]> {
     });
   }
 
-  // 2. Check port 9222 directly (custom Chrome/Dia instances, --remote-debugging-port)
+  // 2. Check port 9222 directly (custom instances, --remote-debugging-port)
   if (!seenPorts.has(9222)) {
     try {
       const resp = await fetch(`http://127.0.0.1:9222/json/version`, {
@@ -646,9 +682,10 @@ export async function detectBrowsers(): Promise<DetectedBrowser[]> {
           name: info.Browser || 'Chrome',
           profileDir: '',
           port: 9222,
-          wsPath: info.webSocketDebuggerUrl.replace(/^ws:\/\/[^\/]+/, ''),
+          wsPath: info.webSocketDebuggerUrl.replace(/^ws:\/\/[^/]+/, ''),
           wsUrl: info.webSocketDebuggerUrl,
           mtimeMs: Date.now(),
+          version: info.Browser,
         });
       }
     } catch { /* no browser on 9222 */ }
@@ -660,6 +697,12 @@ export async function detectBrowsers(): Promise<DetectedBrowser[]> {
 
 type BrowserCandidate = { name: string; profileDir: string };
 
+/**
+ * Returns known browser profile directories for the current platform.
+ * Supports Google Chrome and Dia Browser (macOS). On other platforms,
+ * auto-detection falls back to HTTP port scan (port 9222) or explicit
+ * connection options.
+ */
 function getBrowserCandidates(): BrowserCandidate[] {
   const home = process.env.HOME ?? process.env.USERPROFILE ?? '';
   const list: BrowserCandidate[] = [];
@@ -667,16 +710,9 @@ function getBrowserCandidates(): BrowserCandidate[] {
 
   if (process.platform === 'darwin') {
     const base = `${home}/Library/Application Support`;
-    push('Google Chrome',        `${base}/Google/Chrome`);
-    push('Dia',                  `${base}/Dia/User Data`);
-  } else if (process.platform === 'linux') {
-    const cfg = `${home}/.config`;
-    push('Google Chrome',        `${cfg}/google-chrome`);
-    push('Dia',                  `${cfg}/dia`);
-  } else if (process.platform === 'win32') {
-    const local = process.env.LOCALAPPDATA ?? `${home}\\AppData\\Local`;
-    push('Google Chrome',        `${local}\\Google\\Chrome\\User Data`);
-    push('Dia',                  `${local}\\Dia\\User Data`);
+    push('Google Chrome', `${base}/Google/Chrome`);
+    push('Dia',           `${base}/Dia`);
+    push('Dia',           `${base}/Dia/User Data`);
   }
   return list;
 }
@@ -698,26 +734,29 @@ async function tryReadDevToolsActivePort(
 }
 
 async function discoverByPort(port: number): Promise<string> {
-  // Method 1: HTTP /json/version (--remote-debugging-port flag)
-  try {
-    const resp = await fetch(`http://127.0.0.1:${port}/json/version`, {
-      signal: AbortSignal.timeout(2000),
-    });
-    if (resp.ok) {
-      const info = await resp.json();
-      return info.webSocketDebuggerUrl;
-    }
-  } catch { /* fall through */ }
-
-  // Method 2: Scan DevToolsActivePort files (Chrome 144+ inspect mode, no HTTP)
-  const home = process.env.HOME ?? '';
-  const candidates = [
-    `${home}/Library/Application Support/Dia/User Data`,
-    `${home}/Library/Application Support/Google/Chrome`,
-  ];
-  for (const dir of candidates) {
+  // Method 1: HTTP endpoint discovery — try /json/version, /json, /json/list
+  // Dia Browser returns 404 on /json/version (and all /json/*), so we fall
+  // through to /json or /json/list which return an array with webSocketDebuggerUrl.
+  const endpoints = ['/json/version', '/json', '/json/list'];
+  for (const ep of endpoints) {
     try {
-      const file = Bun.file(`${dir}/DevToolsActivePort`);
+      const resp = await fetch(`http://127.0.0.1:${port}${ep}`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      if (ep === '/json/version') {
+        if (data.webSocketDebuggerUrl) return data.webSocketDebuggerUrl;
+      } else if (Array.isArray(data) && data.length > 0) {
+        if (data[0].webSocketDebuggerUrl) return data[0].webSocketDebuggerUrl;
+      }
+    } catch { /* try next endpoint */ }
+  }
+
+  // Method 2: Scan DevToolsActivePort files across known browsers
+  for (const { profileDir } of getBrowserCandidates()) {
+    try {
+      const file = Bun.file(`${profileDir}/DevToolsActivePort`);
       const text = await file.text();
       const [p, wsPath] = text.trim().split('\n');
       if (Number(p) === port && wsPath?.startsWith('/devtools/')) {
@@ -726,7 +765,8 @@ async function discoverByPort(port: number): Promise<string> {
     } catch { /* no file or not matching */ }
   }
 
-  throw new Error(`No browser on port ${port}. Enable CDP from chrome://inspect or start with --remote-debugging-port=${port}`);
+  throw new Error(
+    `No browser on port ${port}. Enable CDP from chrome://inspect or dia://inspect, ` +
+    `or start with --remote-debugging-port=${port}`,
+  );
 }
-
-

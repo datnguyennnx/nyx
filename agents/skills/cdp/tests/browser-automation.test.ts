@@ -2,13 +2,15 @@
  * browser-automation.test.ts — Unit tests for pure template functions
  *
  * These tests validate the JS code-generation functions WITHOUT a browser
- * or CDP connection. Every function is pure (same input → same output).
+ * or CDP connection. Every function is pure (same input -> same output).
  *
  * Key coverage:
- *  - All 7 template functions (connectCode, qualityGateCode, followCode,
- *    batchFollowCode, batchSearchCode, searchCode, batchHarvestCode)
+ *  - All 10 template functions (connectCode, extractionCode, qualityGateCode,
+ *    followCode, batchFollowCode, batchSearchCode, searchCode,
+ *    batchHarvestCode, sessionHealthCheckCode, readyStatePoll, readyStateCheck)
+ *  - Content validation (validateContent)
  *  - Code structure: expected CDP methods, proper embedding of args
- *  - Purity: identical args → identical output (===)
+ *  - Purity: identical args -> identical output (===)
  *  - No constant leaks: TypeScript-only constants (GOOGLE_*) must NOT
  *    appear in generated JS (would cause ReferenceError in browser)
  */
@@ -17,11 +19,16 @@ import { test, expect } from 'bun:test';
 import {
   connectCode,
   qualityGateCode,
+  extractionCode,
   followCode,
   batchFollowCode,
   batchSearchCode,
   searchCode,
   batchHarvestCode,
+  sessionHealthCheckCode,
+  readyStatePoll,
+  readyStateCheck,
+  validateContent,
 } from '../scripts/browser-automation.ts';
 
 // ─── connectCode ──────────────────────────────────────────────────────────
@@ -44,7 +51,7 @@ test('connectCode checks session.isConnected() before connecting', () => {
   expect(code).toContain('session.isConnected()');
 });
 
-// ─── qualityGateCode ──────────────────────────────────────────────────────
+// ─── connectivityGateCode ─────────────────────────────────────────────────
 
 test('qualityGateCode contains expected regex patterns [ERR_CONNECTION, 404]', () => {
   const code = qualityGateCode();
@@ -69,10 +76,81 @@ test('qualityGateCode references content and loadError (scope correctness)', () 
   expect(code).toContain('isJunk');
 });
 
+// ─── extractionCode ───────────────────────────────────────────────────────
+
+test('extractionCode returns a function declaration string', () => {
+  const code = extractionCode();
+  expect(typeof code).toBe('string');
+  expect(code).toContain('(offset, maxLen, url, selector) =>');
+  expect(code).toContain('document.querySelector');
+  expect(code).toContain('JSON.stringify');
+});
+
+test('extractionCode contains quality gate patterns inline', () => {
+  const code = extractionCode();
+  expect(code).toContain("This site can't be reached");
+  expect(code).toContain('ERR_CONNECTION');
+  expect(code).toContain('404 Not Found');
+  expect(code).toContain('low_quality_content');
+});
+
+test('extractionCode generates section boundary detection (h1,h2,h3)', () => {
+  const code = extractionCode();
+  expect(code).toContain('querySelectorAll');
+  expect(code).toContain('h1,h2,h3');
+  expect(code).toContain('sections.push');
+});
+
+// ─── readyStatePoll ───────────────────────────────────────────────────────
+
+test('readyStatePoll returns looping poll code with callFunctionOn', () => {
+  const code = readyStatePoll();
+  expect(typeof code).toBe('string');
+  expect(code).toContain('for(var i=0;i<50;i++)');
+  expect(code).toContain('document.readyState');
+  expect(code).toContain('Runtime.evaluate');
+  expect(code).toContain('setTimeout(r,200)');
+});
+
+test('readyStatePoll has balanced braces', () => {
+  const code = readyStatePoll();
+  const openBraces = (code.match(/\{/g) || []).length;
+  const closeBraces = (code.match(/\}/g) || []).length;
+  expect(openBraces).toBe(closeBraces);
+});
+
+// ─── readyStateCheck ──────────────────────────────────────────────────────
+
+test('readyStateCheck returns a single evaluate expression', () => {
+  const code = readyStateCheck();
+  expect(typeof code).toBe('string');
+  expect(code).toContain('Runtime.evaluate');
+  expect(code).toContain('document.readyState');
+});
+
+// ─── sessionHealthCheckCode ───────────────────────────────────────────────
+
+test('sessionHealthCheckCode connects and closes agent tabs only', () => {
+  const code = sessionHealthCheckCode(9222);
+  expect(code).toContain('session.connect');
+  expect(code).toContain('agentTabs.keys()');
+  expect(code).toContain('closeTab');
+  expect(code).toContain('port:9222');
+  expect(code).not.toContain('force:true');
+  expect(code).not.toContain('force');
+});
+
+test('sessionHealthCheckCode no longer enumerates all CDP targets', () => {
+  const code = sessionHealthCheckCode(9222);
+  expect(code).not.toContain('Target.getTargets');
+  expect(code).not.toContain('about:blank');
+  expect(code).not.toContain('chrome://');
+});
+
 // ─── followCode ───────────────────────────────────────────────────────────
 
 test('followCode contains createTarget, Page.navigate, Runtime.evaluate, closeTab', () => {
-  const code = followCode('http://example.com', 0, -1, 30000, false, 'article, main, [role=main]', 9222);
+  const code = followCode('http://example.com', 0, -1, 30000, 'article, main, [role=main]', 9222);
   expect(code).toContain('createTarget');
   expect(code).toContain('Page.navigate');
   expect(code).toContain('Runtime.evaluate');
@@ -81,44 +159,43 @@ test('followCode contains createTarget, Page.navigate, Runtime.evaluate, closeTa
 
 test('followCode URL is properly JSON-stringified', () => {
   const url = "http://example.com/path?q=1&x='test'";
-  const code = followCode(url, 0, -1, 30000, false, 'body', 9222);
+  const code = followCode(url, 0, -1, 30000, 'body', 9222);
   expect(code).toContain(JSON.stringify(url));
 });
 
 test('followCode selector appears in the generated extraction expression', () => {
   const selector = 'main.content > p';
-  const code = followCode('http://example.com', 0, -1, 30000, false, selector, 9222);
+  const code = followCode('http://example.com', 0, -1, 30000, selector, 9222);
   // The selector is embedded via JSON.stringify then re-stringified for
-  // Runtime.evaluate; the raw selector string still appears in the output.
+  // Runtime.callFunctionOn; the raw selector string still appears in the output.
   expect(code).toContain('main.content > p');
 });
 
 test('followCode timeout is embedded as a numeric literal', () => {
   const timeout = 30000;
-  const code = followCode('http://example.com', 0, -1, timeout, false, 'body', 9222);
+  const code = followCode('http://example.com', 0, -1, timeout, 'body', 9222);
   expect(code).toContain(String(timeout));
 });
 
 test('followCode uses session.connect (output contains session.connect)', () => {
-  const code = followCode('http://example.com', 0, -1, 15000, false, 'body', 9222);
+  const code = followCode('http://example.com', 0, -1, 15000, 'body', 9222);
   expect(code).toContain('session.connect');
 });
 
-test('followCode extracts with document.querySelector fallback', () => {
-  const code = followCode('http://example.com', 0, -1, 15000, false, 'body', 9222);
+test('followCode extracts with document.querySelector fallback via Runtime.evaluate', () => {
+  const code = followCode('http://example.com', 0, -1, 15000, 'body', 9222);
   expect(code).toContain('document.querySelector');
   expect(code).toContain('session.Runtime.evaluate');
 });
 
 test('followCode closes tab in try/catch', () => {
-  const code = followCode('http://example.com', 0, -1, 15000, false, 'body', 9222);
+  const code = followCode('http://example.com', 0, -1, 15000, 'body', 9222);
   expect(code).toContain('closeTab');
-  // closeTab is wrapped in try{}catch(e){}
+  // closeTab is in the finally block
+  const finallyIdx = code.indexOf('finally{');
   const closeIdx = code.indexOf('closeTab');
-  const tryIdx = code.lastIndexOf('try{', closeIdx);
-  const catchIdx = code.indexOf('catch(', closeIdx);
-  expect(tryIdx).toBeGreaterThan(-1);
-  expect(catchIdx).toBeGreaterThan(closeIdx);
+  expect(finallyIdx).toBeGreaterThan(-1);
+  expect(closeIdx).toBeGreaterThan(finallyIdx);
 });
 
 // ─── batchSearchCode ──────────────────────────────────────────────────────
@@ -271,6 +348,40 @@ test('batchHarvestCode wraps extraction in try/catch with loadError', () => {
   expect(code).toContain('loadError=e.message');
 });
 
+// ─── validateContent ──────────────────────────────────────────────────────
+
+test('validateContent rejects empty content', () => {
+  const result = validateContent('');
+  expect(result.ok).toBe(false);
+  expect(result.score).toBe(0);
+});
+
+test('validateContent accepts valid natural language content', () => {
+  const text = 'The quick brown fox jumps over the lazy dog. This is a complete sentence with enough words to pass the quality gate. ' +
+    'Multiple sentences exist in this text. Each one adds to the total word count. This content should easily pass validation. ' +
+    'We need at least 80 characters and multiple sentences with punctuation. The quality score should be well above 0.5.';
+  const result = validateContent(text);
+  expect(result.ok).toBe(true);
+  expect(result.score).toBeGreaterThanOrEqual(0.5);
+});
+
+test('validateContent detects browser error pages', () => {
+  // Must be > 80 chars to avoid too_short precedence
+  const result = validateContent("This site can't be reached. The connection was reset. ERR_CONNECTION_TIMED_OUT. We are unable to connect to the server. Please check your internet connection and try again later. If the problem persists, contact support.");
+  expect(result.ok).toBe(false);
+  expect(result.reason).toBe('browser_error_page');
+});
+
+test('validateContent detects 404 pages', () => {
+  // Content with 404 but few words and no punctuation to compound deductions
+  // Length > 80 (avoid too_short), < 100 (trigger navigation_chrome), < 15 words
+  // Score: 1.0 - 0.5 (not_found) - 0.3 (navigation_chrome) - 0.2 (too_few_words) = 0.0
+  const result = validateContent('404 Not Found This-page-was-removed-from-server Check-URL-spelling-and-retry-now-thanks-more');
+  expect(result.ok).toBe(false);
+  expect(result.reason).toBe('not_found');
+  expect(result.score).toBeLessThan(0.5);
+});
+
 // ─── Purity Tests ─────────────────────────────────────────────────────────
 
 test('connectCode is pure: same args return identical string (===)', () => {
@@ -282,9 +393,26 @@ test('qualityGateCode is pure: always returns identical string (===)', () => {
   expect(qualityGateCode()).toBe(qualityGateCode());
 });
 
+test('extractionCode is pure: always returns identical string (===)', () => {
+  expect(extractionCode()).toBe(extractionCode());
+});
+
+test('readyStatePoll is pure: always returns identical string (===)', () => {
+  expect(readyStatePoll()).toBe(readyStatePoll());
+});
+
+test('readyStateCheck is pure: always returns identical string (===)', () => {
+  expect(readyStateCheck()).toBe(readyStateCheck());
+});
+
+test('sessionHealthCheckCode is pure: same args return identical string (===)', () => {
+  expect(sessionHealthCheckCode(9222)).toBe(sessionHealthCheckCode(9222));
+  expect(sessionHealthCheckCode(8080)).toBe(sessionHealthCheckCode(8080));
+});
+
 test('followCode is pure: same args return identical string (===)', () => {
-  expect(followCode('http://x.com', 0, -1, 15000, false, 'body', 9222))
-    .toBe(followCode('http://x.com', 0, -1, 15000, false, 'body', 9222));
+  expect(followCode('http://x.com', 0, -1, 15000, 'body', 9222))
+    .toBe(followCode('http://x.com', 0, -1, 15000, 'body', 9222));
 });
 
 test('batchSearchCode is pure: same args return identical string (===)', () => {
@@ -308,8 +436,8 @@ test('batchHarvestCode is pure: same args return identical string (===)', () => 
 });
 
 test('no cross-call contamination: different args produce independent results', () => {
-  const a = followCode('http://a.com', 0, -1, 10000, false, 'body', 9222);
-  const b = followCode('http://b.com', 0, -1, 20000, false, 'main', 9223);
+  const a = followCode('http://a.com', 0, -1, 10000, 'body', 9222);
+  const b = followCode('http://b.com', 0, -1, 20000, 'main', 9223);
   expect(a).not.toBe(b);
   expect(a).toContain('http://a.com');
   expect(b).toContain('http://b.com');
@@ -323,11 +451,15 @@ test('generated JS does not contain GOOGLE_* TypeScript constants', () => {
   const codes = [
     ['connectCode', connectCode(9222)],
     ['qualityGateCode', qualityGateCode()],
-    ['followCode', followCode('http://x.com', 0, -1, 15000, false, 'body', 9222)],
+    ['extractionCode', extractionCode()],
+    ['followCode', followCode('http://x.com', 0, -1, 15000, 'body', 9222)],
     ['batchFollowCode', batchFollowCode(['http://x.com'], 'body', 15000, 9222)],
     ['batchSearchCode', batchSearchCode(['q'], 5, 9222)],
     ['searchCode', searchCode('q', 5, 9222)],
     ['batchHarvestCode', batchHarvestCode(['q'], 5, 3, 15000, 9222)],
+    ['sessionHealthCheckCode', sessionHealthCheckCode(9222)],
+    ['readyStatePoll', readyStatePoll()],
+    ['readyStateCheck', readyStateCheck()],
   ];
   const forbidden = ['GOOGLE_TRANSLATE_PATTERN', 'GOOGLE_RESULT_LINK', 'GOOGLE_RESULT_CONTAINER'];
   for (const [name, code] of codes) {
@@ -345,11 +477,15 @@ test('generated JS does not leak other TypeScript identifiers into browser scope
   const codes: string[] = [
     connectCode(9222),
     qualityGateCode(),
-    followCode('http://x.com', 0, -1, 15000, false, 'body', 9222),
+    extractionCode(),
+    followCode('http://x.com', 0, -1, 15000, 'body', 9222),
     batchFollowCode(['http://x.com'], 'body', 15000, 9222),
     batchSearchCode(['q'], 5, 9222),
     searchCode('q', 5, 9222),
     batchHarvestCode(['q'], 5, 3, 15000, 9222),
+    sessionHealthCheckCode(9222),
+    readyStatePoll(),
+    readyStateCheck(),
   ];
 
   // JS built-ins that legitimately appear in generated code

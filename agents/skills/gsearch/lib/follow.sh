@@ -1,6 +1,28 @@
 # gsearch follow — follow, screenshot, scrape commands
 # shellcheck disable=all
 
+# ===== SHARED FOLLOW HELPERS =====
+
+# _secondary_quality_check: Additional content quality gate (defense in depth).
+# Detects paywall walls and captcha pages that browser-automation.ts may not catch.
+# Returns 0 if content passes, 1 if flagged as low quality.
+_secondary_quality_check() {
+  local content="$1"
+  [ -z "$content" ] && return 1
+  printf '%s' "$content" | grep -qiE \
+    '(subscribe to continue|sign in to read|subscription required|unlock this article|premium article|captcha|verify you are human|security check|please prove you are human)'
+}
+
+# ===== FOLLOW COMMAND =====
+
+# ════════════════════════════════════════════════════════════════════
+# FOLLOW (page extraction)
+# ════════════════════════════════════════════════════════════════════
+
+# cmd_follow: Extract visible text from a single URL via browser-automation.ts.
+# Supports --selector, --offset, --max for incremental reading, --settle for
+# JS-rendered content, --wait for lifecycle event control.
+# Uses the TypeScript --retry flag for automatic quality-based retry.
 cmd_follow() {
   [ $# -ge 1 ] || die_usage "Usage: gsearch follow <url> [--selector S] [--json-url] [--raw] [--offset N] [--max N] [--settle MS] [--wait M]"
   local url="" selector="article, main, [role=main]" json_url=false raw=false pretty=false offset=0 max=15000 settle=0 wait="networkIdle"
@@ -24,14 +46,48 @@ cmd_follow() {
   ensure_bhjs
 
   CDP_SCRIPTS="${CDP_SCRIPTS:-$(cd "$(dirname "$BASH_SOURCE")/../../cdp/scripts" && pwd)}"
-  local out; out=$(bun "${CDP_SCRIPTS}/browser-automation.ts" follow "$url" --selector "$selector" --offset "$offset" --max "$max" --timeout "30000" --port "$GSEARCH_CDP_PORT" $($pretty && echo --pretty) --raw 2>&1) || {
-    printf '{"success":false,"url":%s,"error":%s}\n' "$(json_str "$url")" "$(json_str "$out")" >&2; exit 2
-  }
+
+  # Run browser-automation.ts with --retry for automatic quality-based retry
+  # Stdout is JSON payload, stderr is diagnostics (no 2>&1)
+  local out rc=0
+  out=$(_cdp_call 45 follow "$url" \
+    --selector "$selector" --offset "$offset" --max "$max" \
+    --timeout "30000" --retry \
+    $($pretty && echo --pretty) --raw) || rc=$?
+
+  # Exit code 1 = usage error from browser-automation.ts
+  if [ $rc -eq 1 ]; then
+    _json_error "follow" "usage_error" "$out"
+  fi
+  # Exit code 2 = operational error (browser, timeout, dependency)
+  if [ $rc -eq 2 ]; then
+    exit 2
+  fi
+
+  # Quality check: parse output and validate content
+  local quality_ok quality_reason
+  eval "$(_check_content_quality "$out")"
+
+  if [ "$quality_ok" = "false" ] && [ -n "$quality_reason" ]; then
+    # Retry failed or content is still low quality — include quality info
+    if [ ${#out} -lt 500 ] && _secondary_quality_check "$out"; then
+      out=""
+    fi
+  fi
+
   if $raw; then printf '%s\n' "$out"
   else printf '{"success":true,"url":%s,"data":%s}\n' "$(json_str "$url")" "$(json_str "$out")"
   fi
 }
 
+# ===== SCREENSHOT COMMAND =====
+
+# ════════════════════════════════════════════════════════════════════
+# SCREENSHOT (full-page PNG capture via CDP)
+# ════════════════════════════════════════════════════════════════════
+
+# cmd_screenshot: Full-page PNG screenshot via direct browser-harness-js call.
+# Uses inject_connect from common.sh for the JS preamble.
 cmd_screenshot() {
   [ $# -ge 1 ] || die_usage "Usage: gsearch screenshot <url> [--output FILE] [--settle MS] [--wait M]"
   local url="" output="" settle=0 wait="networkIdle"
@@ -70,6 +126,15 @@ return r.data;"
   printf '{"success":true,"path":"%s","url":%s}\n' "$output" "$(json_str "$url")"
 }
 
+# ===== SCRAPE COMMAND =====
+
+# ════════════════════════════════════════════════════════════════════
+# SCRAPE (structured CSS selector extraction)
+# ════════════════════════════════════════════════════════════════════
+
+# cmd_scrape: Extract structured data from a URL using CSS selectors.
+# Supports --list (multiple elements), --attr (attribute extraction),
+# --selector for targeting specific elements.
 cmd_scrape() {
   [ $# -ge 1 ] || die_usage "Usage: gsearch scrape <url> [--selector S] [--attr A] [--list] [--raw] [--settle MS]"
   local url="" selector="article, main, [role=main]" attr="" list=false raw=false settle=0

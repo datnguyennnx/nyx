@@ -136,6 +136,15 @@ BUN_CALL_COUNT=0
 MOCK_CDP_SCRIPTS="/tmp/gsearch-test-cdp-scripts"
 mkdir -p "$MOCK_CDP_SCRIPTS"
 
+# Create stub browser-automation.ts for _cdp_call's file-existence check
+# _cdp_call checks for ${CDP_SCRIPTS}/browser-automation.ts before calling bun
+cat > "$MOCK_CDP_SCRIPTS/browser-automation.ts" << 'STUB'
+#!/usr/bin/env bun
+// Mock for tests - always returns empty array as JSON
+console.log('[]');
+STUB
+chmod +x "$MOCK_CDP_SCRIPTS/browser-automation.ts"
+
 # Mock bun() to record args
 bun() {
   BUN_CALL_COUNT=$((BUN_CALL_COUNT + 1))
@@ -237,6 +246,97 @@ if test_die_on_unknown_opt; then
   pass=$((pass + 1))
 else
   echo "  FAIL FAIL: 4f: --bogus did not exit 1"
+  fail=$((fail + 1))
+fi
+
+# ════════════════════════════════════════════════════════════════════
+# === NEW TESTS === _validate_search_results (7 tests)
+# ════════════════════════════════════════════════════════════════════
+
+echo ""
+echo "=== _validate_search_results ==="
+
+# Test 5a: valid JSON array with title+url returns 0
+validate_test_0() {
+  ( _validate_search_results '[{"title":"Test","url":"https://example.com"}]' 2>/dev/null; ) && return 0 || return 1
+}
+if validate_test_0; then
+  echo "  OK 5a: valid result returns 0"
+  pass=$((pass + 1))
+else
+  echo "  FAIL FAIL: 5a: valid result should return 0"
+  fail=$((fail + 1))
+fi
+
+# Test 5b: empty JSON array returns 1
+validate_test_1() {
+  ( _validate_search_results '[]' 2>/dev/null; ) && return 1 || return 0
+}
+if validate_test_1; then
+  echo "  OK 5b: empty array returns 1"
+  pass=$((pass + 1))
+else
+  echo "  FAIL FAIL: 5b: empty array should return 1"
+  fail=$((fail + 1))
+fi
+
+# Test 5c: empty string returns 1
+validate_test_2() {
+  ( _validate_search_results '' 2>/dev/null; ) && return 1 || return 0
+}
+if validate_test_2; then
+  echo "  OK 5c: empty string returns 1"
+  pass=$((pass + 1))
+else
+  echo "  FAIL FAIL: 5c: empty string should return 1"
+  fail=$((fail + 1))
+fi
+
+# Test 5d: malformed JSON returns 1
+validate_test_3() {
+  ( _validate_search_results 'not json' 2>/dev/null; ) && return 1 || return 0
+}
+if validate_test_3; then
+  echo "  OK 5d: malformed JSON returns 1"
+  pass=$((pass + 1))
+else
+  echo "  FAIL FAIL: 5d: malformed JSON should return 1"
+  fail=$((fail + 1))
+fi
+
+# Test 5e: object missing "title" field returns 1
+validate_test_4() {
+  ( _validate_search_results '[{"url":"https://example.com"}]' 2>/dev/null; ) && return 1 || return 0
+}
+if validate_test_4; then
+  echo "  OK 5e: missing title returns 1"
+  pass=$((pass + 1))
+else
+  echo "  FAIL FAIL: 5e: missing title should return 1"
+  fail=$((fail + 1))
+fi
+
+# Test 5f: object missing "url" field returns 1
+validate_test_5() {
+  ( _validate_search_results '[{"title":"No URL"}]' 2>/dev/null; ) && return 1 || return 0
+}
+if validate_test_5; then
+  echo "  OK 5f: missing url returns 1"
+  pass=$((pass + 1))
+else
+  echo "  FAIL FAIL: 5f: missing url should return 1"
+  fail=$((fail + 1))
+fi
+
+# Test 5g: some valid among invalid — at least one valid entry returns 0
+validate_test_6() {
+  ( _validate_search_results '[{"title":"","url":"https://x.com"},{"title":"Real","url":"https://real.com"}]' 2>/dev/null; ) && return 0 || return 1
+}
+if validate_test_6; then
+  echo "  OK 5g: at least one valid entry returns 0"
+  pass=$((pass + 1))
+else
+  echo "  FAIL FAIL: 5g: at least one valid entry should return 0"
   fail=$((fail + 1))
 fi
 

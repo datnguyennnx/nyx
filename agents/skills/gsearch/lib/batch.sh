@@ -1,11 +1,36 @@
 # gsearch batch — parallel/multi-tab batch operations via browser-automation.ts
 # shellcheck disable=all
 
-# ═══════════════════════════════════════════════════════════════════════
-# BATCH / PARALLEL OPERATIONS (information-theoretic multi-tab)
-# ═══════════════════════════════════════════════════════════════════════
+# ===== BATCH / PARALLEL OPERATIONS (information-theoretic multi-tab) =====
 
-# — batch search: multiple queries in parallel tabs, dedup by URL, sort by density
+# _rewrite_arxiv_url: Normalize arXiv URLs to abstract HTML pages.
+# Handles /pdf/, /abs/, .pdf suffix, and export.arxiv.org mirror.
+_rewrite_arxiv_url() {
+  local u="$1"
+  case "$u" in
+    *export.arxiv.org/*)
+      # Rewrite export.arxiv.org to arxiv.org
+      u="${u//export.arxiv.org/arxiv.org}"
+      ;;
+  esac
+  case "$u" in
+    *arxiv.org/pdf/*)
+      # Convert PDF URL to abstract page (sed with | delimiter avoids / escaping)
+      u=$(printf '%s' "$u" | sed 's|arxiv\.org/pdf/|arxiv.org/abs/|')
+      # Strip .pdf suffix (handles both /pdf/ID.pdf and /abs/ID.pdf)
+      u="${u%.pdf}"
+      ;;
+    *arxiv.org/abs/*.pdf)
+      # Strip .pdf suffix from abs URLs
+      u="${u%.pdf}"
+      ;;
+  esac
+  printf '%s' "$u"
+}
+
+# ===== BATCH SEARCH =====
+
+# cmd_batch_search: Multiple queries in parallel tabs, dedup by URL, sort by density.
 cmd_batch_search() {
   local count=5
   while [ $# -gt 0 ]; do
@@ -18,15 +43,25 @@ cmd_batch_search() {
   done
   [ $# -ge 1 ] || die_usage "Usage: gsearch batch search [--count N] query1 query2 ..."
 
-  local raw
-  raw=$(bun "${CDP_SCRIPTS}/browser-automation.ts" batch-search "$@" --count "$count" --port "$GSEARCH_CDP_PORT" 2>&1) || {
-    printf '{"tool":"gsearch","error":"batch_search_failed","detail":%s}\n' "$(json_str "$raw")" >&2
+  # Rate limiting between batch operations
+  _batch_delay
+
+  local raw rc=0
+  raw=$(_cdp_call 45 batch-search "$@" --count "$count") || rc=$?
+
+  if [ $rc -eq 1 ]; then
+    _json_error "batch_search" "usage_error" "$raw"
+  fi
+  if [ $rc -eq 2 ]; then
     exit 2
-  }
+  fi
+
   printf '%s\n' "$raw"
 }
 
-# — batch follow: multiple URLs in parallel tabs, returns combined content
+# ===== BATCH FOLLOW =====
+
+# cmd_batch_follow: Multiple URLs in parallel tabs, returns combined content.
 cmd_batch_follow() {
   local selector="article, main, [role=main]" raw=false pretty=false offset=0 max=15000
   while [ $# -gt 0 ]; do
@@ -43,30 +78,37 @@ cmd_batch_follow() {
   done
   [ $# -ge 1 ] || die_usage "Usage: gsearch batch follow [--selector S] [--offset N] [--max M] [--pretty] url1 url2 ..."
 
+  # Tab limit sanity check
+  _check_tab_limit "$@"
+
   # Rewrite arXiv PDF URLs to abstract pages before passing to browser-automation.ts
   local urls=()
   local u
   for u in "$@"; do
-    case "$u" in
-      *arxiv.org/pdf/*)
-        u="${u/\/arxiv.org\/pdf\//\/arxiv.org\/abs\/}"
-        u="${u%.pdf}"
-        ;;
-    esac
-    urls+=("$u")
+    urls+=("$(_rewrite_arxiv_url "$u")")
   done
 
-  local raw_out
-  raw_out=$(bun "${CDP_SCRIPTS}/browser-automation.ts" batch-follow "${urls[@]}" --selector "$selector" --offset "$offset" --max "$max" --timeout 15000 --port "$GSEARCH_CDP_PORT" $($pretty && echo --pretty) 2>&1) || {
-    printf '{"tool":"gsearch","error":"batch_follow_failed","detail":%s}\n' "$(json_str "$raw_out")" >&2
-    exit 2
-  }
-  if $raw; then printf '%s\n' "$raw_out"
-  else printf '%s\n' "$raw_out"
+  # Rate limiting between batch operations
+  _batch_delay
+
+  local raw_out rc=0
+  raw_out=$(_cdp_call 45 batch-follow "${urls[@]}" \
+    --selector "$selector" --offset "$offset" --max "$max" --timeout 15000 \
+    $($pretty && echo --pretty)) || rc=$?
+
+  if [ $rc -eq 1 ]; then
+    _json_error "batch_follow" "usage_error" "$raw_out"
   fi
+  if [ $rc -eq 2 ]; then
+    exit 2
+  fi
+
+  printf '%s\n' "$raw_out"
 }
 
-# — batch harvest: full information pipeline
+# ===== BATCH HARVEST =====
+
+# cmd_batch_harvest: Full information pipeline.
 #   Phase 1: parallel search (all queries → dedup → rank by snippet length)
 #   Phase 2: parallel follow (top N unique URLs → extract content)
 cmd_batch_harvest() {
@@ -84,22 +126,42 @@ cmd_batch_harvest() {
   done
   [ $# -ge 1 ] || die_usage "Usage: gsearch batch harvest [--count N] [--max M] [--maxN N] [--topics] query1 query2 ..."
 
-  local raw
-  raw=$(bun "${CDP_SCRIPTS}/browser-automation.ts" batch-harvest "$@" --count "$count" --max "$max_pages" --timeout 15000 --port "$GSEARCH_CDP_PORT" 2>&1) || {
-    printf '{"tool":"gsearch","error":"batch_harvest_failed","detail":%s}\n' "$(json_str "$raw")" >&2
+  # Rate limiting between batch operations
+  _batch_delay
+
+  local raw rc=0
+  raw=$(_cdp_call 45 batch-harvest "$@" --count "$count" --max "$max_pages" --timeout 15000) || rc=$?
+
+  if [ $rc -eq 1 ]; then
+    _json_error "batch_harvest" "usage_error" "$raw"
+  fi
+  if [ $rc -eq 2 ]; then
     exit 2
-  }
+  fi
+
   printf '%s\n' "$raw"
 }
 
-# — batch: dispatch to subcommands
+# ===== BATCH DISPATCHER =====
+
+# cmd_batch: Dispatch to subcommands with pre-flight check.
 cmd_batch() {
   [ $# -ge 1 ] || die_usage "Usage: gsearch batch <search|follow|harvest> [args...]"
   local sub="$1"; shift
+
+  # Pre-flight: ensure browser is available before expensive batch ops
+  ensure_browser || force_browser_launch "$GSEARCH_CDP_PORT" || {
+    printf '{"tool":"gsearch","command":"batch","error":"no_browser","detail":"Cannot start browser for batch operation on port %s"}\n' "$GSEARCH_CDP_PORT" >&2
+    exit 2
+  }
+
   case "$sub" in
     search)  cmd_batch_search "$@" ;;
     follow)  cmd_batch_follow "$@" ;;
     harvest) cmd_batch_harvest "$@" ;;
-    *) die_usage "gsearch batch: unknown subcommand '$sub' (use: search | follow | harvest)" ;;
+    *)
+      printf '{"tool":"gsearch","command":"batch","error":"unknown_subcommand","detail":"Unknown subcommand: %s (use: search | follow | harvest)"}\n' "$sub" >&2
+      exit 2
+      ;;
   esac
 }

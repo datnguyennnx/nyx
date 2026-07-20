@@ -5,7 +5,7 @@
  *   POST /eval     body = raw JS to evaluate (NOT JSON-wrapped).
  *                  Top-level await supported. Single expression auto-returns.
  *                  Response: {"ok":true,"result":<json>} | {"ok":false,"error":..,"stack"?:..}
- *   GET  /health   {"ok":true,"uptime":<seconds>,"connected":<bool>,"sessionId":<string|null>}
+ *   GET  /health   {"status":"ok","version":"<sdk>","uptime":<s>,"connected":<bool>,"sessionId":<string|null>,"stale":<bool>}
  *   POST /quit     graceful shutdown. Returns {"ok":true} then exits.
  *
  * State: `session`, the active sessionId, event subscribers, and any
@@ -28,18 +28,24 @@ const session = new Session();
 const PORT = Number(process.env.CDP_REPL_PORT ?? 9876);
 const startedAt = Date.now();
 
+// Cache the SDK version at boot time (matches browser-harness-js convention).
+const VERSION = Session.version;
+
 // ---- Rate limiting (sliding window, per-second counter) ----
-// Allow up to 200 requests in any rolling 1-second window.
-// This gives generous headroom for bursty single-CLI usage (100 req/s sustained).
-const RATE_BURST = 200;
-let requestTimes: number[] = [];
+const RATE_LIMIT_WINDOW_MS = 1000; // 1 second
+const RATE_LIMIT_MAX_REQS = 200;   // max requests per window
+const requestTimestamps: number[] = [];
 
 function checkRateLimit(): boolean {
   const now = Date.now();
-  // Prune timestamps outside the 1-second sliding window
-  requestTimes = requestTimes.filter(t => now - t < 1000);
-  if (requestTimes.length >= RATE_BURST) return false;
-  requestTimes.push(now);
+  // Remove timestamps outside the window
+  while (requestTimestamps.length > 0 && requestTimestamps[0] < now - RATE_LIMIT_WINDOW_MS) {
+    requestTimestamps.shift();
+  }
+  if (requestTimestamps.length >= RATE_LIMIT_MAX_REQS) {
+    return false; // rate limited
+  }
+  requestTimestamps.push(now);
   return true;
 }
 
@@ -105,16 +111,22 @@ const server = Bun.serve({
 
     if (req.method === 'GET' && url.pathname === '/health') {
       return Response.json({
-        ok: true,
+        status: 'ok',
+        version: VERSION,
         uptime: Math.floor((Date.now() - startedAt) / 1000),
         connected: session.isConnected(),
         sessionId: session.getActiveSession() ?? null,
+        stale: session.isStale(),
+        browserVersion: session.browserVersion ?? null,
       });
     }
 
     if (req.method === 'POST' && url.pathname === '/eval') {
       if (!checkRateLimit()) {
-        return Response.json({ error: 'rate limit exceeded' }, { status: 429 });
+        return Response.json(
+          { error: 'rate_limited', message: 'Too many requests. Try again in a moment.' },
+          { status: 429 },
+        );
       }
       const code = await req.text();
       if (!code.trim()) {

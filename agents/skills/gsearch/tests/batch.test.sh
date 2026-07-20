@@ -173,6 +173,79 @@ else
   exit 1
 fi
 
+# ════════════════════════════════════════════════════════════════════
+# === NEW TESTS === _rewrite_arxiv_url (6 tests)
+# ════════════════════════════════════════════════════════════════════
+
+echo ""
+echo "=== _rewrite_arxiv_url ==="
+
+# Test 6: PDF URL converted to abstract URL
+RESULT=$(_rewrite_arxiv_url "https://arxiv.org/pdf/2401.12345")
+echo "  input:    https://arxiv.org/pdf/2401.12345"
+echo "  output:   $RESULT"
+if [ "$RESULT" = "https://arxiv.org/abs/2401.12345" ]; then
+  echo "  OK _rewrite_arxiv_url pdf → abs"
+else
+  echo "  FAIL FAIL: expected https://arxiv.org/abs/2401.12345, got $RESULT"
+  exit 1
+fi
+
+# Test 7: Non-arxiv URL unchanged
+RESULT=$(_rewrite_arxiv_url "https://example.com/paper.pdf")
+echo "  input:    https://example.com/paper.pdf"
+echo "  output:   $RESULT"
+if [ "$RESULT" = "https://example.com/paper.pdf" ]; then
+  echo "  OK _rewrite_arxiv_url non-arxiv unchanged"
+else
+  echo "  FAIL FAIL: expected https://example.com/paper.pdf, got $RESULT"
+  exit 1
+fi
+
+# Test 8: arXiv PDF with .pdf suffix stripped
+RESULT=$(_rewrite_arxiv_url "https://arxiv.org/pdf/2401.12345.pdf")
+echo "  input:    https://arxiv.org/pdf/2401.12345.pdf"
+echo "  output:   $RESULT"
+if [ "$RESULT" = "https://arxiv.org/abs/2401.12345" ]; then
+  echo "  OK _rewrite_arxiv_url pdf with .pdf suffix stripped"
+else
+  echo "  FAIL FAIL: expected https://arxiv.org/abs/2401.12345, got $RESULT"
+  exit 1
+fi
+
+# Test 9: arXiv abs URL already — stays unchanged
+RESULT=$(_rewrite_arxiv_url "https://arxiv.org/abs/2401.12345")
+echo "  input:    https://arxiv.org/abs/2401.12345"
+echo "  output:   $RESULT"
+if [ "$RESULT" = "https://arxiv.org/abs/2401.12345" ]; then
+  echo "  OK _rewrite_arxiv_url abs unchanged"
+else
+  echo "  FAIL FAIL: expected https://arxiv.org/abs/2401.12345, got $RESULT"
+  exit 1
+fi
+
+# Test 10: export.arxiv.org rewritten to arxiv.org
+RESULT=$(_rewrite_arxiv_url "https://export.arxiv.org/pdf/2401.12345")
+echo "  input:    https://export.arxiv.org/pdf/2401.12345"
+echo "  output:   $RESULT"
+if [ "$RESULT" = "https://arxiv.org/abs/2401.12345" ]; then
+  echo "  OK _rewrite_arxiv_url export.arxiv.org → arxiv.org abs"
+else
+  echo "  FAIL FAIL: expected https://arxiv.org/abs/2401.12345, got $RESULT"
+  exit 1
+fi
+
+# Test 11: abs URL with .pdf suffix stripped
+RESULT=$(_rewrite_arxiv_url "https://arxiv.org/abs/2401.12345.pdf")
+echo "  input:    https://arxiv.org/abs/2401.12345.pdf"
+echo "  output:   $RESULT"
+if [ "$RESULT" = "https://arxiv.org/abs/2401.12345" ]; then
+  echo "  OK _rewrite_arxiv_url abs .pdf suffix stripped"
+else
+  echo "  FAIL FAIL: expected https://arxiv.org/abs/2401.12345, got $RESULT"
+  exit 1
+fi
+
 # --- All tests passed ---
 echo ""
 echo "════════════════════════════════════════════"
