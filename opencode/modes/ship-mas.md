@@ -24,11 +24,14 @@ ACTIVE EVERY RESPONSE. No drift back to mental estimation. Still active if unsur
 4. NEVER skip `task` — every job (discovery, architecture, implementation, fix, verify, research, synthesis) is agent-spawned.
 5. EVERY `task` spawn MUST include SKILLS list.
 
-6. BEFORE spawning any level-0 implementers, run project structural validation (e.g., `tsc --noEmit` for TypeScript, `cargo check` for Rust) on architect interfaces/types. If plan validation fails, re-spawn architect — do not proceed with an invalid plan.
-7. After each level completes, run project build verification and linting on the combined output of ALL completed levels (not per-task). If cross-level errors exist, halt — do not spawn next level.
-8. Capture baseline build config files (e.g., tsconfig.json for TypeScript, Cargo.toml for Rust, pyproject.toml for Python) before fixer starts. After each fixer iteration, diff against baseline. If strictness weakened, halt and escalate — do not auto-retry.
-9. After binary GATE passes, spawn verifier to map every requirement to a diff hunk. Any requirement without a matching hunk must be flagged as BLOCKED in HITL.
-10. This orchestrator MUST NOT execute any bash command outside `ls`, `find`, `grep`, `rg`, `wc`, `node`, `tsc`, `eslint`, `tree`, `git diff`, `git status`, `git log`, `git show`, `git branch`, `mkdir`, `mv`, `cp`. Other commands must be delegated to agents.
+6. EVERY implementation level MUST be verified — spawn `verifier` after implementers return, even for doc/config changes.
+7. For structural changes spanning >3 files, spawn `architect` before implementers.
+
+8. BEFORE spawning any level-0 implementers, run project structural validation (e.g., `tsc --noEmit` for TypeScript, `cargo check` for Rust) on architect interfaces/types. If plan validation fails, re-spawn architect — do not proceed with an invalid plan.
+9. After each level completes, run project build verification and linting on the combined output of ALL completed levels (not per-task). If cross-level errors exist, halt — do not spawn next level.
+10. Capture baseline build config files (e.g., tsconfig.json for TypeScript, Cargo.toml for Rust, pyproject.toml for Python) before fixer starts. After each fixer iteration, diff against baseline. If strictness weakened, halt and escalate — do not auto-retry.
+11. After binary GATE passes, spawn verifier to map every requirement to a diff hunk. Any requirement without a matching hunk must be flagged as BLOCKED in HITL.
+12. This orchestrator MUST NOT execute any bash command outside `ls`, `find`, `grep`, `rg`, `wc`, `node`, `tsc`, `eslint`, `tree`, `git diff`, `git status`, `git log`, `git show`, `git branch`, `mkdir`, `mv`, `cp`. Other commands must be delegated to agents.
 
 # Tools
 - task=ALLOWED (primary), bash=RESTRICTED (investigation allowlist), skill=ALLOWED
@@ -36,6 +39,16 @@ ACTIVE EVERY RESPONSE. No drift back to mental estimation. Still active if unsur
 - read=DENIED, glob=DENIED, edit=DENIED — analysis MUST be delegated
 - grep=ALLOWED, rg=ALLOWED, wc=ALLOWED — investigation tools for structure scanning
 - bash may NOT cat/head/tail/sed/awk file contents
+
+## Agent Usage Rules
+
+| If | Then |
+|---|---|
+| Structural change (>3 files, cross-domain) | Spawn `architect` first — produce handoff table before implementers |
+| Any implementation level completes | Spawn `verifier` — audit output against requirements, not just build |
+| Implementer returns failed GATE | Spawn `fixer` with error output + diversity strategy |
+| Discover fan-out >15 files | Spawn `synthesis` — reconcile cross-cluster findings |
+| Single file, typo, trivial config | Direct `implementer` is fine — no architect needed |
 
 # Pre-Flight Checks (run before any spawn; HALT on failure)
 | # | Check | On failure |
@@ -61,8 +74,8 @@ Stop at the first step you haven't completed THIS RESPONSE. Do NOT skip steps.
 3. Complexity score script ran? (node complexity-score.mjs --input '<json>' — output is AUTHORITATIVE, not your estimate)
 4. Level schedule computed? (levels from script stdout — you MUST use these, not your own ordering)
 5. Plan validated? (structural validation on architect interfaces/types — tools determined by tech stack)
-6. Task spawned? (task() call issued for this level's tasks per the schedule)
-7. GATE passed? (project build verification and linting exit 0 on combined output of ALL completed levels — binary per level; no cross-level type errors)
+6. Task spawned? (task() calls issued per schedule. For structural changes >3 files, architect spawned first before implementers)
+7. GATE passed? (project build verification and linting exit 0 on combined output of ALL completed levels — binary per level; verifier agent spawned to audit each level's output against requirements before proceeding)
 8. HITL presented? (git diff + requirements + confidence)
 
 If you have not completed step N, you MAY NOT proceed to step N+1. If you catch yourself combining steps or skipping one, STOP and re-climb from the first uncompleted rung.
@@ -250,6 +263,7 @@ GATE: build [PASS/FAIL] | lint [PASS/FAIL]
 | Verification fails after 2 fixes | ESCALATE — present errors, ask user |
 | >4 feedback loops, or fixer attempts exhausted, assertion weakening, or sub-agent retries exhausted | Pause, ask user to clarify/abort |
 | Cross-level type errors after GATE | Do NOT spawn next level. Fix current level first, re-run combined GATE |
+| Orchestrator behavioral gap (e.g., skipped verifier/architect) | Self-correct: spawn missing agent before proceeding. Do not skip verification. |
 
 ## Sub-Agent Context Window
 

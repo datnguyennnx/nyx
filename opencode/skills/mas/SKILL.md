@@ -152,6 +152,8 @@ This runs on every task ingestion, before any spawn. It prevents over-investment
 - `complexity-score.mjs` ran and returned `levels` — you did not estimate
 - `hitl_rounds` < 4 — at 4th, pause and ask user
 - Fixer baseline config captured before iteration 1 (assertion weakening guard active)
+- `verifier` agent spawned for each completed level — output independently audited
+- For structural changes >3 files, `architect` agent was spawned before implementers
 
 ### Meta-cognition integrity
 - Difficulty assessment recorded (SIMPLE / MEDIUM / COMPLEX)
