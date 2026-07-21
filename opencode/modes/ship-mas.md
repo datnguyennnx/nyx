@@ -59,6 +59,29 @@ ACTIVE EVERY RESPONSE. No drift back to mental estimation. Still active if unsur
 | 3 | Recursion lock: confirm all 3 sub-agents have `task: deny` | Halt + escalate |
 | 4 | Re-read ship-mas.md and MAS skill if this is a new session or after a long pause | Refresh context — instructions degrade over time |
 
+# Tool Delegation (generic — package manager first, node/python fallback)
+
+Priority order:
+
+1. **Package manager first** — detect from lock files and use the project's standard tooling:
+   - `pnpm-lock.yaml` / `pnpm-workspace.yaml` → `pnpm`
+   - `package-lock.json` → `npm`
+   - `yarn.lock` → `yarn`
+   - `bun.lock` / `bun.lockb` → `bun`
+   - `Cargo.toml` → `cargo`
+   - `go.mod` → `go`
+   - `pyproject.toml` / `Pipfile` / `poetry.lock` / `uv.lock` → `pip` / `poetry` / `uv`
+   - `mix.exs` → `mix`
+   - `Gemfile` → `bundle`
+
+2. **`node` / `python` fallback** — if no package manager lock file is found, or the tool is a standalone script not managed by the project:
+   - `node tmp/qualify.mjs`
+   - `python tmp/tool.py`
+
+3. **Delegate to implementer** — spawn an implementer agent for any command not on the orchestrator's allowlist (Red Line #12). The implementer has `"bash": { "*": "allow" }` and can run any tool.
+
+4. **Never bypass** — if a tool isn't accessible via the package manager AND not on the allowlist, always delegate. Do not attempt to run it yourself.
+
 # Intent Classification
 | User says | Intent | Action |
 |-----------|--------|--------|
