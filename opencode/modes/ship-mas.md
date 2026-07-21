@@ -56,6 +56,7 @@ ACTIVE EVERY RESPONSE. No drift back to mental estimation. Still active if unsur
 | 1 | Load `mas` skill | Retry; if still fails → escalate |
 | 2 | Confirm `node --version` and `test -f ~/.config/opencode/scripts/complexity-score.mjs` | Escalate — node or script missing |
 | 3 | Recursion lock: confirm all 7 sub-agents have `task: deny` | Halt + escalate |
+| 4 | Re-read ship-mas.md and MAS skill if this is a new session or after a long pause | Refresh context — instructions degrade over time |
 
 # Intent Classification
 | User says | Intent | Action |
@@ -76,9 +77,16 @@ Stop at the first step you haven't completed THIS RESPONSE. Do NOT skip steps.
 5. Plan validated? (structural validation on architect interfaces/types — tools determined by tech stack)
 6. Task spawned? (task() calls issued per schedule. For structural changes >3 files, architect spawned first before implementers)
 7. GATE passed? (project build verification and linting exit 0 on combined output of ALL completed levels — binary per level; verifier agent spawned to audit each level's output against requirements before proceeding)
-8. HITL presented? (git diff + requirements + confidence)
+8. HITL presented? (git diff + requirements + confidence + sub-agent output contracts verified against requirements)
 
 If you have not completed step N, you MAY NOT proceed to step N+1. If you catch yourself combining steps or skipping one, STOP and re-climb from the first uncompleted rung.
+
+## Context Compaction
+
+When approaching the model's context limit, quality degrades. Before spawning any agent, check:
+- Is the current conversation over 75% of context window? If yes, summarize prior turns into a compact preamble.
+- Is the task prompt over 2000 tokens? If yes, trim reference material — pass only essentials.
+- Compaction format: keep Goal, Completed Steps, Current Task, Relevant Files — drop everything else.
 
 # Workflow (Change/Ship)
 
@@ -106,7 +114,17 @@ Turn N:   task(t1), task(t2)        // same turn = parallel
           [wait for both to return]
 Turn N+1: task(t3)                  // t3's prompt includes t1/t2 results as context
 ```
-Each `task()` prompt: {TASK, TARGET_FILES, REQUIREMENTS, SKILLS, OUTPUT_CONTRACT, context-isolation line}.
+Each `task()` prompt MUST include:
+
+CONTEXT: <1-2 sentences of essential background — NOT full conversation history>
+TASK: <single natural-language description of the goal>
+TARGET_FILES: <specific paths the agent may read/modify>
+REQUIREMENTS: <acceptance criteria — what success looks like>
+SKILLS: <domain skills to load>
+OUTPUT_CONTRACT: <exact format for the return value — JSON schema or structured template>
+
+The prompt MUST be under 2000 tokens. If reference material pushes it over, trim before spawning.
+
 See MAS skill `reference/decomposition.md` for the full prompt schema and per-agent output contracts.
 
 ## Sub-Agent Context Isolation
@@ -205,6 +223,14 @@ Long prompts cause the model to forget information in the middle. Mitigations:
 ```
 Parse `<task_result>` to get agent's actual output.
 
+### Output Contract Verification
+
+After each sub-agent returns, verify its output against the OUTPUT_CONTRACT before passing to the next level:
+1. Does the output contain all required fields?
+2. Does every cited file:line actually exist?
+3. Is the summary under 500 tokens? (If not, the parent context will bloat.)
+4. If any check fails, re-spawn with tighter instructions — do NOT forward invalid output.
+
 # HITL Presentation
 
 Gate is binary. Gate FAIL → no confidence presented (fixer loop). Gate PASS → compute soft confidence for framing only.
@@ -264,6 +290,8 @@ GATE: build [PASS/FAIL] | lint [PASS/FAIL]
 | >4 feedback loops, or fixer attempts exhausted, assertion weakening, or sub-agent retries exhausted | Pause, ask user to clarify/abort |
 | Cross-level type errors after GATE | Do NOT spawn next level. Fix current level first, re-run combined GATE |
 | Orchestrator behavioral gap (e.g., skipped verifier/architect) | Self-correct: spawn missing agent before proceeding. Do not skip verification. |
+| Sub-agent output doesn't match OUTPUT_CONTRACT | Do NOT pass to next level. Re-spawn with stricter contract or verify independently before proceeding. |
+| Context approaching limit mid-pipeline | Pause, run compaction on completed work, then continue with compacted context. |
 
 ## Sub-Agent Context Window
 
