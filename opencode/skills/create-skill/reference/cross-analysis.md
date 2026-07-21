@@ -1,3 +1,8 @@
+---
+name: create-skill-cross-analysis
+description: "Cross-agent analysis of production skills: title patterns, structural findings, and ranked techniques."
+---
+
 # Cross-Agent Analysis of 4 Production Skills
 
 Four independent agents analyzed four production skills and produced structured output contracts. This document compares their findings.

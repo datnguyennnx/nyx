@@ -1,3 +1,8 @@
+---
+name: create-skill-validation
+description: "Information-theoretic validation: SNR, entropy, mutual information, eval-first methodology, hold-out sets, and multi-trial testing."
+---
+
 # Information-Theoretic Validation for Skills
 
 A skill is an information channel. You (the expert) encode domain expertise into SKILL.md. The AI agent decodes it during execution. The channel has constraints: finite context window, competing signals from other skills and conversation, and decoding errors from ambiguity.
@@ -125,3 +130,46 @@ Run these audits before submitting any skill:
 4. **MI audit**: Sort content by mutual information. Cut from the bottom until skill fits token budget.
 5. **Error-correction audit**: For each imperative, find the corresponding trap. If any lacks one, add it.
 6. **Channel capacity audit**: Measure file size. If > 15 KB, offload reference data to separate files.
+
+## Eval-First Methodology (2026)
+
+The best validation is not static analysis — it's empirical testing with and without the skill.
+
+### Baseline Comparison Protocol
+
+For every skill, run test prompts TWICE:
+1. **Without skill loaded** — measure baseline output quality
+2. **With skill loaded** — measure skill-augmented output quality
+
+The skill's value = (quality_with - quality_without). If < 10% improvement, reconsider the skill.
+
+### Test Suite Requirements
+
+| Test type | Count | Purpose |
+|-----------|-------|---------|
+| SHOULD trigger | 5 | Verify skill activates for target tasks |
+| SHOULD NOT trigger | 5 | Verify skill stays silent for related tasks |
+| Output quality (with skill) | 5 | Verify output improves |
+| Output quality (without skill) | 5 | Baseline comparison |
+
+### Hold-Out Validation
+
+Split test prompts into:
+- **Training set** (60%): Used during iteration
+- **Validation set** (40%): Used only for final evaluation
+
+Never tune against the validation set. This prevents overfitting to specific prompts.
+
+### Multi-Trial Requirement
+
+Run 3-5 trials per prompt configuration. Single-trial results are noisy — a skill may pass one trial and fail the next due to model stochasticity.
+
+If the skill passes < 3 of 5 trials, it needs more iteration before shipping.
+
+### Retirement Eval
+
+After 10 real-world uses, run the full test suite WITHOUT the skill. If all tests pass, the model has absorbed the knowledge. Archive the skill.
+
+### Cross-Model Testing
+
+Test skills across target models. Sonnet-tier models need less detail than Haiku-tier. A skill tuned for Sonnet may be too terse for Haiku.

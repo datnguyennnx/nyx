@@ -1,3 +1,8 @@
+---
+name: create-skill-titles-structure
+description: "Title strategy, skill anatomy, progressive disclosure, and information architecture for SKILL.md files."
+---
+
 # Title Patterns and Skill Anatomy
 
 How to choose section titles and structure a skill for maximum agent comprehension.
@@ -67,13 +72,14 @@ The bulk of the skill (60%+ of content). Contains traps, failure patterns, ratio
 
 Binary items only. Every item must be pass/fail with no interpretation needed. The agent runs through this before declaring done.
 
-### Reference Files: Content Only, No Metadata
+### Reference Files: With Frontmatter for Independent Loading
 
-Reference files (in the `references/` folder) are pure content files. Unlike SKILL.md, they have NO YAML frontmatter. They are not entry points — they are instruction supplements loaded on demand. Structure them as plain markdown with:
+Reference files (in the `references/` folder) are loaded on demand when SKILL.md references them. Following 2026 best practices, each reference file now includes YAML frontmatter with `name` and `description` for independent discovery and loading via `skill()`. Structure:
+- YAML frontmatter with `name` (required) and `description` (required)
 - H1 heading matching the file's topic
-- Direct, actionable content
-- No name/description frontmatter (wasted tokens)
-- Referenced explicitly from SKILL.md: `See references/<file>.md for details`
+- Direct, actionable content only
+- Referenced explicitly from SKILL.md: `See reference/<file>.md for details`
+- Max 1 level deep from SKILL.md (flat reference tree)
 
 ## Information Architecture
 
@@ -92,3 +98,22 @@ The most important section should be the deepest. Each subsequent section should
 ### Nesting depth
 
 Max 3 levels of heading nesting (`# → ## → ###`). Deeper nesting increases the chance the agent misparses the hierarchy. If you need more depth, split into a separate reference file.
+
+## Progressive Disclosure (Tiered Loading)
+
+From agentskills.io specification (2026 standard):
+
+**Tier 1 — Metadata (always loaded, ~100 tokens)**
+- `name` field: max 64 chars, lowercase-hyphens, must match directory name
+- `description` field: max 1024 chars, third person, state WHAT and WHEN
+
+**Tier 2 — Body (loaded on trigger, <5000 tokens)**
+- SKILL.md body with core instructions, traps, checklists
+- Hard cap at 500 lines
+
+**Tier 3 — Resources (loaded on demand, zero tokens until accessed)**
+- `references/` directory: deep documentation, policies, SOPs
+- `scripts/` directory: executable code
+- `assets/` directory: templates, static files
+
+Keep the reference tree flat — all references should be one hop from SKILL.md. Deep nesting causes partial reads (Claude docs: agents may only `head -100` deep files).
