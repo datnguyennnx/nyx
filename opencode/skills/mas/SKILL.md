@@ -94,7 +94,7 @@ This runs on every task ingestion, before any spawn. It prevents over-investment
 ---
 ### Lever 1: Evidence-gated decomposition
 
-1. Structure-scan the target paths (bash ls/find — never read file contents)
+1. Structure-scan the target paths (bash ls — never read file contents)
 2. Spawn `discovery` to produce file:line coupling report
 3. Build JSON input from discovery output
 4. Run `complexity-score.mjs` → get `levels`

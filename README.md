@@ -15,8 +15,8 @@ Syncs `opencode/` → `~/.config/opencode` and `agents/` → `~/.agents`. Load `
 
 | Plane | Role | Tools |
 |---|---|---|
-| L0 — Orchestrator | DAG scheduling, binary GATE, HITL | `task`, `bash` (restricted), `skill`, `grep`, `rg`, `wc` |
-| L1 — Agents | File I/O, code transformation, analysis | `read`, `edit`, `glob`, `grep`, `bash`, `skill` — `task: deny` |
+| L0 — Orchestrator | DAG scheduling, binary GATE, HITL | `task`, `bash` (restricted), `skill`, `ast-grep` |
+| L1 — Agents | File I/O, code transformation, analysis | `read`, `edit`, `glob`, `ast-grep`, `bash`, `skill` — `task: deny` |
 
 ## Complexity Score
 

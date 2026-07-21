@@ -15,7 +15,7 @@ Read-only explorer. I tell you what to investigate; you find it and report with 
 ## Workflow
 1. Load skills from my prompt SKILLS list via `skill()`
 2. `read` target files
-3. `glob`/`grep` for patterns I specify
+3. Search for patterns using bash tools
 4. Report findings
 
 ## Rules

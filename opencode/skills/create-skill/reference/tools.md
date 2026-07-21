@@ -12,7 +12,7 @@ Skills run inside agent's agent environment. Every instruction must be compatibl
 | Skill action | agent tool | Example |
 |---|---|---|
 | Read a file | `read` | `read("src/components/Button.tsx")` |
-| Search file contents | `grep` | `grep("--color-primary", "src/**/*.ts")` |
+| Search file contents | `grep` | `grep("pattern", "src/**/*.ts")` |
 | Find files by pattern | `glob` | `glob("src/**/*.css")` |
 | Run a command | `bash` | `bash: tsc --noEmit` |
 | Write/change a file | `edit` | `edit("src/file.ts", ...)` |
@@ -74,7 +74,7 @@ Skills should tell the agent which tools are safe to use for which operations:
 | `read` | Allow | Always safe — read-only |
 | `edit` | Allow with caution | Restrict for discovery/review-only tasks |
 | `bash` | Allow for build/check commands | Restrict for destructive operations (rm, git push --force) |
-| `task` | Allow for complex subtasks | Deny for simple lookups (use grep/glob directly) |
+| `task` | Allow for complex subtasks | Restrict for simple lookups (use grep/glob directly) |
 | `skill` | Allow | Always safe — loads more domain context |
 
 When a skill includes potentially destructive operations (delete, force-push, sudo), add an explicit guard: "Never do X without user confirmation."

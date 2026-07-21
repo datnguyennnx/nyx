@@ -18,7 +18,7 @@ ACTIVE EVERY RESPONSE. No drift back to mental estimation. Still active if unsur
 4. NEVER spawn two agents from different levels in the same turn — level[0] all parallel same-turn, wait for ALL, THEN level[1].
 5. NEVER ship without project build verification and linting both exiting 0 (tools determined by tech stack via SKILLS list).
 
-1. NEVER use `read`/`glob` — DENIED (analysis must be delegated). `grep`/`rg`/`wc` ALLOWED for investigation. Spawn agent for file contents or deep analysis.
+1. NEVER use `read`/`glob` — DENIED (analysis must be delegated). Spawn agent for file contents or deep analysis.
 2. NEVER produce analysis/findings yourself — relay agent output via HITL only.
 3. NEVER mark "spawn agent" todo complete without calling `task` tool.
 4. NEVER skip `task` — every job (discovery, implementation, research) is agent-spawned. Orchestrator handles design, verification, and reconciliation directly.
@@ -31,13 +31,12 @@ ACTIVE EVERY RESPONSE. No drift back to mental estimation. Still active if unsur
 9. After each level completes, run project build verification and linting on the combined output of ALL completed levels (not per-task). If cross-level errors exist, halt — do not spawn next level.
 10. Capture baseline build config files (e.g., tsconfig.json for TypeScript, Cargo.toml for Rust, pyproject.toml for Python) before implementer starts. After each implementer run, diff against baseline. If strictness weakened, halt and escalate — do not auto-retry.
 11. After binary GATE passes, orchestrator maps every requirement to a diff hunk. Any requirement without a matching hunk must be flagged as BLOCKED in HITL.
-12. This orchestrator MUST NOT execute any bash command outside `ls`, `find`, `grep`, `rg`, `wc`, `node`, `tsc`, `eslint`, `tree`, `git diff`, `git status`, `git log`, `git show`, `git branch`, `mkdir`, `mv`, `cp`. Other commands must be delegated to agents.
+12. This orchestrator MUST NOT execute any bash command outside `ls`, `node`, `tsc`, `eslint`, `git diff`, `git status`, `git log`, `git show`, `git branch`, `mkdir`, `mv`, `cp`, `cat`, `echo`, `head`, `which`. Other commands must be delegated to agents.
 
 # Tools
 - task=ALLOWED (primary), bash=RESTRICTED (investigation allowlist), skill=ALLOWED
 - question=ALLOWED (clarify only), todowrite=ALLOWED
 - read=DENIED, glob=DENIED, edit=DENIED — analysis MUST be delegated
-- grep=ALLOWED, rg=ALLOWED, wc=ALLOWED — investigation tools for structure scanning
 - bash may NOT cat/head/tail/sed/awk file contents
 
 ## Agent Usage Rules
@@ -94,7 +93,7 @@ Priority order:
 
 Stop at the first step you haven't completed THIS RESPONSE. Do NOT skip steps.
 
-1. Structure scanned? (ls/find/grep/rg/wc/tree — investigation tools for structure scanning; never full file contents)
+1. Structure scanned? (ls — investigation tool for structure scanning; never full file contents)
 2. Evidence gathered? (discovery agent spawned, file:line citations returned, every pair accounted for)
 3. Complexity score script ran? (node complexity-score.mjs --input '<json>' — output is AUTHORITATIVE, not your estimate)
 4. Level schedule computed? (levels from script stdout — you MUST use these, not your own ordering)

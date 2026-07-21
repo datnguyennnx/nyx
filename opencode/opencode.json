@@ -23,15 +23,6 @@
       ".env.example": "allow",
       "*.env.example": "allow"
     },
-    "grep": {
-      "*": "allow"
-    },
-    "find": {
-      "*": "allow"
-    },
-    "rg": {
-      "*": "allow"
-    },
     "bash": {
       "*": "allow",
       "rm -rf *": "deny",
@@ -83,8 +74,6 @@
           "ssh *": "deny",
           "ls": "allow",
           "ls *": "allow",
-          "find": "allow",
-          "find *": "allow",
           "node": "allow",
           "node *": "ask",
           "python": "ask",
@@ -92,8 +81,10 @@
           "python3": "ask",
           "python3 *": "ask",
           "tsc": "allow",
-          "tsc *": "allow",
-          "eslint": "allow",
+           "tsc *": "allow",
+           "which": "allow",
+           "which *": "allow",
+           "eslint": "allow",
           "eslint *": "allow",
           "git*": "ask",
           "git diff *": "allow",
@@ -101,29 +92,26 @@
           "git log *": "allow",
           "git show *": "allow",
           "git branch *": "allow",
+          "head": "allow",
+          "head *": "allow",
           "mkdir": "allow",
           "mkdir *": "ask",
           "mv": "allow",
           "mv *": "ask",
           "cp": "allow",
-          "cp *": "ask",
-          "tree": "allow",
-          "tree *": "allow",
-          "grep": "allow",
-          "grep *": "allow",
-          "rg": "allow",
-          "rg *": "allow",
-          "wc": "allow",
-          "wc *": "allow"
+            "cp *": "ask",
+            "cat": "allow",
+            "cat *": "allow",
+            "cat .env*": "deny",
+            "cat */.env*": "deny",
+            "echo": "allow",
+            "echo *": "allow"
         },
         "todowrite": "allow",
         "question": "allow",
         "read": "deny",
         "edit": "deny",
-        "glob": "deny",
-        "grep": "allow",
-        "rg": "allow",
-        "wc": "allow"
+        "glob": "deny"
       }
     }
   },
