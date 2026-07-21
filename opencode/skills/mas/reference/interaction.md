@@ -1,3 +1,8 @@
+---
+name: mas-interaction
+description: "Reference for meta-cognitive assessment, feedback classification, human handoff, and fixer diversity strategy in ship-mas orchestration."
+---
+
 # Meta-Cognitive Assessment
 
 ## Difficulty Assessment

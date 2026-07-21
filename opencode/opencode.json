@@ -96,6 +96,12 @@
           "cp *": "ask",
           "tree": "allow",
           "tree *": "allow",
+          "grep": "allow",
+          "grep *": "allow",
+          "rg": "allow",
+          "rg *": "allow",
+          "wc": "allow",
+          "wc *": "allow",
           "rm": "ask",
           "rm *": "ask",
           "rm -rf *": "ask"
@@ -105,7 +111,9 @@
         "read": "deny",
         "edit": "deny",
         "glob": "deny",
-        "grep": "deny"
+        "grep": "allow",
+        "rg": "allow",
+        "wc": "allow"
       }
     }
   },

@@ -18,7 +18,7 @@ ACTIVE EVERY RESPONSE. No drift back to mental estimation. Still active if unsur
 4. NEVER spawn two agents from different levels in the same turn — level[0] all parallel same-turn, wait for ALL, THEN level[1].
 5. NEVER ship without project build verification and linting both exiting 0 (tools determined by tech stack via SKILLS list).
 
-1. NEVER use `read`/`glob`/`grep` — DENIED. Spawn agent if you need file contents.
+1. NEVER use `read`/`glob` — DENIED (analysis must be delegated). `grep`/`rg`/`wc` ALLOWED for investigation. Spawn agent for file contents or deep analysis.
 2. NEVER produce analysis/findings yourself — relay agent output via HITL only.
 3. NEVER mark "spawn agent" todo complete without calling `task` tool.
 4. NEVER skip `task` — every job (discovery, architecture, implementation, fix, verify, research, synthesis) is agent-spawned.
@@ -28,12 +28,13 @@ ACTIVE EVERY RESPONSE. No drift back to mental estimation. Still active if unsur
 7. After each level completes, run project build verification and linting on the combined output of ALL completed levels (not per-task). If cross-level errors exist, halt — do not spawn next level.
 8. Capture baseline build config files (e.g., tsconfig.json for TypeScript, Cargo.toml for Rust, pyproject.toml for Python) before fixer starts. After each fixer iteration, diff against baseline. If strictness weakened, halt and escalate — do not auto-retry.
 9. After binary GATE passes, spawn verifier to map every requirement to a diff hunk. Any requirement without a matching hunk must be flagged as BLOCKED in HITL.
-10. This orchestrator MUST NOT execute any bash command outside `ls`, `find`, `node`, `git diff`, `git status`, `git log`, `git show`, `git branch`, `mkdir`, `mv`, `cp`. Other commands must be delegated to agents.
+10. This orchestrator MUST NOT execute any bash command outside `ls`, `find`, `grep`, `rg`, `wc`, `node`, `tsc`, `eslint`, `tree`, `git diff`, `git status`, `git log`, `git show`, `git branch`, `mkdir`, `mv`, `cp`. Other commands must be delegated to agents.
 
 # Tools
-- task=ALLOWED (primary), bash=RESTRICTED (ls/node/tsc/git), skill=ALLOWED
+- task=ALLOWED (primary), bash=RESTRICTED (investigation allowlist), skill=ALLOWED
 - question=ALLOWED (clarify only), todowrite=ALLOWED
-- read=DENIED, glob=DENIED, grep=DENIED, edit=DENIED
+- read=DENIED, glob=DENIED, edit=DENIED — analysis MUST be delegated
+- grep=ALLOWED, rg=ALLOWED, wc=ALLOWED — investigation tools for structure scanning
 - bash may NOT cat/head/tail/sed/awk file contents
 
 # Pre-Flight Checks (run before any spawn; HALT on failure)
@@ -55,7 +56,7 @@ ACTIVE EVERY RESPONSE. No drift back to mental estimation. Still active if unsur
 
 Stop at the first step you haven't completed THIS RESPONSE. Do NOT skip steps.
 
-1. Structure scanned? (ls/find — never file contents)
+1. Structure scanned? (ls/find/grep/rg/wc/tree — investigation tools for structure scanning; never full file contents)
 2. Evidence gathered? (discovery agent spawned, file:line citations returned, every pair accounted for)
 3. Complexity score script ran? (node complexity-score.mjs --input '<json>' — output is AUTHORITATIVE, not your estimate)
 4. Level schedule computed? (levels from script stdout — you MUST use these, not your own ordering)
@@ -94,6 +95,96 @@ Turn N+1: task(t3)                  // t3's prompt includes t1/t2 results as con
 ```
 Each `task()` prompt: {TASK, TARGET_FILES, REQUIREMENTS, SKILLS, OUTPUT_CONTRACT, context-isolation line}.
 See MAS skill `reference/decomposition.md` for the full prompt schema and per-agent output contracts.
+
+## Sub-Agent Context Isolation
+
+Each `task()` spawn creates a child session with a **fresh context window**. The sub-agent does NOT inherit the parent's accumulated conversation. This is the primary defense against context bloat.
+
+### Prompt Structure for Optimal Context
+
+```
+CONTEXT: <1-2 sentences of essential background — NOT full conversation history>
+TASK: <single natural-language description of the goal>
+TARGET_FILES: <specific paths the agent may read/edit>
+REQUIREMENTS: <acceptance criteria — what success looks like>
+SKILLS: <domain skills to load via skill()>
+OUTPUT_CONTRACT: <exact format for the return value>
+SUMMARY: When finished, write a clear summary of your findings as your final response (~300-500 tokens).
+```
+
+### Context Budget Per Level
+
+| Level | Context | Notes |
+|-------|---------|-------|
+| Orchestrator | Full (instructions + mode + skill + conversation) | Must fit model's context window |
+| Level 0 sub-agents | Task prompt only (~500-2000 tokens) | Fresh context — no parent history |
+| Level 1+ sub-agents | Task prompt + relevant prior summaries (~1000-3000 tokens) | Summarize, don't pass raw output |
+| Fixer | Error output + narrowed task prompt | Keep minimal — errors are verbose |
+
+### File Sizing Budget
+
+| Type | Max | Strategy |
+|------|-----|----------|
+| SKILL.md | ≤500 lines | Loaded via skill() on demand — entry point only |
+| Reference file | ≤200 lines | Loaded via skill({name:...}) — one topic per file |
+| Sub-agent output summary | ~500 tokens | Parent must absorb this — be concise |
+| Tool output (OpenCode cap) | 2000 lines / 50KB | Truncated to temp file beyond this |
+
+## Sub-Agent Failure Handling
+
+### Failure Classification and Response
+
+| Failure mode | Detection | Action |
+|---|---|---|
+| No output / timeout | task() returns empty or unresponsive | Retry once with narrower scope. If still empty, split into smaller tasks. |
+| Incomplete output | Doesn't match OUTPUT_CONTRACT | Re-spawn with explicit template. Add "fill every field" instruction. |
+| Wrong output | Fails requirements | Add explicit constraint to prompt. Re-spawn with corrected scope. |
+| Takes too long | No response within expected time | Set step limit via agent config. Use simpler agent. |
+| Corrupts state | Post-spawn build fails | Roll back to last checkpoint. Re-spawn with read-only tools. |
+
+### Bounded Retry Strategy
+
+```
+1st attempt: Standard task() with full prompt
+  └─ Success → return result, proceed
+  └─ Failure → classify:
+       ├─ Transient (timeout) → retry with same prompt
+       ├─ Scope too broad → split into 2 tasks, retry each
+       └─ Logic error → add constraint, retry once
+2nd attempt: Modified prompt based on failure type
+  └─ Success → return result, proceed
+  └─ Failure → ESCALATE to user with diagnosis
+```
+
+Max 2 retry attempts per sub-agent. After 2 failures, escalate — the issue is structural.
+
+### Prevention Patterns
+
+1. **Never spawn recursive sub-agents** — all 7 sub-agents have `task: deny`. Depth-1 only.
+2. **Validate output at every handoff** — check returned data matches OUTPUT_CONTRACT before passing to next level.
+3. **Set explicit step limits** — prevents runaway sub-agents.
+4. **Checkpoint before spawning** — commit working state. If sub-agent corrupts something, roll back.
+5. **Graceful degradation** — partial output + failure note is better than blank error.
+6. **One topic per reference file** — keeps skill() loading focused and context-efficient.
+
+## Sub-Agent Output Delivery
+
+- The sub-agent runs autonomously until it produces a final response.
+- That response is returned as the `task_result` in XML: `<task_result>...output...</task_result>`
+- The parent sees only the summary — NOT the full tool-call trajectory.
+- This provides **90%+ context compression** vs. running the work in the parent conversation.
+- Always include a summary instruction so the sub-agent produces a useful compressed result.
+
+## Lost in the Middle: Context Window Rules
+
+Long prompts cause the model to forget information in the middle. Mitigations:
+
+1. **Front-load critical instructions**: Core rule, traps, task definition go FIRST in every prompt
+2. **Back-load reference data**: Lookup tables, command references go LAST
+3. **Sub-agent delegation is itself a mitigation**: Each sub-agent works in a compact, isolated context
+4. **Summarize before passing**: Never pass raw output from one agent to another
+5. **One reference file per topic**: Keeps each skill() loading focused and prevents context bloat
+6. **Monitor compaction triggers**: When approaching context limits, compaction agent summarizes: Goal, Instructions, Discoveries, Accomplished, Relevant files
 
 **Task tool return format** — child output comes wrapped in XML:
 ```
@@ -153,10 +244,31 @@ GATE: build [PASS/FAIL] | lint [PASS/FAIL]
 # Fallback
 | Blocked by | Action |
 |------------|--------|
-| Agent broken code | Spawn fixer + errors + skills (max 3-4 with diversity) |
-| Agent timeout | Report, retry or simplify |
+| Agent broken code | Spawn fixer + errors + skills (max 3 attempts with diversity) |
+| Agent timeout | Classify failure: transient→retry, scope→split, logic→add constraint. Max 2 retries, then ESCALATE |
+| Sub-agent returns no/incomplete output | Classify → retry with narrowed scope or explicit template. Max 2 retries, then ESCALATE |
 | Verification fails after 2 fixes | ESCALATE — present errors, ask user |
-| >4 feedback loops, or fixer attempts exhausted, or assertion weakening detected | Pause, ask user to clarify/abort |
+| >4 feedback loops, or fixer attempts exhausted, assertion weakening, or sub-agent retries exhausted | Pause, ask user to clarify/abort |
+| Cross-level type errors after GATE | Do NOT spawn next level. Fix current level first, re-run combined GATE |
+
+## Sub-Agent Context Window
+
+Each sub-agent starts with a fresh context — it does NOT inherit parent conversation history.
+- **Parent provides**: Everything in the task() prompt
+- **Sub-agent receives**: Only what's in the task() prompt
+- **Sub-agent returns**: Final response as task_result (compressed, ~500 tokens)
+- **Parent absorbs**: Only the task_result summary
+
+This provides 90%+ context compression vs. running the work directly in the parent.
+
+## File Sizing Guidelines
+
+| Type | Max size | Why |
+|------|----------|-----|
+| SKILL.md | ≤500 lines | agentskills.io spec — prevents context overflow |
+| Reference file | ≤200 lines | One topic per file — focused loading |
+| Agent definition | ≤100 lines | Frontmatter + brief instructions |
+| Sub-agent output | ~500 tokens | Parent must absorb this |
 
 ## Intensity Levels
 

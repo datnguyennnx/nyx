@@ -48,8 +48,6 @@ function assert(name, condition, detail = "") {
 
   assert("S1 H_norm", approx(out.H_norm, 0.9183, 0.01), `got ${out.H_norm}`);
   assert("S1 D_JS", approx(out.D_JS, 0, 0.001), `got ${out.D_JS}`);
-  assert("S1 I_norm", approx(out.I_norm_coupling_proxy, 0.6667, 0.01), `got ${out.I_norm_coupling_proxy}`);
-  assert("S1 C_T", approx(out.C_T, 0.7925, 0.01), `got ${out.C_T}`);
   assert("S1 levels", JSON.stringify(out.levels) === JSON.stringify([["t2"], ["t1"]]), `got ${JSON.stringify(out.levels)}`);
   assert("S1 sequentialRequired", out.routing.sequentialRequired === true);
   assert("S1 parallelSafe", out.routing.parallelSafe === false);
@@ -69,8 +67,6 @@ function assert(name, condition, detail = "") {
 
   assert("S2 H_norm", approx(out.H_norm, 1.0, 0.001), `got ${out.H_norm}`);
   assert("S2 D_JS", approx(out.D_JS, 0, 0.001), `got ${out.D_JS}`);
-  assert("S2 I_norm", approx(out.I_norm_coupling_proxy, 0, 0.001), `got ${out.I_norm_coupling_proxy}`);
-  assert("S2 C_T", approx(out.C_T, 1.0, 0.001), `got ${out.C_T}`);
   assert("S2 levels", JSON.stringify(out.levels) === JSON.stringify([["t1", "t2"]]), `got ${JSON.stringify(out.levels)}`);
   // parallelSafe/sequentialRequired are informational — levels drives scheduling.
   // With no edges, all tasks are in one level (parallel-safe by schedule).
@@ -86,8 +82,7 @@ function assert(name, condition, detail = "") {
 
   assert("S3 H_norm", approx(out.H_norm, 0, 0.001), `got ${out.H_norm}`);
   assert("S3 D_JS", approx(out.D_JS, 0, 0.001), `got ${out.D_JS}`);
-  assert("S3 C_T", approx(out.C_T, 0, 0.001), `got ${out.C_T}`);
-  // Single task: C_total = 0.4*0 + 0.3*(1-0) + 0.2*0 + 0.1*0 = 0.3 > 0.25, so fastLane is false
+  // Single task: C_total = 0.44*0 + 0.33*(1-0) + 0.22*0 = 0.33 > 0.25, so fastLane is false
   assert("S3 fastLane", out.routing.fastLane === false);
   assert("S3 levels", JSON.stringify(out.levels) === JSON.stringify([["t1"]]));
 }
@@ -145,8 +140,6 @@ function assert(name, condition, detail = "") {
 
   assert("S6 H_norm", approx(out.H_norm, 0.962, 0.02), `got ${out.H_norm}`);
   assert("S6 D_JS > 0", out.D_JS > 0, `got ${out.D_JS}`);
-  assert("S6 I_norm > 0", out.I_norm_coupling_proxy > 0, `got ${out.I_norm_coupling_proxy}`);
-  assert("S6 C_T", out.C_T > 0, `got ${out.C_T}`);
 
   // Check level structure: t1, t2, t4 in level 0 (order doesn't matter), t3 in level 1
   const l0 = out.levels[0].sort();

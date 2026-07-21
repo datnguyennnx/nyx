@@ -1,3 +1,7 @@
+---
+name: mas-verification
+description: "Reference for binary GATE, meta-cognition, soft confidence, semantic verification, and TECA overthink detection in ship-mas orchestration."
+---
 # GATE
 ```
 Project build verification and linting must both exit 0 (e.g., tsc --noEmit for TypeScript, cargo check for Rust, pytest for Python).

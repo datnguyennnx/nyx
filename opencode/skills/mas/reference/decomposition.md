@@ -1,3 +1,7 @@
+---
+name: mas-decomposition
+description: "Reference for complexity scoring, DAG scheduling, edge taxonomy, and per-level GATE in ship-mas orchestration."
+---
 # Topology
 L0: ship-mas = classify, decompose, spawn, verify, HITL
 L1: Generic agents (discovery, architect, implementer, fixer, verifier) = direct tool access, domain skills via `skill` tool
@@ -137,3 +141,92 @@ Common stacks:
 | Java | javac/mvn compile | checkstyle | mvn test |
 
 The orchestrator does NOT hardcode any specific tool. Each spawned agent uses its SKILLS list and project context to select the appropriate verification tools.
+
+# Managing the Sub-Agent Context Window
+
+Sub-agents spawned via `task()` get a **fresh context window** — they do NOT inherit the parent orchestrator's accumulated conversation. This is the primary defense against context bloat. Design each task() prompt accordingly.
+
+## Context Isolation Rules
+
+| Rule | Why |
+|------|-----|
+| Sub-agent starts with ZERO parent context | Prevents 100K+ token conversations from being copied to every child |
+| Only pass what's in the `task()` prompt | The prompt is the sub-agent's entire world model |
+| Never pass full conversation history | Defeats the purpose of context isolation |
+| Include a clear output contract | The sub-agent's response is compressed to ~500 tokens when returned |
+
+## Optimal File Sizing
+
+| File Type | Max Size | Why |
+|-----------|----------|-----|
+| SKILL.md body | ≤500 lines | agentskills.io spec limit; prevents context overflow |
+| Reference file | ≤200 lines | Loaded on demand; keep focused per topic |
+| Agent definition | ≤100 lines | Frontmatter + brief instructions only |
+| Sub-agent output summary | ~500 tokens | Parent must absorb this; keep concise |
+| Tool output (untruncated) | 2000 lines / 50KB | OpenCode's built-in truncation boundary |
+
+## Sub-Agent Prompt Structure
+
+Every `task()` prompt should follow this optimized structure:
+
+```
+CONTEXT: <1-2 sentences of essential background only>
+TASK: <single, natural-language description of what to do>
+TARGET_FILES: <specific paths the agent may modify>
+REQUIREMENTS: <acceptance criteria — what success looks like>
+OUTPUT_CONTRACT: <exact format for the return value>
+SKILLS: <domain skills to load>
+SUMMARY: When finished, write a clear summary of your findings/ changes as your final response. This summary will be returned to the parent orchestrator. Be concise — aim for 300-500 tokens.
+```
+
+## Failure Handling Patterns
+
+| Failure mode | Detection | Action |
+|---|---|---|
+| Sub-agent returns no output | task() returns empty or times out | Retry once with stricter scope. If still empty, split into smaller sub-tasks. |
+| Sub-agent returns incomplete output | Output doesn't match OUTPUT_CONTRACT | Re-spawn with explicit template. Add "fill every field" instruction. |
+| Sub-agent takes too long | No response within expected time | Set explicit step limits. Use simpler agent type. |
+| Sub-agent corrupts shared state | Post-spawn build fails | Roll back to last checkpoint. Re-spawn with read-only tools first. |
+| Hallucination propagation | Output cites files/lines that don't exist | Add "only cite what you actually observed" to prompt. Verify citations post-spawn. |
+
+## Sub-Agent Bounded Retry Strategy
+
+```
+1st attempt: Standard task() with full prompt
+  └─ Success → return result
+  └─ Failure → classify:
+       ├─ Transient (timeout, rate limit) → retry with same prompt, exponential backoff
+       ├─ Scope too broad → split into 2 smaller tasks, retry each
+       └─ Logic error → add explicit constraint to prompt, retry once
+2nd attempt: Modified prompt based on failure classification
+  └─ Success → return result
+  └─ Failure → ESCALATE to user with failure summary
+```
+
+Max 2 retry attempts per sub-agent. After 2 failures, the issue is structural — do not auto-retry.
+
+## Context Budget Allocation Per Level
+
+| Pipeline Stage | Context budget | Notes |
+|----------------|---------------|-------|
+| Orchestrator (ship-mas) | Full (instructions + mode + mas skill + conversation) | Must fit within model's context window |
+| Level 0 sub-agents | Task prompt only (~500-2000 tokens) | Fresh context per agent |
+| Level 1 sub-agents | Task prompt + Level 0 output summaries (~1000-3000 tokens) | Include only relevant summaries |
+| Level N sub-agents | Task prompt + accumulated summaries from prior levels | Each level adds ~500 tokens max |
+| Fixer sub-agent | Error output + task prompt | Keep minimal — errors are already verbose |
+
+## Reference File Loading Strategy
+
+- **SKILL.md**: Loaded on demand via `skill()` tool. Keep < 500 lines. This is the entry point.
+- **Reference files**: Also loaded on demand via `skill({name: "mas-decomposition"})`. Each reference should cover ONE topic. Keep < 200 lines.
+- **Never nest references deeper than 1 level**: SKILL.md → reference/file.md [PASS]. SKILL.md → reference/subdir/file.md [FAIL]. Deep nesting causes partial reads (agent may only `head -100`).
+
+## "Lost in the Middle" Mitigation
+
+Long prompts cause the model to forget information in the middle. Mitigations:
+
+1. **Front-load critical instructions**: Core rule, traps, and task definition go FIRST
+2. **Back-load reference data**: Lookup tables, command references go LAST
+3. **Avoid long lists in the middle**: Tables > 10 rows should be in reference files
+4. **Sub-agent delegation is itself a mitigation**: Each sub-agent works in a compact context
+5. **Summarize before passing**: Never pass raw output from one agent to another — summarize to ~500 tokens first
