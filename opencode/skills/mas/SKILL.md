@@ -1,6 +1,6 @@
 ---
 name: mas
-description: Use when orchestrating multi-agent shipping pipelines — decomposing work into parallel tasks, spawning agents level-by-level from evidence-gated dependency graphs, and verifying output with a binary compilation gate. Covers complexity scoring via hybrid ensemble (min-cut + modularity + conductance + legacy entropy), Kahn-scheduled DAG execution, 3-level edge taxonomy (BLOCKING/PARALLEL/WRITE), evidence coupling, fixer bounded retry, meta-cognition gating, satisficing confidence checks, TECA overthink detection, human handoff framework, and HITL feedback classification. Use ONLY for MAS orchestration — not for single-agent tasks or direct code edits.
+description: Use when orchestrating multi-agent shipping pipelines — decomposing work into parallel tasks, spawning agents level-by-level from evidence-gated dependency graphs, and verifying output with a binary compilation gate. Covers complexity scoring via hybrid ensemble (min-cut + modularity + conductance + legacy entropy), Kahn-scheduled DAG execution, 3-level edge taxonomy (BLOCKING/PARALLEL/WRITE), evidence coupling, implementer re-spawn with corrected instructions, meta-cognition gating, satisficing confidence checks, TECA overthink detection, human handoff framework, and HITL feedback classification. Use ONLY for MAS orchestration — not for single-agent tasks or direct code edits.
 ---
 
 # MAS Orchestration
@@ -32,9 +32,9 @@ Before any agent spawn, run these checks. Halt on failure.
 |---|-------|------------|
 | 1 | Load `mas` skill | Retry; if still fails → escalate |
 | 2 | Confirm `node --version` and complexity-score.mjs exists | Escalate — node or script missing |
-| 3 | Recursion lock: confirm all 7 sub-agents have `task: deny` | Halt + escalate |
+| 3 | Recursion lock: confirm all 3 sub-agents have `task: deny` | Halt + escalate |
 
-The 7 sub-agents are: discovery, architect, implementer, fixer, verifier, researcher (external research via gsearch+CDP), synthesis (cross-cluster report merging for >15 file fan-out).
+The 3 sub-agents are: discovery (file investigation), implementer (code changes), researcher (web research).
 
 See reference/diagnosis.md for diagnosis patterns when failures occur.
 
@@ -67,11 +67,11 @@ User says "change the approach." You immediately re-run discovery + decompositio
 
 **Rule:** Classify feedback first. Only `scope change` and `decision override` trigger re-decomposition. Everything else is a targeted agent re-spawn.
 
-**Trap 5: Letting fixer run unlimited times**
+**Trap 5: Re-spawning implementer without correcting instructions**
 
-Fixer fails. You modify its prompt and re-run. It fails again on a different error. You modify again. This loop can continue indefinitely because each fix can introduce a new error.
+Implementer fails. You modify its instructions and re-spawn. It fails again on a different error. You modify again. This loop can continue indefinitely because each fix can introduce a new error.
 
-**Rule:** Fixer has max 3 attempts. After 3 failures, escalate to the user. Do not modify prompts and retry — the issue is structural, not prompt-quality.
+**Rule:** Max 3 re-spawn attempts with corrected instructions. After 3 failures, escalate to the user. Do not retry with the same instructions — the issue is structural, not prompt-quality.
 
 **Trap 6: Using `explore` for evidence gathering**
 
@@ -104,9 +104,9 @@ This runs on every task ingestion, before any spawn. It prevents over-investment
 
 1. Spawn all tasks in `level[0]` in one turn (parallel)
 2. Wait for ALL to return
-3. Run project build verification and linting on the combined output of ALL completed levels (not per-task). If cross-level type errors exist, halt — do not spawn next level. Spawn fixer (max 3 attempts with diversity — see reference/interaction.md for strategy) before proceeding.
+3. Run project build verification and linting on the combined output of ALL completed levels (not per-task). If cross-level type errors exist, halt — do not spawn next level. Re-spawn implementer with corrected instructions (max 3 attempts — see reference/interaction.md for strategy) before proceeding.
 4. If pass, proceed to `level[1]` with accumulated context
-5. If fail, spawn fixer (max 3 attempts with diversity — see reference/interaction.md for strategy), then escalate
+5. If fail, re-spawn implementer with corrected instructions (max 3 attempts — see reference/interaction.md for strategy), then escalate
 6. Repeat for each level
 
 ## Rationalization Table
@@ -117,8 +117,8 @@ This runs on every task ingestion, before any spawn. It prevents over-investment
 | "I know the codebase, I can skip discovery" | Discovery produces citations, not knowledge. The script needs evidence, not your memory |
 | "No coupling found for this pair = parallel-safe" | Only explicit **P-PARALLEL** with positive confirmation = parallel. Absence of evidence is not evidence of absence |
 | "tsc passed with one warning, close enough" | Build verification is pass/fail. A diagnostic (warning or error) means it fails — fix it or it blocks |
-| "I'll re-decompose since the user changed the approach" | Classify: approach change → architect. Scope change → re-decompose. Don't re-decompose for every word |
-| "Fixer failed once, I'll tweak the prompt and retry" | Fixer gets 3 tries. After that, escalate — the issue is structural |
+| "I'll re-decompose since the user changed the approach" | Classify: approach change → orchestrator redesigns. Scope change → re-decompose. Don't re-decompose for every word |
+| "Implementer failed once, I'll tweak the instructions and retry" | Max 3 re-spawn attempts. After that, escalate — the issue is structural |
 | "I'll use `explore` for discovery, it's faster" | `explore` doesn't produce structured citations. Use `discovery` — it's built for evidence contracts |
 | "These tasks are in different files, they're independent" | Check shared type imports. If both import from a shared type file being modified, they're coupled |
 | "This task is small, I don't need the meta-cognition gate" | Meta-cognition runs in constant time and may route SIMPLE tasks to fast lane — skipping it costs nothing but skipping it blindly loses the fast-lane shortcut |
@@ -144,16 +144,16 @@ This runs on every task ingestion, before any spawn. It prevents over-investment
 ### Gate compliance
 - Build verification exited 0 — binary pass, not "almost"
 - Linting exited 0 — binary pass, not "almost"
-- Fixer ran at most 3 times per failure — if 3 failures, escalate
+- Implementer re-spawned at most 3 times per failure — if 3 failures, escalate
 
 ### Delegation hygiene
 - No diff touches files outside `target_files`
 - Every `task()` prompt included a SKILLS list for domain context
 - `complexity-score.mjs` ran and returned `levels` — you did not estimate
 - `hitl_rounds` < 4 — at 4th, pause and ask user
-- Fixer baseline config captured before iteration 1 (assertion weakening guard active)
-- `verifier` agent spawned for each completed level — output independently audited
-- For structural changes >3 files, `architect` agent was spawned before implementers
+- Implementer baseline config captured before iteration 1 (assertion weakening guard active)
+- orchestrator checks each level's output against requirements — independent of implementer self-check
+- For structural changes >3 files, orchestrator produced a plan before implementers
 
 ### Meta-cognition integrity
 - Difficulty assessment recorded (SIMPLE / MEDIUM / COMPLEX)

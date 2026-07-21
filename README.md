@@ -1,6 +1,6 @@
 # nyx
 
-Seven-agent ship-mas topology: discovery → architect → implementer → fixer → verifier, with researcher (external research) and synthesis (>15 file fan-out). Two-layer architecture: a stateless orchestrator (L0) applies evidence-gated, deterministic decomposition over task graphs, then delegates execution to spawned LLM agents (L1) with bounded retry, binary GATE, and meta-cognition gating.
+Three-agent ship-mas topology: discovery (file investigation), implementer (code changes), researcher (web research). Orchestrator handles design, verification, and reconciliation directly.
 
 ## Quick Start
 
@@ -52,7 +52,7 @@ User → ship-mas
   │ for each level in levels:
   │   spawn all level tasks in parallel
   │   GATE: build verification + linting (binary — never averaged)
-  │   FAIL → fixer (max 3, diversity strategy) → ESCALATE
+  │   FAIL → re-spawn implementer with corrected instructions → ESCALATE if persistent
   │   PASS → soft confidence (framing only)
   └─ HITL: pure presentation — no questions, no approval gate
 ```
@@ -62,7 +62,7 @@ User → ship-mas
 - Orchestrator never analyzes code — every analytical task delegated to spawned agent
 - No file modified by two parallel tasks (script-enforced disjointness)
 - Binary GATE — never averaged with soft signals
-- Fixer: max 3 iterations with diversity, then ESCALATE
+- Implementer failures: max 3 re-spawn attempts with corrected instructions, then ESCALATE
 - All sub-agents have `task: deny` (recursion lock)
 - Sub-agent gets fresh context window — no parent conversation inheritance
 

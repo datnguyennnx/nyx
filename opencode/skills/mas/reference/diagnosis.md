@@ -1,6 +1,6 @@
 ---
 name: mas-diagnosis
-description: "Reference for diagnosing MAS orchestration failures: cross-level type errors, parallel conflicts, GATE-pass mismatch, feedback loops, and assertion weakening."
+description: "Diagnosis guide for common MAS orchestration failures: cross-level type errors, parallel implementer conflicts, GATE-pass mismatch, feedback loops, and re-spawn assertion weakening."
 ---
 
 # How to Diagnose Failures (not just fix them)
@@ -11,7 +11,7 @@ description: "Reference for diagnosing MAS orchestration failures: cross-level t
 
 **Root cause:** Level N output was not verified before Level N+1 started. The GATE ran on each task individually, but no cross-level contract check was done.
 
-**Fix:** Apply the per-level combined GATE (see reference/decomposition.md). Before spawning Level N+1, run project build verification and linting on the combined output of all completed levels. If cross-level type errors exist, spawn fixer (max 3 attempts with diversity) before proceeding.
+**Fix:** Apply the per-level combined GATE (see reference/decomposition.md). Before spawning Level N+1, run project build verification and linting on the combined output of all completed levels. If cross-level type errors exist, re-spawn implementer with corrected instructions (max 3 attempts) before proceeding.
 
 **Prevention:** If you know a task changes a shared interface, add a **P-BLOCKING** edge (producer → consumer). The script will put the producer in an earlier level.
 
@@ -33,7 +33,7 @@ description: "Reference for diagnosing MAS orchestration failures: cross-level t
 
 **Fix:** Before HITL, map every requirement to a specific diff hunk. If a requirement has no matching diff, flag it as BLOCKED — do not present it as done.
 
-**Prevention:** Include acceptance criteria in every `implementer` task prompt. The verifier agent should check against these criteria, not just code style.
+**Prevention:** Include acceptance criteria in every `implementer` task prompt. The orchestrator should check output against these criteria, not just code style.
 
 ## Failure: Feedback loops never converge
 
@@ -42,19 +42,19 @@ description: "Reference for diagnosing MAS orchestration failures: cross-level t
 **Root cause:** Feedback is not being classified before acting. Every piece of feedback is treated as a re-spawn, even when it contradicts previous decisions or changes scope.
 
 **Fix:** Classify each feedback message before re-spawning:
-- **Approach change** ("use X instead of Y") → spawn architect, not implementer
+- **Approach change** ("use X instead of Y") → orchestrator redesigns approach, then passes to implementer
 - **Implementation redo** ("this logic is wrong") → spawn implementer for affected files only
 - **Scope change** ("also add feature Z") → re-decompose with expanded scope — flag scope creep to the user
 - **Minor tweak** ("change this color") → direct agent spawn, no re-decompose
 
 **Prevention:** Track `hitl_rounds`. At round 4, pause and ask the user to clarify or abort. Do not auto-continue past 3.
 
-## Failure: Fixer weakens the gate instead of fixing the output
+## Failure: Re-spawn weakens the gate instead of fixing the output
 
-**Symptom:** Fixer returns "passed" but the build config (e.g., tsconfig.json, .eslintrc, Cargo.toml, pyproject.toml) has been relaxed (strict → false, rules downgraded from error to warn).
+**Symptom:** Re-spawn returns "passed" but the build config (e.g., tsconfig.json, .eslintrc, Cargo.toml, pyproject.toml) has been relaxed (strict → false, rules downgraded from error to warn).
 
-**Root cause:** The fixer found it easier to weaken the gate criteria than to fix the actual code. This is a documented failure mode in autonomous repair systems (arXiv 2605.01471).
+**Root cause:** A re-spawn might weaken the gate criteria instead of fixing the actual code. This is a documented failure mode in autonomous repair systems (arXiv 2605.01471).
 
-**Fix:** Capture baseline build config before fixer starts. Diff after each iteration. If strictness weakened, halt and escalate — do NOT auto-retry. See reference/interaction.md for detection rules.
+**Fix:** Capture baseline build config before first implementer spawn. Diff after each re-spawn. If strictness weakened, halt and escalate — do NOT auto-retry. See reference/interaction.md for detection rules.
 
-**Prevention:** The GATE configuration must be immutable from the fixer's perspective. Fixer can only modify target files, not build configuration.
+**Prevention:** The GATE configuration must be immutable from the implementer's perspective. Implementer can only modify target files, not build configuration.

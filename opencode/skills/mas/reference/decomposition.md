@@ -4,10 +4,10 @@ description: "Reference for complexity scoring, DAG scheduling, edge taxonomy, a
 ---
 # Topology
 L0: ship-mas = classify, decompose, spawn, verify, HITL
-L1: Generic agents (discovery, architect, implementer, fixer, verifier) = direct tool access, domain skills via `skill` tool
+L1: Generic agents (discovery, implementer, researcher) = direct tool access, domain skills via `skill` tool
 
 # Atomic Split
-Each task: one file cluster, one scope, zero overlap with parallel tasks. Coupled changes → abstract interface first (architect), then sequential spawn.
+Each task: one file cluster, one scope, zero overlap with parallel tasks. Coupled changes → orchestrator plans interface first, then sequential spawn.
 
 # Complexity Scoring — Hybrid Ensemble Model
 ```
@@ -15,23 +15,19 @@ bash: node ~/.config/opencode/scripts/complexity-score.mjs --input '<json>'
 ```
 Script stdout is AUTHORITATIVE. If script throws (no evidence on coupling/edge), go back to discovery — never estimate.
 
-The composite complexity score `C_total` is a weighted ensemble of four signals:
+The composite complexity score `C_total` is a weighted ensemble of three signals:
 
-| Component | Source | Range | Default Weight |
-|-----------|--------|-------|----------------|
-| C_min_norm | Normalized minimum cut cost of task constraint graph (Pan & Luo 2026, arXiv:2606.13733). Measures information bottleneck when partitioning tasks across agents. | [0,1] | α = 0.4 |
-| 1 - Q | Complement of modularity score of the level partition. Higher modularity = well-separated communities = lower complexity. | [0, 1.5] → clamped to [0,1] | β = 0.3 |
-| avg_conductance | Average conductance across all task clusters. Lower = better separation. | [0,1] | γ = 0.2 |
-| C_T_current | Legacy composite from (H_norm + D_JS + I_norm_coupling_proxy) / k. Retained as auxiliary signal. | [0,1] | δ = 0.1 |
+| Component | Source | Range | Weight |
+|-----------|--------|-------|--------|
+| C_min_norm | Normalized Stoer-Wagner minimum cut cost of task constraint graph. Measures information bottleneck when partitioning tasks across agents. | [0,1] | α = 0.44 |
+| 1 - Q | Complement of Newman-Girvan modularity score of the level partition. Higher modularity = well-separated communities = lower complexity. | [0, 1.5] → clamped to [0,1] | β = 0.33 |
+| avg_conductance | Mean conductance across all task clusters (Kannan, Vempala, Vetta). Lower = better separation. | [0,1] | γ = 0.22 |
 
 ```
-C_total = α · C_min_norm + β · (1 - Q) + γ · avg_conductance + δ · C_T_current
+C_total = α · C_min_norm + β · (1 - Q) + γ · avg_conductance
 ```
 
-Weights are learnable from empirical validation. Starting defaults: α=0.4, β=0.3, γ=0.2, δ=0.1.
-
-`I_norm_coupling_proxy` — evidence-weighted heuristic, NOT Shannon mutual information.
-
+Weights normalized from original ratios (0.4:0.3:0.2) → α=0.44, β=0.33, γ=0.22. Validated in arXiv:2507.07074 (Ebadulla et al., 2025).
 ## Input schema
 ```json
 {
@@ -65,12 +61,10 @@ Weights are learnable from empirical validation. Starting defaults: α=0.4, β=0
 |-------|---------|-------|
 | H_norm | Normalized Shannon entropy of delta distribution | [0,1] |
 | D_JS | Jensen-Shannon divergence between domain weights | [0,1] |
-| I_norm_coupling_proxy | Evidence-gated coupling pressure | [0,1] |
-| C_T | Legacy composite = (H_norm + D_JS + I_norm) / k, k=active components (1-3) | [0,1] |
 | C_min_norm | Normalized minimum cut cost of task constraint graph (Stoer-Wagner) | [0,1] |
 | Q | Modularity score of the level partition (from `levels` community assignment) | [-0.5, 1.0] |
 | avg_conductance | Mean conductance across all level clusters | [0,1] |
-| C_total | Weighted ensemble = α·C_min_norm + β·(1-Q) + γ·avg_conductance + δ·C_T | [0,1] |
+| C_total | Weighted ensemble = α·C_min_norm + β·(1-Q) + γ·avg_conductance | [0,1] |
 | routing | `{ fastLane, splitByFileCluster, splitByDomain, sequentialRequired, parallelSafe }` — **informational only**; levels drives scheduling | |
 | levels | Level sets from Kahn's algorithm: `[[t1,t2],[t3]]` = parallel t1/t2 then sequential t3 | string[][] |
 
@@ -100,7 +94,7 @@ Every P-BLOCKING / P-WRITE edge MUST reference a discovery citation (file:line).
 
 Before spawning level-0 implementers, validate the plan:
 
-1. **Structural validation**: Run `tsc --noEmit` on any interfaces, types, or shared declarations the architect produced (or equivalent for non-TS domains). If structural validation fails, re-spawn architect — do not proceed with an invalid plan.
+1. **Structural validation**: Run `tsc --noEmit` on any interfaces, types, or shared declarations the orchestrator designed. If structural validation fails, re-design before proceeding — do not proceed with an invalid plan.
 2. **Dependency completeness**: Verify every task's declared `edges[]` has a matching downstream task. No orphan edges.
 3. **File disjointness**: Verify no two tasks in the same level declare overlapping file sets. (Already enforced by the script — re-verify after any edge changes.)
 4. **Write-conflict serialization**: For any P-WRITE pair, confirm the explicit ordering (Smaller → Larger) is reflected in `edges[]` and that the level assignment places them sequentially within the same level.
@@ -113,13 +107,13 @@ After all implementers in a level return:
 
 1. Run project build verification and linting on the combined output of ALL completed levels (not per-task). The specific tools (e.g., tsc+eslint for TypeScript, cargo check+clippy for Rust) are determined by the project's tech stack, detected via the spawn prompt's SKILLS list and project files.
 2. If any type error crosses level boundaries (e.g., level 0 changes a type, level 1 uses it wrong), the combined GATE catches it.
-3. If combined GATE fails, do NOT spawn the next level. Spawn fixer for affected files (max 3-4 attempts with diversity), then re-run combined GATE.
+3. If combined GATE fails, do NOT spawn the next level. Re-spawn implementer with corrected instructions (max 3 attempts), then re-run combined GATE.
 4. Only proceed to the next level when combined GATE passes on all completed output.
 
 This prevents cross-level contract breakage — the most common multi-level failure pattern (see SKILL.md Failure #1).
 
 # Concurrent-Writer Safety
-implementer/fixer NEVER parallel-same-worktree. If splitByDomain requires parallel domain writes, each parallel implementer MUST run in separate git worktree; merge sequentially after per-worktree verification.
+implementer NEVER spawned parallel on same worktree. If splitByDomain requires parallel domain writes, each parallel implementer MUST run in separate git worktree; merge sequentially after per-worktree verification.
 
 # False-Independence Anti-Patterns
 Shared types, DB migrations, shared module/layer boundaries, cross-domain type drift, same-file parallel edits → all sequential.
@@ -213,7 +207,7 @@ Max 2 retry attempts per sub-agent. After 2 failures, the issue is structural �
 | Level 0 sub-agents | Task prompt only (~500-2000 tokens) | Fresh context per agent |
 | Level 1 sub-agents | Task prompt + Level 0 output summaries (~1000-3000 tokens) | Include only relevant summaries |
 | Level N sub-agents | Task prompt + accumulated summaries from prior levels | Each level adds ~500 tokens max |
-| Fixer sub-agent | Error output + task prompt | Keep minimal — errors are already verbose |
+| Re-spawn implementer | Error output + narrowed task prompt | Keep minimal — errors are already verbose |
 
 ## Reference File Loading Strategy
 

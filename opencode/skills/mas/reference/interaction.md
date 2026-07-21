@@ -1,6 +1,6 @@
 ---
 name: mas-interaction
-description: "Reference for meta-cognitive assessment, feedback classification, human handoff, and fixer diversity strategy in ship-mas orchestration."
+description: "Reference for meta-cognitive assessment, feedback classification, human handoff, and re-spawn diversity strategy in ship-mas orchestration."
 ---
 
 # Meta-Cognitive Assessment
@@ -25,9 +25,9 @@ The orchestrator performs this assessment once, at task ingestion, and uses it t
 
 | Pattern | Re-entry Action |
 |---|---|
-| Approach change | Re-spawn architect with feedback |
+| Approach change | Orchestrator redesigns approach, passes to implementer |
 | Implementation redo | Re-spawn implementer for affected files |
-| Verification add | Re-spawn verifier with new check |
+| Verification add | Orchestrator adds new check to requirements |
 | Scope change / Feature add | Re-decompose with new scope |
 | Decision override | Re-decompose with corrected approach |
 
@@ -91,24 +91,21 @@ Track in memory: current tasks, completed, pending, HITL rounds. On re-entry: di
 
 ## Assertion Weakening Detection
 
-When the fixer runs, it may attempt to "pass" the GATE by weakening verification criteria rather than fixing the actual output. Documented failure mode in autonomous test repair systems (arXiv 2605.01471).
+When re-spawning implementer after a failure, check that verification criteria are not weakened rather than fixing the actual output. Documented failure mode in autonomous test repair systems (arXiv 2605.01471).
 
 Detection rules:
-1. After each fixer iteration, diff the project's build config files (tsconfig.json, .eslintrc, etc.) against the baseline captured before the fixer started.
+1. After each implementer re-spawn, diff the project's build config files against the baseline captured before the first attempt.
 2. If any strictness setting was relaxed (e.g., strict: true → false, noUnusedLocals: true → false, or eslint rules changed from error → warn), halt immediately.
 3. Do NOT auto-retry after assertion weakening is detected. Escalate to user with the diff of weakened settings.
 
 Response: Write-lock the pipeline. Present the weakened config diff to the user. Require explicit `!continue` to proceed.
 
-## Fixer Iteration Diversity Strategy
+## Re-spawn Diversity Strategy
 
-When the fixer needs multiple iterations (increased from max 2 to max 3-4), use exponential diversity:
+When re-spawning implementer after failure, vary the approach:
 
-| Iteration | Strategy | Reasoning |
-|-----------|----------|-----------|
-| 1 | Direct fix based on error message | Fastest path — works for simple errors |
-| 2 | Re-read surrounding context before fixing | Broader view catches missing imports, type mismatches |
-| 3 | Spawn architect to propose redesign if structural | Complex errors may need redesign, not patching |
-| 4 (if configured) | Escalate — structural issue | After 3 attempts, the problem is structural |
-
-Diversity prevents the fixer from repeating the same wrong approach and increases convergence probability.
+| Attempt | Strategy | Reasoning |
+|---------|----------|-----------|
+| 1 | Pass error output + narrowed file scope | Works for simple errors |
+| 2 | Include broader context (dependencies, related files) | Catches missing imports, interface changes |
+| 3 (if needed) | Escalate — problem may be structural | After 2 attempts, deeper redesign needed |

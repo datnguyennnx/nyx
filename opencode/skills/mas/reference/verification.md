@@ -6,7 +6,7 @@ description: "Reference for binary GATE, meta-cognition, soft confidence, semant
 ```
 Project build verification and linting must both exit 0 (e.g., tsc --noEmit for TypeScript, cargo check for Rust, pytest for Python).
 ```
-- FAIL → spawn fixer (max 2) → still fail → ESCALATE
+- FAIL → re-spawn implementer with corrected instructions (max 3) → still fail → ESCALATE
 - NEVER average with other signals. A failing gate ALWAYS blocks shipping regardless of citation quality or diff integrity.
 - While gate is failing, do NOT compute or display any confidence score. Soft confidence is computed ONLY after gate passes, and only for framing (never affects ship/no-ship).
 
@@ -41,7 +41,7 @@ The meta-cognition gate runs once at task ingestion. It does NOT replace the sta
 ```
 implementer → build+lint GATE
   ├─ PASS → compute soft confidence (framing) → HITL
-  └─ FAIL → fixer (max 2) → still fail → ESCALATE
+  └─ FAIL → re-spawn implementer with corrected instructions → ESCALATE
      (no confidence computed while gate failing)
 ```
 
@@ -63,7 +63,7 @@ NEVER affects ship/no-ship — gate already passed.
 
 # Graduated Verdicts
 
-The GATE produces a binary pass/fail (project build verification and linting (determined by tech stack) exit 0). However, the verifier agent may return a graduated verdict for HITL framing:
+The GATE produces a binary pass/fail (project build verification and linting (determined by tech stack) exit 0). However, the orchestrator may report a graduated verdict for HITL framing:
 
 | Verdict | Condition | Action |
 |---------|-----------|--------|
@@ -80,7 +80,7 @@ After each implementer output, compute soft confidence (formula above). Apply th
 | Confidence | Action |
 |------------|--------|
 | > 0.80 | Ship — skip remaining verification steps |
-| 0.50 - 0.80 | Run 1 verifier pass, then re-check confidence |
+| 0.50 - 0.80 | Orchestrator manually checks output against requirements, then re-check confidence |
 | < 0.50 | Run full verification pipeline (GATE + semantic + citation quality) |
 
 The satisficing gate is the bridge between soft confidence computation and HITL presentation. It decides how much additional verification is warranted before presenting to the user.
@@ -89,7 +89,7 @@ Rule: Satisficing never overrides the binary GATE. If GATE fails and confidence 
 
 # Semantic Gate (Layer 2)
 
-After the binary GATE passes, the verifier agent performs a semantic check:
+After the binary GATE passes, the orchestrator performs a semantic check:
 
 1. Map every requirement to a specific diff hunk (file:line range)
 2. Any requirement with NO matching hunk → flagged as BLOCKED in HITL
