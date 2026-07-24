@@ -1,5 +1,5 @@
 ---
-name: discovery
+name: discoverer
 description: "Reads files, maps structure, reports with file:line citations. Read-only — never modifies files."
 model: opencode-go/deepseek-v4-flash
 hidden: true

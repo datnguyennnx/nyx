@@ -33,7 +33,7 @@ Before any agent spawn, assess the task to allocate the correct pipeline depth. 
 |------------|----------------|--------------|-----------|
 | SIMPLE | 1 | 1 | 0 (satisficing only) |
 | MEDIUM | 2 | 1-2 | 1 (if confidence < 0.8) |
-| COMPLEX | Full discovery + decomposition pipeline | Per schedule | Full GATE |
+| COMPLEX | Full discoverer + decomposition pipeline | Per schedule | Full GATE |
 
 The meta-cognition gate runs once at task ingestion. It does NOT replace the standard discovery/decomposition pipeline — it selects the pipeline depth. A COMPLEX classification forces evidence-gated decomposition (Lever 1). A SIMPLE classification may skip discovery and go direct to implementer if C_total < 0.25 (fast lane).
 

@@ -26,7 +26,7 @@ Max 3 feedback loops. At 4th: pause, ask user. Preserve history. Flag scope cree
 
 ## Human Handoff
 When uncertainty about the correct next action is high:
-- Uncertainty > 0.7 AND steps < 3 → spawn additional discovery/analysis agent
+- Uncertainty > 0.7 AND steps < 3 → spawn additional discoverer/analysis agent
 - Uncertainty > 0.7 AND steps ≥ 3 → ASK USER — present findings + recommendation
 - Uncertainty < 0.3 → proceed (satisficing)
 

@@ -24,7 +24,7 @@ Syncs `opencode/` → `~/.config/opencode` and `agents/` → `~/.agents`. Load `
 | C_total | Pipeline | Behavior |
 |---------|----------|----------|
 | < 0.25 | Fast lane | Skip evidence gathering. Go straight to implementer. |
-| 0.25 — 0.60 | Normal | Full discovery → decomposition → parallel agents → GATE |
+| 0.25 — 0.60 | Normal | Full discoverer → decomposition → parallel agents → GATE |
 | > 0.60 | Full | Maximum caution. Extra verification. Conservative splitting. |
 
 ## Workflow
@@ -34,7 +34,7 @@ User → ship-mas
   │ classify intent → pre-flight checks
   │ The Ladder:
   │   1. Structure scan
-  │   2. Evidence gathering: spawn discovery → file:line citations
+  │   2. Evidence gathering: spawn discoverer → file:line citations
   │   3. complexity-score.mjs → levels
   │   4. Level schedule from script stdout
   │   5. Plan validation
@@ -45,7 +45,7 @@ User → ship-mas
   │ Closed-loop failure path
   │   GATE FAIL → spawn DIAGNOSTICIAN
   │            → re-spawn implementer with diagnosis-informed instructions
-  │            → if still fails → spawn DISCOVERY + RESEARCHER
+  │            → if still fails → spawn DISCOVERER + RESEARCHER
   │            → synthesize → re-spawn with full context
   │            → if still fails → ESCALATE with failure history
   │

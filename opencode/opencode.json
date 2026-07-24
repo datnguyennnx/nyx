@@ -2,7 +2,7 @@
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode-go/deepseek-v4-flash",
   "instructions": [
-     "MAS uses an orchestrator (ship-mas) that decomposes tasks using information-theoretic complexity scoring, spawns agents in parallel via task tool, and verifies output before completing. 4 sub-agents: discovery, diagnostician, implementer, researcher. Agents are self-contained with direct tool access. General/explore agent spawning is blocked in mode to prevent recursion.",
+     "MAS uses an orchestrator (ship-mas) that decomposes tasks using information-theoretic complexity scoring, spawns agents in parallel via task tool, and verifies output before completing. 4 sub-agents: discoverer, diagnostician, implementer, researcher. Agents are self-contained with direct tool access. General/explore agent spawning is blocked in mode to prevent recursion.",
     "CRITICAL: Respect repository rules. Every repo defines agent rules via AGENTS.md and markdown files in its root. Read them as priority instructions. Never skip or override the instruction author."
   ],
   "permission": {
@@ -117,7 +117,7 @@
     }
   },
   "agent": {
-    "discovery": {
+    "discoverer": {
       "permission": {
         "task": "deny"
       }

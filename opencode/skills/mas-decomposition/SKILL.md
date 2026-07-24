@@ -4,7 +4,7 @@ description: "Reference for complexity scoring, DAG scheduling, edge taxonomy, a
 ---
 # Topology
 L0: ship-mas = classify, decompose, spawn, verify, HITL
-L1: Generic agents (discovery, implementer, researcher) = direct tool access, domain skills via `skill` tool
+L1: Generic agents (discoverer, implementer, researcher) = direct tool access, domain skills via `skill` tool
 
 # Atomic Split
 Each task: one file cluster, one scope, zero overlap with parallel tasks. Coupled changes → orchestrator plans interface first, then sequential spawn.
@@ -13,7 +13,7 @@ Each task: one file cluster, one scope, zero overlap with parallel tasks. Couple
 ```
 node ~/.config/opencode/scripts/complexity-score.mjs --input '<json>'
 ```
-Script stdout is AUTHORITATIVE. If script throws, go back to discovery — never estimate.
+Script stdout is AUTHORITATIVE. If script throws, go back to discoverer — never estimate.
 
 C_total = 0.44·min-cut + 0.33·(1-modularity) + 0.22·conductance
   min-cut     = coupling strength (how tightly tasks are coupled)
@@ -73,15 +73,15 @@ C_total serves as the overall complexity gauge — higher C_total suggests more 
 
 # Edge Classification — 3-Level Taxonomy (replaces P1-P6)
 
-Every P-BLOCKING / P-WRITE edge MUST reference a discovery citation (file:line). No citation = no assignment. Every classified edge MUST be compiled into the `edges[]` array passed to complexity-score.mjs — this is what turns classification into an actual schedule. P-PARALLEL pairs produce NO edge (they place both tasks in the same level by default, subject to the script's file-overlap check).
+Every P-BLOCKING / P-WRITE edge MUST reference a discoverer citation (file:line). No citation = no assignment. Every classified edge MUST be compiled into the `edges[]` array passed to complexity-score.mjs — this is what turns classification into an actual schedule. P-PARALLEL pairs produce NO edge (they place both tasks in the same level by default, subject to the script's file-overlap check).
 
 | Level | Name | Condition | Direction | Scheduling |
 |-------|------|-----------|-----------|------------|
 | P-BLOCKING | Blocking | A's output is input to B; or A changes shared contract B uses (type export, API change, interface modification) — **cited** | Producer → Consumer | Sequential (wait) |
-| P-PARALLEL | Parallel | No evidence of coupling; discovery **positively confirmed absence** across all file:line pairs — no citation = not P-PARALLEL | No edge | Same level (parallel) |
+| P-PARALLEL | Parallel | No evidence of coupling; discoverer **positively confirmed absence** across all file:line pairs — no citation = not P-PARALLEL | No edge | Same level (parallel) |
 | P-WRITE | Write-conflict | Both tasks modify same file/resource (even disjoint ranges) — **cited** | Smaller → Larger (or explicit order) | Same file, serialized writes within level |
 
-**Ambiguous**: no evidence of coupling AND no evidence ruling it out → default SEQUENTIAL (not P-PARALLEL). Discovery must positively confirm absence for P-PARALLEL.
+**Ambiguous**: no evidence of coupling AND no evidence ruling it out → default SEQUENTIAL (not P-PARALLEL). Discoverer must positively confirm absence for P-PARALLEL.
 
 ## Plan Validation Before Execution
 

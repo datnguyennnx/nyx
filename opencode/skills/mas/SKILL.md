@@ -18,7 +18,7 @@ If you find yourself thinking "this is simple enough to skip discovery" or "I ca
 
 # Complexity Score
 C_total < 0.25 → fast lane (skip evidence, implementer only)
-C_total 0.25-0.60 → normal pipeline (discovery + decomposition + implementers)
+C_total 0.25-0.60 → normal pipeline (discoverer + decomposition + implementers)
 C_total > 0.60 → full pipeline (maximum caution, extra verification)
 
 Run: node ~/.config/opencode/scripts/complexity-score.mjs --input '<json>'
@@ -28,7 +28,7 @@ Script output is AUTHORITATIVE. Never estimate.
 | Script event | What it means | Your move |
 |---|---|---|
 | Returns levels | Evidence valid, schedule computed | Spawn per levels |
-| Throws "no evidence" | Discovery report is incomplete | Re-run discovery with explicit "cite or state none" per pair |
+| Throws "no evidence" | Discoverer report is incomplete | Re-run discoverer with explicit "cite or state none" per pair |
 | Throws "file overlap" | Same-level tasks share files | Add P-WRITE edge or re-split tasks |
 | Throws "cycle detected" | DAG has cycle | Check P-BLOCKING directions |
 | Returns fastLane: true | C_total < 0.25, single task | Skip evidence, go straight to implementer |
@@ -37,7 +37,7 @@ Script output is AUTHORITATIVE. Never estimate.
 | Type | Condition | Scheduling |
 |---|---|---|
 | P-BLOCKING | A's output is input to B; or A changes shared contract B uses — cited | Sequential (A→B) |
-| P-PARALLEL | Discovery POSITIVELY confirmed no coupling across all file:line pairs | Same level (parallel) |
+| P-PARALLEL | discoverer POSITIVELY confirmed no coupling across all file:line pairs | Same level (parallel) |
 | P-WRITE | Both tasks modify the same file — cited | Serialized within level |
 
 Every edge MUST have an evidence citation. No citation = no assignment. Ambiguous = sequential (not parallel).
@@ -59,7 +59,7 @@ These skills contain the detailed reference material. Load them immediately:
 3. **Averaging the GATE**: Build verification and linting must BOTH exit 0. A warning is a failure. Binary, not "close enough."
 4. **Re-decomposing on every feedback**: Classify feedback first. Only scope change and decision override trigger re-decomposition.
 5. **Re-spawning without correcting instructions**: Max 3 attempts. After 3, escalate — the issue is structural.
-6. **Using explore for evidence**: Using explore for evidence (explore is not a separate agent — use discovery for structured citations with file:line evidence)
+6. **Using explore for evidence**: Using explore for evidence (explore is not a separate agent — use discoverer for structured citations with file:line evidence)
 7. **Orchestrator analyzing files**: You CANNOT read files (read=DENIED). You CANNOT produce analysis. Delegate everything to sub-agents.
 
 # Before Marking Complete

@@ -290,7 +290,7 @@ function computeLevels(tasks, edges) {
     if (!e.evidence) {
       throw new Error(
         `Edge ${e.from} -> ${e.to} has no evidence citation. ` +
-        `Do not encode an ordering constraint discovery didn't verify.`
+        `Do not encode an ordering constraint discoverer didn't verify.`
       );
     }
     adj[e.from].push(e.to);
@@ -399,7 +399,7 @@ function main() {
     if (!c.evidence || c.evidence.length === 0) {
       throw new Error(
         `Coupling pair ${c.a}-${c.b} has no evidence. ` +
-        `Re-run discovery — do not fabricate coupling.`
+        `Re-run discoverer — do not fabricate coupling.`
       );
     }
   }
@@ -431,7 +431,7 @@ function main() {
     }
   }
 
-  const discoveryRan = coupling.length > 0 || tasks.length === 1;
+  const discovererRan = coupling.length > 0 || tasks.length === 1;
 
   const H_norm = entropyNorm(tasks);
   const D_JS = jsDivergence(tasks, domains);
@@ -487,7 +487,7 @@ function main() {
     splitByFileCluster: H_norm > splitByFileClusterThreshold,
     splitByDomain: D_JS > splitByDomainThreshold,
     sequentialRequired: edges.length > 0,
-    parallelSafe: discoveryRan && edges.length === 0,
+    parallelSafe: discovererRan && edges.length === 0,
   };
 
   console.log(JSON.stringify({
