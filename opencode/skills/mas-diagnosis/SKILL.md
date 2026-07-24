@@ -11,7 +11,7 @@ description: "Diagnosis guide for common MAS orchestration failures: cross-level
 
 **Root cause:** Level N output was not verified before Level N+1 started. The GATE ran on each task individually, but no cross-level contract check was done.
 
-**Fix:** Apply the per-level combined GATE (see reference/decomposition.md). Before spawning Level N+1, run project build verification and linting on the combined output of all completed levels. If cross-level type errors exist, re-spawn implementer with corrected instructions (max 3 attempts) before proceeding.
+**Fix:** Apply the per-level combined GATE (load skill({name:'mas-decomposition'})). Before spawning Level N+1, run project build verification and linting on the combined output of all completed levels. If cross-level type errors exist, re-spawn implementer with corrected instructions (max 3 attempts) before proceeding.
 
 **Prevention:** If you know a task changes a shared interface, add a **P-BLOCKING** edge (producer → consumer). The script will put the producer in an earlier level.
 
@@ -53,8 +53,8 @@ description: "Diagnosis guide for common MAS orchestration failures: cross-level
 
 **Symptom:** Re-spawn returns "passed" but the build config (e.g., tsconfig.json, .eslintrc, Cargo.toml, pyproject.toml) has been relaxed (strict → false, rules downgraded from error to warn).
 
-**Root cause:** A re-spawn might weaken the gate criteria instead of fixing the actual code. This is a documented failure mode in autonomous repair systems (arXiv 2605.01471).
+**Root cause:** A re-spawn might weaken the gate criteria instead of fixing the actual code. This is a documented failure mode in autonomous repair systems.
 
-**Fix:** Capture baseline build config before first implementer spawn. Diff after each re-spawn. If strictness weakened, halt and escalate — do NOT auto-retry. See reference/interaction.md for detection rules.
+**Fix:** Capture baseline build config before first implementer spawn. Diff after each re-spawn. If strictness weakened, halt and escalate — do NOT auto-retry. See load skill({name:'mas-interaction'}) for detection rules.
 
 **Prevention:** The GATE configuration must be immutable from the implementer's perspective. Implementer can only modify target files, not build configuration.

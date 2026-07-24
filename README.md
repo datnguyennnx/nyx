@@ -1,6 +1,7 @@
+---
 # nyx
 
-Three-agent ship-mas topology: discovery (file investigation), implementer (code changes), researcher (web research). Orchestrator handles design, verification, and reconciliation directly.
+OpenCode configuration implementing Multi-Agent Shipping (MAS) — a structured orchestrator for coordinating AI agents across complex, multi-file code changes. Uses information-theoretic complexity scoring, evidence-gated dependency graphs, and a binary GATE verification protocol. Features context-window preservation for long-running sessions.
 
 ## Quick Start
 
@@ -9,52 +10,50 @@ git clone <repo-url> && cd nyx
 ./bootstrap.sh install
 ```
 
-Syncs `opencode/` → `~/.config/opencode` and `agents/` → `~/.agents`. Load `ship-mas` mode in opencode.
+Syncs `opencode/` → `~/.config/opencode` and `agents/` → `~/.agents`. Load `ship-mas` mode in opencode. Run `bootstrap.sh install` after any update to sync changes.
 
 ## Architecture
 
 | Plane | Role | Tools |
 |---|---|---|
-| L0 — Orchestrator | DAG scheduling, binary GATE, HITL | `task`, `bash` (restricted), `skill`, `ast-grep` |
-| L1 — Agents | File I/O, code transformation, analysis | `read`, `edit`, `glob`, `ast-grep`, `bash`, `skill` — `task: deny` |
+| L0 — Orchestrator | DAG scheduling, binary GATE, HITL, failure diagnosis routing | `task`, `bash` (restricted allowlist), `skill` |
+| L1 — Agents | File I/O, code transformation, analysis, diagnosis | `read`, `edit`, `glob`, `bash`, `skill` — `task: deny` (recursion lock) |
 
-## Complexity Score
+### Operational Thresholds
 
-Computed by external script, never by the LLM:
-
-```
-node ~/.config/opencode/scripts/complexity-score.mjs --input '<json>'
-```
-
-Three-component weighted ensemble:
-
-```
-C_total = 0.44 · C_min_norm + 0.33 · (1 - Q) + 0.22 · avg_conductance
-```
-
-| Component | Measures |
-|---|---|
-| C_min_norm | Task graph bottleneck — how tightly coupled the work is |
-| 1 - Q | Community separation — how well tasks cluster into groups |
-| avg_conductance | Cluster boundary porosity — how cleanly groups separate |
-
-H_norm (work distribution) and D_JS (domain divergence) are computed for routing flags only — they do not feed into C_total.
-
-The script validates mathematical invariants: unique task IDs, non-negative deltas, symmetric adjacency, weights summing to 1.0, all component ranges. Violations throw descriptive errors.
+| C_total | Pipeline | Behavior |
+|---------|----------|----------|
+| < 0.25 | Fast lane | Skip evidence gathering. Go straight to implementer. |
+| 0.25 — 0.60 | Normal | Full discovery → decomposition → parallel agents → GATE |
+| > 0.60 | Full | Maximum caution. Extra verification. Conservative splitting. |
 
 ## Workflow
 
 ```
 User → ship-mas
   │ classify intent → pre-flight checks
-  │ evidence gathering (MANDATORY): spawn discovery agent → cross-file coupling with file:line citations
-  │ complexity-score.mjs → levels, routing, recommended
-  │ for each level in levels:
-  │   spawn all level tasks in parallel
-  │   GATE: build verification + linting (binary — never averaged)
-  │   FAIL → re-spawn implementer with corrected instructions → ESCALATE if persistent
-  │   PASS → soft confidence (framing only)
-  └─ HITL: pure presentation — no questions, no approval gate
+  │ The Ladder:
+  │   1. Structure scan
+  │   2. Evidence gathering: spawn discovery → file:line citations
+  │   3. complexity-score.mjs → levels
+  │   4. Level schedule from script stdout
+  │   5. Plan validation
+  │   6. Spawn per level: parallel within level, sequential across levels
+  │   7. GATE: build + lint
+  │   8. HITL: presentation with git diff + requirements mapping + confidence
+  │
+  │ Closed-loop failure path
+  │   GATE FAIL → spawn DIAGNOSTICIAN
+  │            → re-spawn implementer with diagnosis-informed instructions
+  │            → if still fails → spawn DISCOVERY + RESEARCHER
+  │            → synthesize → re-spawn with full context
+  │            → if still fails → ESCALATE with failure history
+  │
+  │ Context preservation:
+  │   After compaction → re-load all 5 skills via skill()
+  │   When context feels tight → delegate more to sub-agents
+  │   When instructions degrade → stop, re-read mode, re-load skills
+  └─ No questions, no approval gate — pure presentation
 ```
 
 ## Invariants
@@ -62,9 +61,11 @@ User → ship-mas
 - Orchestrator never analyzes code — every analytical task delegated to spawned agent
 - No file modified by two parallel tasks (script-enforced disjointness)
 - Binary GATE — never averaged with soft signals
+- Closed-loop failures: diagnose → fix → if still fails → deeper diagnose → only then escalate
 - Implementer failures: max 3 re-spawn attempts with corrected instructions, then ESCALATE
 - All sub-agents have `task: deny` (recursion lock)
 - Sub-agent gets fresh context window — no parent conversation inheritance
+- Skills re-loaded after every compaction event
 
 ## References — Always respected who delivered this sense for generation
 

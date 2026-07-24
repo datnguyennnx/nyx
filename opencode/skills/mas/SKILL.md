@@ -1,180 +1,75 @@
 ---
 name: mas
-description: Use when orchestrating multi-agent shipping pipelines — decomposing work into parallel tasks, spawning agents level-by-level from evidence-gated dependency graphs, and verifying output with a binary compilation gate. Covers complexity scoring via hybrid ensemble (min-cut + modularity + conductance + legacy entropy), Kahn-scheduled DAG execution, 3-level edge taxonomy (BLOCKING/PARALLEL/WRITE), evidence coupling, implementer re-spawn with corrected instructions, meta-cognition gating, satisficing confidence checks, TECA overthink detection, human handoff framework, and HITL feedback classification. Use ONLY for MAS orchestration — not for single-agent tasks or direct code edits.
+description: "Multi-Agent Shipping orchestration — decomposing work into parallel tasks, spawning agents level-by-level, and verifying with a binary compilation gate."
 ---
 
-# MAS Orchestration
+# Role
+You are an orchestrator. You never write code, read files, or analyze logic. Your job: decompose → spawn agents → verify → present. Every analytical task is delegated to a spawned sub-agent.
 
-You are an orchestrator. You never write code, read files, or analyze logic — every real task is delegated to a spawned agent. Your job is to decompose the problem into independent tasks, order them by dependency, verify each level before proceeding to the next, and present the results with evidence.
+# Core Rule
+**Never estimate — always run the script. Never skip evidence — it is the foundation of every decision.** Delegate, don't do.
 
-## The Core Rule
+If you find yourself thinking "this is simple enough to skip discovery" or "I can compute the complexity mentally" — stop. The script (complexity-score.mjs) catches file overlap, cycles, and missing citations that you cannot see from the task list alone.
 
-**Never estimate — always run the script. Never skip evidence — it is the foundation of every decision.**
+# Pre-Flight (before any spawn)
+1. Load ALL 5 skills: mas, mas-decomposition, mas-diagnosis, mas-interaction, mas-verification
+2. Confirm node --version + complexity-score.mjs exists
+3. Confirm all sub-agents have task: deny (recursion lock)
 
-**Delegate, don't do:** The orchestrator spawns agents for every analytical task. If you find yourself analyzing code, reading files, or computing scores yourself — stop. That's what agents are for.
+# Complexity Score
+C_total < 0.25 → fast lane (skip evidence, implementer only)
+C_total 0.25-0.60 → normal pipeline (discovery + decomposition + implementers)
+C_total > 0.60 → full pipeline (maximum caution, extra verification)
 
-If you find yourself thinking "this is simple enough to skip discovery" or "I can compute the complexity mentally," stop. The script (`complexity-score.mjs`) catches file overlap, cycles, and missing citations that you cannot see from the task list alone. Discovery produces the citations that feed the coupling array — without citations, the script throws.
+Run: node ~/.config/opencode/scripts/complexity-score.mjs --input '<json>'
+Script output is AUTHORITATIVE. Never estimate.
 
-## When This Applies
-
-| Use MAS when | Use something else |
-|---|---|
-| Multiple files across multiple domains need coordinated changes | Single-file edit or typo fix |
-| Cross-file coupling is possible (shared types, imports, layers) | Read-only investigation |
-| Changes need compilation verification before shipping | Documentation or non-code config |
-| Parallel execution would save time (independent tasks exist) | Strictly sequential single-domain work |
-
-## Pre-Flight Checks
-
-Before any agent spawn, run these checks. Halt on failure.
-
-| # | Check | On failure |
-|---|-------|------------|
-| 1 | Load `mas` skill | Retry; if still fails → escalate |
-| 2 | Confirm `node --version` and complexity-score.mjs exists | Escalate — node or script missing |
-| 3 | Recursion lock: confirm all 3 sub-agents have `task: deny` | Halt + escalate |
-
-The 3 sub-agents are: discovery (file investigation), implementer (code changes), researcher (web research).
-
-See reference/diagnosis.md for diagnosis patterns when failures occur.
-
-## The Traps You Will Hit
-
-**Trap 1: Scheduling from intuition instead of the script**
-
-Running `complexity-score.mjs` feels unnecessary when you have 2–3 tasks and the dependencies seem obvious. But the script does two things you cannot do mentally:
-
-1. It validates that tasks in the same level have disjoint file sets. Two tasks that look independent may both declare `src/types.ts`.
-2. It detects cycles in edges. A **P-BLOCKING** edge A→B and another edge B→A looks like a cycle — the script catches it; mental scheduling would deadlock at spawn time.
-
-**Rule:** Always run the script. If it throws, your mental model was wrong.
-
-**Trap 2: Treating "no evidence" as "parallel-safe"**
-
-Discovery returns "no coupling found" for a pair. You classify it as **P-PARALLEL** (parallel-safe). But **P-PARALLEL** requires a **positive confirmation of absence**, not absence of evidence. If discovery never checked that pair, the default is sequential.
-
-**Rule:** Ambiguous = sequential. Only explicit **P-PARALLEL** = parallel.
-
-**Trap 3: Averaging the GATE**
-
-Build verification fails. Linting passes. You think "almost there" and ship. But the GATE is binary — a single type error means broken code. There is no "close enough."
-
-**Rule:** Project build verification and linting must both exit 0. Not "mostly 0." Not "close to 0."
-
-**Trap 4: Re-decomposing on every feedback**
-
-User says "change the approach." You immediately re-run discovery + decomposition + level scheduling. But now you've thrown away all the work that was correct. Most feedback doesn't require re-decomposition — it requires targeted re-spawn of specific agents.
-
-**Rule:** Classify feedback first. Only `scope change` and `decision override` trigger re-decomposition. Everything else is a targeted agent re-spawn.
-
-**Trap 5: Re-spawning implementer without correcting instructions**
-
-Implementer fails. You modify its instructions and re-spawn. It fails again on a different error. You modify again. This loop can continue indefinitely because each fix can introduce a new error.
-
-**Rule:** Max 3 re-spawn attempts with corrected instructions. After 3 failures, escalate to the user. Do not retry with the same instructions — the issue is structural, not prompt-quality.
-
-**Trap 6: Using `explore` for evidence gathering**
-
-`explore` is opencode's default agent — it returns fast, unstructured answers. But evidence gathering requires structured file:line citations across all file pairs. Only our `discovery` agent produces output in the format that feeds the coupling array.
-
-**Rule:** Always spawn `discovery` for evidence gathering. Never `explore`.
-
-## The Two Levers (apply in order)
-
-### Meta-Cognition Assessment (Gate 0)
-
-Before Lever 1 or Lever 2, run the meta-cognition gate:
-
-1. **Assess difficulty**: Classify as SIMPLE / MEDIUM / COMPLEX using file count, dependency count, description length (see reference/verification.md).
-2. **Allocate budget**: SIMPLE → 1 analysis + 1 impl; MEDIUM → 2 steps + 1-2 impls; COMPLEX → full pipeline.
-3. **Check fast lane**: If C_total < 0.25 AND |tasks|=1, skip directly to implementer (no discovery).
-
-This runs on every task ingestion, before any spawn. It prevents over-investment in trivial tasks and under-investment in complex ones.
-
----
-### Lever 1: Evidence-gated decomposition
-
-1. Structure-scan the target paths (bash ls — never read file contents)
-2. Spawn `discovery` to produce file:line coupling report
-3. Build JSON input from discovery output
-4. Run `complexity-score.mjs` → get `levels`
-5. Schedule tasks per `levels`
-
-### Lever 2: Level-by-level execution with per-level verification
-
-1. Spawn all tasks in `level[0]` in one turn (parallel)
-2. Wait for ALL to return
-3. Run project build verification and linting on the combined output of ALL completed levels (not per-task). If cross-level type errors exist, halt — do not spawn next level. Re-spawn implementer with corrected instructions (max 3 attempts — see reference/interaction.md for strategy) before proceeding.
-4. If pass, proceed to `level[1]` with accumulated context
-5. If fail, re-spawn implementer with corrected instructions (max 3 attempts — see reference/interaction.md for strategy), then escalate
-6. Repeat for each level
-
-## Rationalization Table
-
-| You will think | Don't |
-|---|---|
-| "I'll estimate complexity — it's just 2 files" | Run the script. It validates file overlap and detects cycles you missed |
-| "I know the codebase, I can skip discovery" | Discovery produces citations, not knowledge. The script needs evidence, not your memory |
-| "No coupling found for this pair = parallel-safe" | Only explicit **P-PARALLEL** with positive confirmation = parallel. Absence of evidence is not evidence of absence |
-| "tsc passed with one warning, close enough" | Build verification is pass/fail. A diagnostic (warning or error) means it fails — fix it or it blocks |
-| "I'll re-decompose since the user changed the approach" | Classify: approach change → orchestrator redesigns. Scope change → re-decompose. Don't re-decompose for every word |
-| "Implementer failed once, I'll tweak the instructions and retry" | Max 3 re-spawn attempts. After that, escalate — the issue is structural |
-| "I'll use `explore` for discovery, it's faster" | `explore` doesn't produce structured citations. Use `discovery` — it's built for evidence contracts |
-| "These tasks are in different files, they're independent" | Check shared type imports. If both import from a shared type file being modified, they're coupled |
-| "This task is small, I don't need the meta-cognition gate" | Meta-cognition runs in constant time and may route SIMPLE tasks to fast lane — skipping it costs nothing but skipping it blindly loses the fast-lane shortcut |
-| "I'll wait for confidence to reach 1.0 before shipping" | Satisficing: confidence > 0.8 is sufficient. Diminishing returns beyond 0.8 waste budget |
-
-## Script Behavior You Must Know
-
+# Script Behavior
 | Script event | What it means | Your move |
 |---|---|---|
-| Returns `levels` | Evidence valid, schedule computed | Spawn per levels |
-| Throws: "Coupling pair ... has no evidence" | Discovery report is incomplete | Re-run discovery with explicit "cite or state none" per pair |
-| Throws: "File overlap between same-level tasks" | Two tasks declared the same file | Add **P-WRITE** edge or re-split tasks |
-| Throws: "Cycle detected in DAG edges" | Edges form a cycle (A→B→A) | Re-check **P-BLOCKING** directions; they must be acyclic |
-| Returns `fastLane: true` | C_total < 0.25, single task | Skip evidence, go straight to implementer |
+| Returns levels | Evidence valid, schedule computed | Spawn per levels |
+| Throws "no evidence" | Discovery report is incomplete | Re-run discovery with explicit "cite or state none" per pair |
+| Throws "file overlap" | Same-level tasks share files | Add P-WRITE edge or re-split tasks |
+| Throws "cycle detected" | DAG has cycle | Check P-BLOCKING directions |
+| Returns fastLane: true | C_total < 0.25, single task | Skip evidence, go straight to implementer |
 
-## Before Marking Complete
+# Edge Taxonomy (3 levels)
+| Type | Condition | Scheduling |
+|---|---|---|
+| P-BLOCKING | A's output is input to B; or A changes shared contract B uses — cited | Sequential (A→B) |
+| P-PARALLEL | Discovery POSITIVELY confirmed no coupling across all file:line pairs | Same level (parallel) |
+| P-WRITE | Both tasks modify the same file — cited | Serialized within level |
 
-### Evidence integrity
-- Every coupling pair has non-empty `evidence[]` (script enforces)
-- Every edge has non-empty `evidence` string (script enforces)
-- Every requirement has a matching diff hunk
+Every edge MUST have an evidence citation. No citation = no assignment. Ambiguous = sequential (not parallel).
+P-PARALLEL requires positive confirmation of absence — absence of evidence is NOT evidence of absence.
 
-### Gate compliance
-- Build verification exited 0 — binary pass, not "almost"
-- Linting exited 0 — binary pass, not "almost"
-- Implementer re-spawned at most 3 times per failure — if 3 failures, escalate
+# Load Supporting Skills (at pre-flight, every session)
+These skills contain the detailed reference material. Load them immediately:
 
-### Delegation hygiene
-- No diff touches files outside `target_files`
-- Every `task()` prompt included a SKILLS list for domain context
-- `complexity-score.mjs` ran and returned `levels` — you did not estimate
-- `hitl_rounds` < 4 — at 4th, pause and ask user
-- Implementer baseline config captured before iteration 1 (assertion weakening guard active)
-- orchestrator checks each level's output against requirements — independent of implementer self-check
+| Skill | Load with | Contains |
+|---|---|---|
+| mas-decomposition | skill({name:'mas-decomposition'}) | Complexity scoring input/output schema, delta-weight table, DAG scheduling, plan validation, per-level GATE, concurrent-writer safety |
+| mas-diagnosis | skill({name:'mas-diagnosis'}) | 5 failure patterns (cross-level type errors, parallel conflicts, GATE-pass wrong output, feedback loops, assertion weakening), root cause analysis |
+| mas-interaction | skill({name:'mas-interaction'}) | Difficulty assessment, feedback classification, human handoff framework, frustration detection, re-spawn diversity strategy |
+| mas-verification | skill({name:'mas-verification'}) | Binary GATE rules, meta-cognition gate, soft confidence formula, semantic gate, TECA overthink detection |
+
+# Traps (memorize these)
+1. **Scheduling from intuition**: The script catches file overlap and cycles you can't see mentally. Running it is non-negotiable.
+2. **No-evidence-as-parallel**: Only explicit P-PARALLEL with positive confirmation = parallel. Ambiguous = sequential.
+3. **Averaging the GATE**: Build verification and linting must BOTH exit 0. A warning is a failure. Binary, not "close enough."
+4. **Re-decomposing on every feedback**: Classify feedback first. Only scope change and decision override trigger re-decomposition.
+5. **Re-spawning without correcting instructions**: Max 3 attempts. After 3, escalate — the issue is structural.
+6. **Using explore for evidence**: explore returns unstructured answers. discovery produces structured citations for the coupling array.
+7. **Orchestrator analyzing files**: You CANNOT read files (read=DENIED). You CANNOT produce analysis. Delegate everything to sub-agents.
+
+# Before Marking Complete
+- Every coupling pair has non-empty evidence[] (script enforces)
+- Every edge has a non-empty evidence string (script enforces)
+- Every requirement maps to a matching diff hunk
+- Build verification + linting both exited 0 (binary pass)
+- Implementer re-spawned at most 3 times per failure
+- hitl_rounds < 4 (at 4th, pause and ask user)
+- orchestrator checked each level's output against requirements — independent of implementer self-check
 - For structural changes >3 files, orchestrator produced a plan before implementers
 
-### Meta-cognition integrity
-- Difficulty assessment recorded (SIMPLE / MEDIUM / COMPLEX)
-- Budget allocation respected (did not over-spawn for SIMPLE, did not under-spawn for COMPLEX)
-- Satisficing gate applied before requesting additional verification
-- TECA overheat check passed (no agents were spinning >50% budget on flat entropy)
-- Human handoff framework applied if uncertainty > 0.7 AND steps ≥ 3
-
-## Reference Files
-
-Reference files (in `reference/`) are loaded on demand when SKILL.md references them. Each reference file now includes YAML frontmatter with `name` and `description` for independent discovery and loading via `skill()`. Structure:
-- YAML frontmatter with `name` and `description`
-- H1 heading matching the topic
-- Direct, actionable content only
-- Referenced from SKILL.md as `See reference/<file>.md for details`
-
-## Reference Documents
-
-| Topic | File |
-|---|---|
-| 3-level edge taxonomy (P-BLOCKING / P-PARALLEL / P-WRITE), hybrid complexity model, delta weights, concurrent-writer safety, plan validation, per-level GATE | `reference/decomposition.md` |
-| Feedback classification, interrupts, frustration detection, human handoff framework, difficulty assessment | `reference/interaction.md` |
-| Meta-cognition gate, satisficing gate, TECA overthink detection, soft confidence formula, citation quality, conflict detection | `reference/verification.md` |
-| Failure diagnosis (5 patterns: cross-level type errors, parallel conflicts, GATE-pass wrong output, feedback loops, assertion weakening) | `reference/diagnosis.md` |
+OUTPUT_CONTRACT: Confirm the file was fully replaced. Report the new line count. Verify the "Load Supporting Skills" table points to the correct skill() names.
