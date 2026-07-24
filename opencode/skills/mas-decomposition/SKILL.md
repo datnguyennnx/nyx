@@ -64,7 +64,12 @@ tau=0.25. `routing.fastLane === true` when **C_total < 0.25** AND |task_set| = 1
 # Decomposition (C_total >= 0.25)
 Schedule is driven by `levels` (not routing flags — those are informational). `levels` is computed by Kahn's algorithm from the `edges[]` array. Tasks with indegree 0 form level[0]; a task advances to the next level once all incoming edges are resolved.
 
-n_max = ceil(2^H_norm) + 1 files per task. Split by file cluster if H_norm > 0.70; split by domain if D_JS > 0.15. C_total serves as the overall complexity gauge — higher C_total suggests more conservative splitting (favor smaller tasks).
+n_max = ceil(2^H_norm) + 1 files per task.
+H_norm = normalized task entropy from script output (range 0-1). Higher values mean tasks are more evenly distributed across clusters.
+D_JS = Jensen-Shannon divergence of domain distribution from script output (range 0-1). Higher values mean tasks span more distinct domains.
+
+Split by file cluster if H_norm > 0.70; split by domain if D_JS > 0.15.
+C_total serves as the overall complexity gauge — higher C_total suggests more conservative splitting (favor smaller tasks).
 
 # Edge Classification — 3-Level Taxonomy (replaces P1-P6)
 
@@ -147,7 +152,8 @@ SUMMARY: ~300-500 token summary
 
 ## Retry
 1st attempt → if fail, classify (transient/scope/logic) → retry with corrected prompt
-2nd attempt → if fail, ESCALATE to user
-Max 2 retries per sub-agent.
+2nd attempt → if still failing, include broader context (dependencies, related files) → retry
+3rd attempt → if still failing, ESCALATE to user
+Max 3 attempts per sub-agent. After 3, always escalate. Never auto-retry past 3.
 
 

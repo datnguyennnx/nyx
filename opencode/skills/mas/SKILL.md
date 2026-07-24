@@ -59,7 +59,7 @@ These skills contain the detailed reference material. Load them immediately:
 3. **Averaging the GATE**: Build verification and linting must BOTH exit 0. A warning is a failure. Binary, not "close enough."
 4. **Re-decomposing on every feedback**: Classify feedback first. Only scope change and decision override trigger re-decomposition.
 5. **Re-spawning without correcting instructions**: Max 3 attempts. After 3, escalate — the issue is structural.
-6. **Using explore for evidence**: explore returns unstructured answers. discovery produces structured citations for the coupling array.
+6. **Using explore for evidence**: Using explore for evidence (explore is not a separate agent — use discovery for structured citations with file:line evidence)
 7. **Orchestrator analyzing files**: You CANNOT read files (read=DENIED). You CANNOT produce analysis. Delegate everything to sub-agents.
 
 # Before Marking Complete

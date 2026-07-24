@@ -6,18 +6,7 @@ description: "Reference for meta-cognitive assessment, feedback classification, 
 # Meta-Cognitive Assessment
 
 ## Difficulty Assessment
-
-Before any interaction with spawned agents, classify the overall task difficulty. This feeds the Meta-Cognition Gate (load skill({name:'mas-verification'})):
-
-| Factor | Simple | Medium | Complex |
-|--------|--------|--------|---------|
-| Target files | ≤2 | 3-5 | >5 |
-| Dependencies | ≤1 | 2-3 | >3 |
-| Description length | <200 chars | 200-500 chars | >500 chars |
-| Domains | 1 | 2 | 3+ |
-| Cross-team? | No | No | Yes |
-
-The orchestrator performs this assessment once, at task ingestion, and uses it to select the pipeline depth (see verification.md Meta-Cognition Gate).
+See mas-verification skill for the difficulty assessment table. (Canonical location.)
 
 ---
 
@@ -61,5 +50,5 @@ When re-spawning implementer after failure, vary the approach:
 | Attempt | Strategy | Reasoning |
 |---------|----------|-----------|
 | 1 | Pass error output + narrowed file scope | Works for simple errors |
-| 2 | Include broader context (dependencies, related files) | Catches missing imports, interface changes |
+| 2 | Include discovery findings + research results — broader context and additional evidence | Catches missing imports, interface changes |
 | 3 (if needed) | Escalate — problem may be structural | After 2 attempts, deeper redesign needed |

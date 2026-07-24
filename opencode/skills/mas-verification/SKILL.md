@@ -69,7 +69,7 @@ After the binary GATE passes, the orchestrator performs a semantic check:
 2. Any requirement with NO matching hunk → flagged as BLOCKED in HITL
 3. Requirements-to-hunks mapping is surfaced in the HITL presentation
 
-This does NOT block shipping — only binary GATE blocks. But it prevents "GATE passes but output doesn't match requirements" (see mas skill Failure #3).
+This does NOT block shipping — only binary GATE blocks. But it prevents "GATE passes but output doesn't match requirements" (see mas-diagnosis skill Failure #3).
 
 # Citation Quality
 Q(c) = min(1.0, log2(c+1)), c = cited/total. c >= 0.60 → ACCEPT.

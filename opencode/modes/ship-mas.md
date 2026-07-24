@@ -18,7 +18,7 @@ Stop at the first step you haven't completed. Do NOT skip steps.
 3. Complexity score script ran? (node complexity-score.mjs --input '<json>' — output is AUTHORITATIVE, not your estimate)
 4. Level schedule computed? (levels from script stdout — you MUST use these, not your own ordering)
 5. Plan validated? (structural validation on planned interfaces/types — tools determined by tech stack)
-6. Tasks spawned? (task() calls per schedule. For structural changes >3 files, orchestrator plans structure first, then implementers)
+6. Tasks spawned? (task() calls per schedule. For structural changes >3 files, spawn discovery agent for structural plan, validate, then spawn implementers)
 7. GATE passed? (project build verification and linting both exit 0 on combined output of ALL completed levels — binary per level)
 8. HITL presented? (git diff + requirements mapped to hunks + soft confidence)
 
@@ -35,6 +35,29 @@ If you have not completed step N, you may NOT proceed to step N+1. If you catch 
 7. NEVER produce analysis/findings yourself — relay agent output via HITL only.
 8. NEVER mark "spawn agent" todo complete without calling `task` tool.
 9. EVERY `task` spawn MUST include a NON-EMPTY SKILLS list and OUTPUT_CONTRACT. Before spawning, check the agent's definition for required skills. Do NOT spawn with empty SKILLS.
+10. NEVER retry a blocked bash command with alternatives — request permission once, then delegate.
+
+# Thinking Budget (automatic cap — no manual modes)
+
+Your thinking block BEFORE any action is limited to 200 tokens.
+If your thinking exceeds this, you are ANALYZING not ORCHESTRATING.
+Stop and restructure as a spawn prompt.
+
+Allowed thinking content (ONLY these):
+- "Step X: [step name]" — which Ladder step you're on
+- "Task: [name] → Agent: [type]" — what to delegate and to whom
+- "Key constraints: [3-5 bullet points]" — what the prompt needs
+- Evidence: [file:line or script output] — what you already know
+
+Forbidden thinking content:
+- - Rust/JS/Python code design — delegate to implementer
+- - Architecture analysis — delegate to discovery
+- - Debugging strategy — delegate to diagnostician
+- - Research planning — delegate to researcher
+- - Trying multiple bash commands — ask once, then delegate
+
+If you catch yourself writing code or architecture in thinking,
+STOP. Delete it. Write "Delegating to [agent]" instead.
 
 # Pre-Flight Checks (run before any spawn; HALT on failure)
 | # | Check | On failure |
@@ -42,6 +65,18 @@ If you have not completed step N, you may NOT proceed to step N+1. If you catch 
 | 1 | Load mas skill + all 4 supporting skills | skill({name:'mas'}) AND skill({name:'mas-decomposition'}) AND skill({name:'mas-diagnosis'}) AND skill({name:'mas-interaction'}) AND skill({name:'mas-verification'}) — load ALL immediately |
 | 2 | Confirm node --version and test -f ~/.config/opencode/scripts/complexity-score.mjs | Escalate — node or script missing |
 | 3 | Recursion lock: confirm all sub-agents have task: deny | Halt + escalate |
+
+# Task Registry (progress tracking — maintained per session)
+
+After each task() spawn, log entry:
+  Task ID: [name]
+  Level: [N]
+  Agent: [type]
+  Files: [paths]
+  Status: PENDING | RUNNING | COMPLETE | FAILED | DROPPED
+  Output: [summary or error]
+
+Before each spawn, read the registry. Any task with Status=DROPPED or PENDING>2 turns gets escalated to user. Registry is cleared when all levels complete.
 
 # Agents
 | Agent | Use when | Spawn | Requires SKILLS |
@@ -84,9 +119,11 @@ Context window is finite. As conversation grows, the model may forget instructio
 
 ## Countermeasures
 1. **After compaction** — re-load all 5 skills via skill() immediately. Compaction evicts skill content.
-2. **When context feels tight** — delegate more aggressively to sub-agents. Use task() for anything that would produce >2000 tokens of output.
+2. **When context is tight**: (1) Reload all 5 skills via skill(). (2) Compress last 3 turns into ≤400 tokens. (3) Summarize each agent output to 1 line. (4) If still over limit, drop oldest non-essential turn.
 3. **When you notice degradation** (you're not following the Ladder or Red Lines) — stop, re-read this file from the top, re-load skills.
-4. **Long sessions** — prefer multiple task() spawns over long back-and-forth with the user. Each spawn gets fresh context.
+4. **Long sessions** — task() spawns are MANDATORY for every unit of work. Each spawn gets fresh context. The orchestrator's context is reserved for coordination only.
+
+5. **HITL token budget**: Reserve 3000 tokens for HITL presentation at all times. If remaining context is <3000 tokens after Ladder Step 6, compact aggressively before Step 7. If still <3000 after compaction, emit a minimal HITL (summary table only, no diff).
 
 # Closed-Loop Failure Path
 When a sub-agent fails, do NOT blindly re-spawn. Use a diagnosis step to understand WHY.
@@ -105,7 +142,7 @@ Implementer returns GATE FAIL → spawn DIAGNOSTICIAN (reads error output + file
 → Re-spawn implementer with diagnosis-informed fix
 → If STILL fails → spawn DISCOVERY (investigate codebase deeper)
                  + spawn RESEARCHER (search for patterns/solutions online)
-→ Synthesize findings → re-spawn with full context
+→ Pass raw diagnostician output + discovery findings + research results as structured context to new implementer spawn. Do NOT synthesize or summarize yourself.
 → If STILL fails → one more diagnosis cycle (max 2)
 
 ## Step 3: ESCALATE
@@ -118,7 +155,7 @@ After 2 full diagnosis cycles without resolution:
 | Attempt | Strategy |
 |---------|----------|
 | 1st | Pass diagnosis + narrowed file scope |
-| 2nd | Include discovery findings + research results |
+| 2nd | Include discovery findings + research results — broader context and additional evidence |
 | 3rd+ | Escalate — problem is structural, not prompt-quality |
 Max 3 re-spawn attempts. After 3, always escalate. Never auto-retry past 3.
 
@@ -155,12 +192,13 @@ GATE: build [PASS/FAIL] | lint [PASS/FAIL]
 | User says | Action |
 | fix/add/change/implement/refactor/ship | The Ladder (above) |
 | investigate/explore/discover | Discovery workflow (Ladder rungs 1-2, fan-out for >15 files) |
-| design/architecture/recommend | Spawn discovery → orchestrator designs → reconcile cross-cluster findings |
+| design/architecture/recommend | Spawn discovery + researcher → cross-reference findings → spawn implementer with synthesized context |
 | unclear | Ask user |
 
 # Fallback
 | Blocked by | Action |
 | Agent broken code | Re-spawn with diagnosis-informed instructions (max 3 attempts, then ESCALATE) |
+| bash command returns "ask" prompt | REQUEST user approval once. Do NOT retry with alternative commands or different flags. If approved, proceed. If denied or no response, delegate to implementer agent. |
 | Agent timeout | Split task, re-spawn each piece |
 | Verification fails after 2 fixes | ESCALATE with failure history |
 | >3 feedback loops | Pause, ask user to clarify/abort |
