@@ -58,3 +58,13 @@ description: "Diagnosis guide for common MAS orchestration failures: cross-level
 **Fix:** Capture baseline build config before first implementer spawn. Diff after each re-spawn. If strictness weakened, halt and escalate — do NOT auto-retry. See load skill({name:'mas-interaction'}) for detection rules.
 
 **Prevention:** The GATE configuration must be immutable from the implementer's perspective. Implementer can only modify target files, not build configuration.
+
+## Failure: Overthinking causes wrong output despite correct initial approach
+
+**Symptom:** The orchestrator spends excessive tokens in thinking blocks (exceeding the tier budget by 50%+), oscillates between two valid approaches, and produces lower-quality output than a faster decision would have. Common in complex decomposition and cross-crate refactoring tasks.
+
+**Root cause:** Insufficient delegation. The orchestrator tries to resolve ambiguity internally instead of spawning a discoverer or researcher to gather evidence. Research (Zhou et al. 2026, arXiv 2604.10739) shows that beyond a task-dependent threshold (typically 7K-12K tokens), marginal utility of additional thinking becomes negative. Answer oscillation is the strongest predictor (r=0.78).
+
+**Fix:** Apply the Thinking Budget tiers from ship-mas.md. If you catch yourself going back and forth between two options in a thinking block, stop and spawn a discoverer to gather evidence instead. Use the tier's budget as a hard limit — if exceeded, restructure as a spawn prompt.
+
+**Prevention:** Before any complex thinking block, pre-commit to a decision deadline: "I will decide between options A and B within [tier budget], then spawn an agent for whichever option I choose." Track answer oscillation markers ("but wait", "actually", "hmm"). At the third oscillation marker, force a spawn.

@@ -83,6 +83,13 @@ Every P-BLOCKING / P-WRITE edge MUST reference a discoverer citation (file:line)
 
 **Ambiguous**: no evidence of coupling AND no evidence ruling it out → default SEQUENTIAL (not P-PARALLEL). Discoverer must positively confirm absence for P-PARALLEL.
 
+## Delegation Gate
+Before spawning any sub-agent for an edge task, apply the delegation gate:
+- Is the work parallelizable across multiple files? → delegate
+- Does the orchestrator lack context on the files involved? → delegate
+- Is verification of the output cheaper than redoing it? → delegate
+- Is the task sequential, well-understood, and self-contained? → do NOT delegate (inline)
+
 ## Plan Validation Before Execution
 
 Before spawning level-0 implementers, validate the plan:
@@ -91,6 +98,7 @@ Before spawning level-0 implementers, validate the plan:
 2. **Dependency completeness**: Verify every task's declared `edges[]` has a matching downstream task. No orphan edges.
 3. **File disjointness**: Verify no two tasks in the same level declare overlapping file sets. (Already enforced by the script — re-verify after any edge changes.)
 4. **Write-conflict serialization**: For any P-WRITE pair, confirm the explicit ordering (Smaller → Larger) is reflected in `edges[]` and that the level assignment places them sequentially within the same level.
+5. **Critical step identification**: Label each task as CRITICAL (~16% of steps) or ROUTINE (~84%). A step is CRITICAL if: (a) an alternate action would flip the task outcome, (b) it involves cross-crate interface design, (c) it changes a shared contract. CRITICAL steps must be validated and verified before any ROUTINE step in the same level proceeds.
 
 Rationale: A.DOT planner research (IBM, arXiv 2603.14229) shows 14.8% correctness improvement from dual validation before execution. Catches the most expensive class of error (wrong plan) before any code is written.
 

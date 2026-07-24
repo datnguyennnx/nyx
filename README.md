@@ -1,7 +1,9 @@
----
 # nyx
 
-OpenCode configuration implementing Multi-Agent Shipping (MAS) — a structured orchestrator for coordinating AI agents across complex, multi-file code changes. Uses information-theoretic complexity scoring, evidence-gated dependency graphs, and a binary GATE verification protocol. Features context-window preservation for long-running sessions.
+MAS orchestrator for opencode. Uses information-theoretic complexity
+scoring (C_total), evidence-gated dependency graphs, tiered thinking budgets (500-12K tokens),
+Delegation Gate, per-workspace Experience Registry, TECA overthink detection, and binary GATE
+verification. Context-window preservation for long-running sessions.
 
 ## Quick Start
 
@@ -10,107 +12,107 @@ git clone <repo-url> && cd nyx
 ./bootstrap.sh install
 ```
 
-Syncs `opencode/` → `~/.config/opencode` and `agents/` → `~/.agents`. Load `ship-mas` mode in opencode. Run `bootstrap.sh install` after any update to sync changes.
-
-## Architecture
-
-| Plane | Role | Tools |
-|---|---|---|
-| L0 — Orchestrator | DAG scheduling, binary GATE, HITL, failure diagnosis routing | `task`, `bash` (restricted allowlist), `skill` |
-| L1 — Agents | File I/O, code transformation, analysis, diagnosis | `read`, `edit`, `glob`, `bash`, `skill` — `task: deny` (recursion lock) |
-
-### Operational Thresholds
-
-| C_total | Pipeline | Behavior |
-|---------|----------|----------|
-| < 0.25 | Fast lane | Skip evidence gathering. Go straight to implementer. |
-| 0.25 — 0.60 | Normal | Full discoverer → decomposition → parallel agents → GATE |
-| > 0.60 | Full | Maximum caution. Extra verification. Conservative splitting. |
+Syncs `opencode/` → `~/.config/opencode` and `agents/` → `~/.agents`. Load `ship-mas` mode.
+Run `bootstrap.sh install` after any update.
 
 ## Workflow
 
 ```
 User → ship-mas
   │ classify intent → pre-flight checks
-  │ The Ladder:
-  │   1. Structure scan
-  │   2. Evidence gathering: spawn discoverer → file:line citations
-  │   3. complexity-score.mjs → levels
-  │   4. Level schedule from script stdout
-  │   5. Plan validation
-  │   6. Spawn per level: parallel within level, sequential across levels
-  │   7. GATE: build + lint
-  │   8. HITL: presentation with git diff + requirements mapping + confidence
   │
-  │ Closed-loop failure path
-  │   GATE FAIL → spawn DIAGNOSTICIAN
-  │            → re-spawn implementer with diagnosis-informed instructions
-  │            → if still fails → spawn DISCOVERER + RESEARCHER
-  │            → synthesize → re-spawn with full context
-  │            → if still fails → ESCALATE with failure history
+  │ The Ladder:
+  │   [!] 1. Structure scan
+  │   [!] 2. Evidence gathering: spawn discoverer → file:line citations
+  │   [!] 3. complexity-score.mjs → C_total + levels
+  │   [ ] 4. Level schedule from script stdout
+  │   [!] 5. Plan validation
+  │   [ ] 6. Spawn per level: parallel within level, sequential across levels
+  │   [ ] 7. GATE: build + lint (binary)
+  │   [ ] 8. HITL: diff + requirements + confidence
+  │   [!] = critical step (blocks progression)
+  │
+  │ Thinking tiers by C_total:
+  │   < 0.25 → Quick (500)  0.25-0.60 → Moderate (2K)  > 0.60 → Complex (5K)
+  │   Cross-crate → Deep (8K)  Hard cap: 12K per block
+  │
+  │ Delegation gate before each spawn:
+  │   Parallelizable? Context gap? Verify cheaper? → YES = delegate
+  │   NO to all → inline (15X token overhead)
+  │
+  │ Experience Registry → .opencode/experience-registry.json
+  │
+  │ Closed-loop failure:
+  │   GATE FAIL → DIAGNOSTICIAN → re-spawn implementer (max 3)
+  │            → if still fails → DISCOVERER + RESEARCHER → escalate
+  │
+  │ TECA before HITL:
+  │   Check oscillation markers, hesitation markers, budget compliance
+  │   RED on any → don't finalize → spawn agent
   │
   │ Context preservation:
-  │   After compaction → re-load all 5 skills via skill()
-  │   When context feels tight → delegate more to sub-agents
-  │   When instructions degrade → stop, re-read mode, re-load skills
+  │   After compaction → re-load all 5 skills
+  │   When tight → delegate more
+  │   When degraded → re-read mode, re-load skills
   └─ No questions, no approval gate — pure presentation
 ```
 
-## Invariants
+## References
 
-- Orchestrator never analyzes code — every analytical task delegated to spawned agent
-- No file modified by two parallel tasks (script-enforced disjointness)
-- Binary GATE — never averaged with soft signals
-- Closed-loop failures: diagnose → fix → if still fails → deeper diagnose → only then escalate
-- Implementer failures: max 3 re-spawn attempts with corrected instructions, then ESCALATE
-- All sub-agents have `task: deny` (recursion lock)
-- Sub-agent gets fresh context window — no parent conversation inheritance
-- Skills re-loaded after every compaction event
+Always respected who delivered this sense for generation
 
-## References — Always respected who delivered this sense for generation
+- [Stoer & Wagner (1997)](https://doi.org/10.1145/263867.263872) — Minimum Cut
 
-Each formula in ship-mas traces to established mathematical work. We apply them as-is, proven by their authors.
 
-### Stoer & Wagner (1997) — Minimum Cut — [PAPER](https://doi.org/10.1145/263867.263872)
+$$
+C_{\text{min}} = \min_{S \subset V} \sum_{u \in S, v \notin S} w(u,v)
+$$
 
-Information bottleneck in the task dependency graph. Identifies the smallest set of edges that separates the graph — where coordination cost is highest.
+- [Newman & Girvan (2004)](https://doi.org/10.1103/PhysRevE.69.026113) — Modularity
 
-```math
-C_{\text{min\_norm}} = \frac{\text{min-cut}(G)}{\max\text{-cut}}
-```
 
-### Newman & Girvan (2004) — Modularity — [PAPER](https://doi.org/10.1103/PhysRevE.69.026113)
-
-Community separation quality of the level partition. Measures whether intra-cluster edges exceed random expectation. Higher modularity = better separation = lower complexity.
-
-```math
+$$
 Q = \frac{1}{2m}\sum_{ij}\left[A_{ij} - \frac{k_i k_j}{2m}\right]\delta(c_i, c_j)
-```
+$$
 
-### Kannan, Vempala & Vetta (2004) — Conductance — [PAPER](https://doi.org/10.1145/990308.990313)
+- [Kannan, Vempala & Vetta (2004)](https://doi.org/10.1145/990308.990313) — Conductance
 
-Cluster boundary porosity. Measures how many edges cross a cluster boundary relative to its volume. Low conductance = clean cluster separation.
 
-```math
-\phi(S) = \frac{a(S, \bar{S})}{\min(\text{vol}(S), \text{vol}(\bar{S}))}
-```
+$$
+\phi(S) = \frac{\sum_{i \in S, j \notin S} w_{ij}}{\min(\text{vol}(S), \text{vol}(\bar{S}))}
+$$
 
-### Shannon (1948) — Entropy — [PAPER](https://doi.org/10.1002/j.1538-7305.1948.tb01338.x)
+- [Shannon (1948)](https://doi.org/10.1002/j.1538-7305.1948.tb01338.x) — Entropy
 
-Work distribution across tasks. Used for routing flag only — does not feed into C_total.
 
-```math
-H_n = -\frac{\sum p_i \log_2 p_i}{\log_2 |V|}
-```
+$$
+H = -\sum_{i} p_i \log_2 p_i
+$$
 
-### Lin (1991) — Jensen-Shannon Divergence — [PAPER](https://doi.org/10.1109/18.61115)
+- [Lin (1991)](https://doi.org/10.1109/18.61115) — Jensen-Shannon Divergence
 
-Domain separation between top-2 task domains. Used for routing flag only — does not feed into C_total.
 
-```math
-D_{JS} = \frac{1}{2}D_{KL}(P \parallel M) + \frac{1}{2}D_{KL}(Q \parallel M)
-```
+$$
+D_{\text{JS}} = \frac{1}{2}D_{\text{KL}}(P \parallel M) + \frac{1}{2}D_{\text{KL}}(Q \parallel M)
+$$
 
-### Ebadulla et al. (2025) — Ensemble Validation — [arXiv](https://arxiv.org/abs/2507.07074)
+- [Ebadulla et al. (2025)](https://arxiv.org/abs/2507.07074) — Ensemble Validation
 
-Empirical validation of weighted ensemble for multi-agent complexity scoring. Our weights α=0.44, β=0.33, γ=0.22 follow their methodology.
+
+$$
+C_{\text{total}} = 0.44 \cdot C_{\text{min}} + 0.33 \cdot (1 - Q) + 0.22 \cdot \bar{\phi}
+$$
+
+- [Zhou et al. (2026)](https://arxiv.org/abs/2604.10739) — Overthinking in LLM Test-Time Compute
+
+
+$$
+P(\text{flip}) \propto \text{tokens}_{\text{thought}} \quad \text{for} \quad \text{tokens}_{\text{thought}} > 12\text{K}
+$$
+
+- [Li et al. (2026)](https://arxiv.org/abs/2602.03412) — Verified Critical Step Optimization
+
+
+$$
+|\text{critical}| \approx 0.16 \cdot |\text{steps}|
+$$

@@ -8,6 +8,19 @@ description: "Reference for meta-cognitive assessment, feedback classification, 
 ## Difficulty Assessment
 See mas-verification skill for the difficulty assessment table. (Canonical location.)
 
+## Delegation Threshold Calibration
+
+Before spawning any sub-agent, apply the delegation gate:
+1. **Parallelizable?** — Can the work be split into independent units? If yes, delegate.
+2. **Context gap?** — Does the orchestrator lack the files or domain knowledge? If yes, delegate.
+3. **Verify-cheaper-than-redo?** — Is validating the output easier than redoing it? If yes, delegate.
+If NO to all three: do the work inline. Delegation carries 15× token overhead (Anthropic 2025).
+
+Production benchmarks (GitHub Copilot CLI, June 2026):
+- Raising delegation threshold → 23% fewer tool failures per session
+- Selective delegation → 27% fewer search tool failures
+- No quality regression detected in A/B test over 4 weeks
+
 ---
 
 ## Feedback Classification
@@ -52,3 +65,5 @@ When re-spawning implementer after failure, vary the approach:
 | 1 | Pass error output + narrowed file scope | Works for simple errors |
 | 2 | Include discovery findings + research results — broader context and additional evidence | Catches missing imports, interface changes |
 | 3 (if needed) | Escalate — problem may be structural | After 2 attempts, deeper redesign needed |
+
+**Note**: Before each re-spawn, check if overthinking caused the initial failure (see mas-diagnosis skill — Failure #6). If the initial approach was correct but the output was wrong due to oscillation or hesitation, the fix is narrower scope and less deliberation, not more context.

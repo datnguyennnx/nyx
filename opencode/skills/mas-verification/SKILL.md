@@ -29,11 +29,18 @@ Before any agent spawn, assess the task to allocate the correct pipeline depth. 
 | COMPLEX | >5 target files OR >3 dependencies OR description >500 chars OR cross-domain |
 
 ## Token Budget Allocation
-| Difficulty | Analysis Steps | Implementers | Verifiers |
-|------------|----------------|--------------|-----------|
-| SIMPLE | 1 | 1 | 0 (satisficing only) |
-| MEDIUM | 2 | 1-2 | 1 (if confidence < 0.8) |
-| COMPLEX | Full discoverer + decomposition pipeline | Per schedule | Full GATE |
+| Difficulty | Analysis Steps | Implementers | Verifiers | Thinking Tier |
+|------------|----------------|--------------|-----------|---------------|
+| SIMPLE | 1 | 1 | 0 (satisficing only) | Quick (500 tokens) |
+| MEDIUM | 2 | 1-2 | 1 (if confidence < 0.8) | Moderate (2K tokens) |
+| COMPLEX | Full discovery + decomposition pipeline | Per schedule | Full GATE | Complex (5K tokens) |
+| CROSS-CUTTING | Multi-level decomposition + research | Per schedule | Full GATE + TECA | Deep (8K tokens) |
+
+**Hard cap**: 12,000 tokens per thinking block. Note: overthinking effects are
+cumulative across blocks (Zhou et al. 2026 measured per-task, not per-block).
+If you use multiple blocks totaling >12K tokens in a single Ladder step, you
+may still experience overthinking effects despite each block being under the cap.
+Prefer one focused block over multiple smaller ones.
 
 The meta-cognition gate runs once at task ingestion. It does NOT replace the standard discovery/decomposition pipeline — it selects the pipeline depth. A COMPLEX classification forces evidence-gated decomposition (Lever 1). A SIMPLE classification may skip discovery and go direct to implementer if C_total < 0.25 (fast lane).
 
@@ -61,6 +68,31 @@ soft_confidence = (cited_changes/total_changes + matched_hunks/total_hunks) / 2
 Never overrides the binary GATE.
 ```
 
+# Efficiency Metrics
+
+After each GATE pass, compute and report:
+
+## Token Efficiency
+`token_efficiency = passed_steps / total_thinking_tokens (est.)`
+
+## Delegation Efficiency  
+`delegation_efficiency = passed_verifications / sub_agents_spawned`
+
+## Waste Ratio
+`waste_ratio = blocked_retries / total_bash_commands`
+
+Targets: token_efficiency > 0.01, delegation_efficiency > 0.5, waste_ratio < 0.05.
+
+Note: Token counts are estimates based on thinking block length and tier budget,
+not API-level measurements. Use for trend analysis, not precise accounting.
+
+### Corrective Actions
+When targets are missed:
+- delegation_efficiency < 0.5: Tighten the Delegation Gate — require 2+ YES conditions before spawning
+- waste_ratio > 0.05: Pre-approve common bash commands to avoid permission-denied retries
+- token_efficiency < 0.01: Reduce thinking tier by one level (Complex→Moderate, Moderate→Quick)
+- All targets met: Continue with current orchestration strategy
+
 # Semantic Gate (Layer 2)
 
 After the binary GATE passes, the orchestrator performs a semantic check:
@@ -70,6 +102,35 @@ After the binary GATE passes, the orchestrator performs a semantic check:
 3. Requirements-to-hunks mapping is surfaced in the HITL presentation
 
 This does NOT block shipping — only binary GATE blocks. But it prevents "GATE passes but output doesn't match requirements" (see mas-diagnosis skill Failure #3).
+
+# TECA Overthink Detection (Layer 3)
+
+Before finalizing any HITL, run the TECA (Thinking Efficiency and Cognitive Assessment) check:
+
+## Oscillation Detection
+Count how many times the thinking block went back and forth between options:
+- 0-1 oscillations → NORMAL
+- 2-3 oscillations → WARNING — spawn discovery agent to resolve
+- 4+ oscillations → OVER-THINKING — abort thinking, force delegation
+
+## Hesitation Marker Detection
+Search thinking for markers: "but wait", "actually", "hmm", "on the other hand", "let me reconsider"
+- 0-2 markers → NORMAL
+- 3-5 markers → WARNING — consider early stopping
+- 6+ markers → OVER-THINKING detected — the answer before the first marker was likely correct
+  (Zhou et al. 2026: 67.5% of negative flips — cases where the final answer is
+  wrong AND differs from the initial answer — involved abandoning correct initial
+  answers. This does NOT mean all early answers are correct — only that when the
+  answer changes from right to wrong, the first answer was likely correct. Use
+  oscillation markers as a warning sign, not a guarantee.)
+
+## Budget Compliance
+Check which tier was allocated (Quick 500 / Moderate 2K / Complex 5K / Deep 8K / Hard 12K):
+- Within budget → GREEN
+- Exceeded budget by <50% → YELLOW — acceptable for complex tasks
+- Exceeded budget by 50%+ → RED — overthinking, restructure as spawn prompt
+
+If TECA flags RED on any dimension, do NOT finalize HITL. Instead, spawn an agent for the remaining ambiguous decisions.
 
 # Citation Quality
 Q(c) = min(1.0, log2(c+1)), c = cited/total. c >= 0.60 → ACCEPT.
