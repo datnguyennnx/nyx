@@ -7,15 +7,12 @@ DOTFILES="$(cd "$(dirname "$0")" && pwd)"
 
 # -- Path configuration --
 AGENTS_DIR="$HOME/.agents"
-CDP_DIR="$AGENTS_DIR/skills/cdp"
-GSEARCH_DIR="$AGENTS_DIR/skills/gsearch"
+GTHINGS_DIR="$AGENTS_DIR/skills/gthings"
 BIN_DIR="$HOME/.local/bin"
 CACHE_DIR="/tmp/nyx-search-cache"
-TEMP_PROFILE_DIR="/tmp/gsearch-profile"
 
 # Source paths (nyx repo -- single source of truth)
-SRC_CDP="$DOTFILES/agents/skills/cdp"
-SRC_GSEARCH="$DOTFILES/agents/skills/gsearch"
+SRC_GTHINGS="$DOTFILES/agents/skills/gthings"
 
 # Track verification failures
 FAILED=0
@@ -29,16 +26,6 @@ symlink_file() {
     rm -rf "$dest"
   fi
   ln -sf "$src" "$dest"
-}
-
-symlink_glob() {
-  local src_base="$1" dest_base="$2" pattern="$3"
-  local src_path="$src_base/$pattern"
-  for f in $src_path; do
-    [ -f "$f" ] || continue
-    local rel="${f#$src_base/}"
-    symlink_file "$f" "$dest_base/$rel"
-  done
 }
 
 verify_symlink() {
@@ -59,16 +46,6 @@ verify_dir() {
     printf '  [FAIL] %s - %s not found\n' "$label" "$path"
     FAILED=1
   fi
-}
-
-# -- Dependency checks --
-
-check_deps() {
-  if ! command -v bun &>/dev/null; then
-    echo "  [INFO] Bun not found. Install: curl -fsSL https://bun.sh/install | bash"
-    return 1
-  fi
-  printf '  [OK] bun: found\n'
 }
 
 # -- Environment setup (profile injection) --
@@ -102,12 +79,6 @@ ensure_env_var() {
 # -- Install logic --
 
 install() {
-  # -- Dependencies --
-  check_deps || {
-    echo "  [INFO] Install missing dependencies and re-run."
-    exit 1
-  }
-
   local opencode_target="$HOME/.config/opencode"
   mkdir -p "$opencode_target"
   rsync -av --delete \
@@ -118,71 +89,17 @@ install() {
     --exclude='sync-*.sh' \
     "$DOTFILES/opencode/" "$opencode_target/"
 
-  rm -rf "$CDP_DIR" "$GSEARCH_DIR"
-
-  for file in browser-automation.ts templates.ts cache.ts quality.ts; do
-    symlink_file "$SRC_CDP/scripts/$file" "$CDP_DIR/scripts/$file"
-  done
-
-  for file in session.ts repl.ts generated.ts; do
-    symlink_file "$SRC_CDP/sdk/$file" "$CDP_DIR/sdk/$file"
-  done
-  symlink_file "$SRC_CDP/sdk/browser-harness-js" "$CDP_DIR/sdk/browser-harness-js"
-
-  symlink_file "$SRC_CDP/SKILL.md" "$CDP_DIR/SKILL.md"
-  symlink_glob "$SRC_CDP" "$CDP_DIR" "interaction-skills/*.md"
-  symlink_glob "$SRC_CDP" "$CDP_DIR" "reference/*.md"
-
-  symlink_file "$SRC_GSEARCH/scripts/gsearch" "$GSEARCH_DIR/scripts/gsearch"
-  symlink_file "$SRC_GSEARCH/scripts/pdf-extract.ts" "$GSEARCH_DIR/scripts/pdf-extract.ts"
-  symlink_file "$SRC_GSEARCH/scripts/setup" "$GSEARCH_DIR/scripts/setup"
-  symlink_glob "$SRC_GSEARCH" "$GSEARCH_DIR" "lib/*.sh"
-
-  symlink_file "$SRC_GSEARCH/SKILL.md" "$GSEARCH_DIR/SKILL.md"
-  symlink_glob "$SRC_GSEARCH" "$GSEARCH_DIR" "reference/*.md"
-
-  mkdir -p "$BIN_DIR"
-  symlink_file "$CDP_DIR/sdk/browser-harness-js" "$BIN_DIR/browser-harness-js"
-  symlink_file "$GSEARCH_DIR/scripts/gsearch" "$BIN_DIR/gsearch"
+  rm -rf "$GTHINGS_DIR"
+  mkdir -p "$GTHINGS_DIR"
+  symlink_file "$SRC_GTHINGS/SKILL.md" "$GTHINGS_DIR/SKILL.md"
 
   ensure_path
 
-  ensure_env_var "CDP_SCRIPTS" "$CDP_DIR/scripts"
-  ensure_env_var "GSEARCH_SCRIPTS" "$GSEARCH_DIR/scripts"
-  ensure_env_var "CDP_SDK" "$CDP_DIR/sdk"
-  export CDP_SCRIPTS="$CDP_DIR/scripts"
-  export GSEARCH_SCRIPTS="$GSEARCH_DIR/scripts"
-  export CDP_SDK="$CDP_DIR/sdk"
-
   mkdir -p "$CACHE_DIR"
-  mkdir -p "$TEMP_PROFILE_DIR"
 
+  verify_symlink "$GTHINGS_DIR/SKILL.md" "gthings: SKILL.md"
 
-  verify_symlink "$CDP_DIR/scripts/browser-automation.ts" "CDP: browser-automation.ts"
-  verify_symlink "$CDP_DIR/scripts/templates.ts"          "CDP: templates.ts"
-  verify_symlink "$CDP_DIR/scripts/cache.ts"              "CDP: cache.ts"
-  verify_symlink "$CDP_DIR/scripts/quality.ts"            "CDP: quality.ts"
-
-  verify_symlink "$CDP_DIR/sdk/session.ts"          "CDP SDK: session.ts"
-  verify_symlink "$CDP_DIR/sdk/repl.ts"             "CDP SDK: repl.ts"
-  verify_symlink "$CDP_DIR/sdk/generated.ts"        "CDP SDK: generated.ts"
-  verify_symlink "$CDP_DIR/sdk/browser-harness-js"  "CDP SDK: browser-harness-js"
-
-  verify_symlink "$CDP_DIR/SKILL.md" "CDP: SKILL.md"
-
-  verify_symlink "$GSEARCH_DIR/scripts/gsearch"        "gsearch: CLI"
-  verify_symlink "$GSEARCH_DIR/scripts/pdf-extract.ts" "gsearch: pdf-extract.ts"
-  verify_symlink "$GSEARCH_DIR/scripts/setup"          "gsearch: setup"
-  verify_symlink "$GSEARCH_DIR/SKILL.md"               "gsearch: SKILL.md"
-
-  verify_symlink "$GSEARCH_DIR/lib/common.sh" "gsearch lib: common.sh"
-  verify_symlink "$GSEARCH_DIR/lib/search.sh" "gsearch lib: search.sh"
-
-  verify_symlink "$BIN_DIR/gsearch"             "PATH: gsearch"
-  verify_symlink "$BIN_DIR/browser-harness-js"  "PATH: browser-harness-js"
-
-  verify_dir "$CACHE_DIR"       "Cache: $CACHE_DIR"
-  verify_dir "$TEMP_PROFILE_DIR" "Temp profile: $TEMP_PROFILE_DIR"
+  verify_dir "$CACHE_DIR" "Cache: $CACHE_DIR"
 
   echo ""
   if [ "$FAILED" -eq 0 ]; then
@@ -195,20 +112,14 @@ install() {
   echo ""
   echo "  opencode config:  ~/.config/opencode/"
   echo "  agent skills:     ~/.agents/"
-  echo "    cdp/scripts     browser-automation.ts, templates.ts, cache.ts, quality.ts"
-  echo "    cdp/sdk         session.ts, repl.ts, generated.ts, browser-harness-js"
-  echo "    gsearch/scripts gsearch CLI, pdf-extract.ts, setup"
-  echo "    gsearch/lib     common.sh, search.sh, batch.sh, actions.sh, follow.sh, pdf.sh"
-  echo "  CLI tools:        ~/.local/bin/{gsearch,browser-harness-js}"
-  echo "  env:              CDP_SCRIPTS, GSEARCH_SCRIPTS, CDP_SDK"
-  echo "  cache:            /tmp/nyx-search-cache"
-  echo "  temp profile:     /tmp/gsearch-profile"
+  echo "    gthings/SKILL.md"
   echo ""
-  echo "  Requires: Google Chrome or Dia installed for browser automation."
+  echo "  Requires: gthings binary installed via 'cargo install gthings'"
+  echo "            Browser (Chrome/Dia) running with --remote-debugging-port=9222"
   echo ""
   echo "  Quick start:"
-  echo "    gsearch launch"
-  echo "    gsearch --count 2 \"your topic\""
+  echo "    gthings status"
+  echo "    gthings search --count 2 \"your topic\""
   echo ""
   echo "  To reinstall: $0 install"
   echo "  Repo: https://github.com/datnguyennnx/nyx"

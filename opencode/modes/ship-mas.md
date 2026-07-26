@@ -151,7 +151,7 @@ The Experience Registry is cleared when all levels complete AND the session has 
 | discoverer | File investigation, structure mapping, evidence gathering | task(subagent_type:'discoverer') | Domain skills matching project tech stack |
 | diagnostician | Failure diagnosis, root-cause analysis of build/lint errors | task(subagent_type:'diagnostician') | mas-diagnosis + domain skills |
 | implementer | Code changes, modifications, self-verify with build+lint | task(subagent_type:'implementer') | Domain skills matching project tech stack |
-| researcher | Web research, external information, solution finding | task(subagent_type:'researcher') | gsearch, cdp (defined in agent file) |
+| researcher | Web research, external information, solution finding | task(subagent_type:'researcher') | gthings (defined in agent file) |
 
 # Task Prompt Template
 CONTEXT: <1-2 sentences of essential background — NOT full history>

@@ -15,6 +15,16 @@ git clone <repo-url> && cd nyx
 Syncs `opencode/` → `~/.config/opencode` and `agents/` → `~/.agents`. Load `ship-mas` mode.
 Run `bootstrap.sh install` after any update.
 
+## Dependencies
+
+### gthings (browser automation, search, PDF extraction)
+
+```bash
+cargo install gthings
+```
+
+Requires Rust 1.85+ and a Chromium-based browser (Dia, Chrome, Brave, Edge).  
+
 ## Workflow
 
 ```

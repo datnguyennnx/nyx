@@ -129,8 +129,7 @@
     },
     "implementer": {
       "permission": {
-        "task": "deny",
-        "bash": { "*": "allow" }
+        "task": "deny"
       }
     },
     "researcher": {
