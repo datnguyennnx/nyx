@@ -90,6 +90,8 @@ Before spawning any sub-agent for an edge task, apply the delegation gate:
 - Is verification of the output cheaper than redoing it? → delegate
 - Is the task sequential, well-understood, and self-contained? → do NOT delegate (inline)
 
+Delegation carries a 15× token overhead (Anthropic 2025) — apply this gate only when the checks above justify it.
+
 ## Plan Validation Before Execution
 
 Before spawning level-0 implementers, validate the plan:
@@ -159,9 +161,6 @@ SUMMARY: ~300-500 token summary
 | Corrupts state | Roll back to last commit |
 
 ## Retry
-1st attempt → if fail, classify (transient/scope/logic) → retry with corrected prompt
-2nd attempt → if still failing, include broader context (dependencies, related files) → retry
-3rd attempt → if still failing, ESCALATE to user
-Max 3 attempts per sub-agent. After 3, always escalate. Never auto-retry past 3.
+See the canonical Re-spawn Diversity Strategy in skills/mas-interaction/SKILL.md (§ Re-spawn Diversity Strategy).
 
 

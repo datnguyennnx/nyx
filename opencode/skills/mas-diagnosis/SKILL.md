@@ -41,11 +41,10 @@ description: "Diagnosis guide for common MAS orchestration failures: cross-level
 
 **Root cause:** Feedback is not being classified before acting. Every piece of feedback is treated as a re-spawn, even when it contradicts previous decisions or changes scope.
 
-**Fix:** Classify each feedback message before re-spawning:
-- **Approach change** ("use X instead of Y") → orchestrator redesigns approach, then passes to implementer
-- **Implementation redo** ("this logic is wrong") → spawn implementer for affected files only
-- **Scope change** ("also add feature Z") → re-decompose with expanded scope — flag scope creep to the user
-- **Minor tweak** ("change this color") → direct agent spawn, no re-decompose
+**Fix:** Classify each feedback message against the canonical feedback classification table in
+skills/mas-interaction/SKILL.md (§ Feedback Classification), which covers 5 categories
+including "Verification add" and "Decision override" that this earlier version omitted.
+Apply the re-entry action specified in that table for each category.
 
 **Prevention:** Track `hitl_rounds`. At round 4, pause and ask the user to clarify or abort. Do not auto-continue past 3.
 
@@ -65,6 +64,5 @@ description: "Diagnosis guide for common MAS orchestration failures: cross-level
 
 **Root cause:** Insufficient delegation. The orchestrator tries to resolve ambiguity internally instead of spawning a discoverer or researcher to gather evidence. Research (Zhou et al. 2026, arXiv 2604.10739) shows that beyond a task-dependent threshold (typically 7K-12K tokens), marginal utility of additional thinking becomes negative. Answer oscillation is the strongest predictor (r=0.78).
 
-**Fix:** Apply the Thinking Budget tiers from ship-mas.md. If you catch yourself going back and forth between two options in a thinking block, stop and spawn a discoverer to gather evidence instead. Use the tier's budget as a hard limit — if exceeded, restructure as a spawn prompt.
-
-**Prevention:** Before any complex thinking block, pre-commit to a decision deadline: "I will decide between options A and B within [tier budget], then spawn an agent for whichever option I choose." Track answer oscillation markers ("but wait", "actually", "hmm"). At the third oscillation marker, force a spawn.
+**Fix:** Apply the oscillation-marker enforcement rules from modes/ship-mas.md (§ Oscillation-Marker Enforcement) and the TECA overthink detection from
+skills/mas-verification/SKILL.md (§ TECA Overthink Detection) instead of relying on hard token caps. The canonical detection thresholds and escalation rules are defined in the TECA section.

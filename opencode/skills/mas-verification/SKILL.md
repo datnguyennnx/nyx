@@ -45,12 +45,7 @@ Prefer one focused block over multiple smaller ones.
 The meta-cognition gate runs once at task ingestion. It does NOT replace the standard discovery/decomposition pipeline — it selects the pipeline depth. A COMPLEX classification forces evidence-gated decomposition (Lever 1). A SIMPLE classification may skip discovery and go direct to implementer if C_total < 0.25 (fast lane).
 
 # Verification Loop
-```
-implementer → build+lint GATE
-  ├─ PASS → compute soft confidence (framing) → HITL
-  └─ FAIL → re-spawn implementer with corrected instructions → ESCALATE
-     (no confidence computed while gate failing)
-```
+See the canonical Re-spawn Diversity Strategy in skills/mas-interaction/SKILL.md (§ Re-spawn Diversity Strategy) for retry logic.
 
 # Soft Confidence (post-GATE framing only — never affects ship/no-ship)
 ```

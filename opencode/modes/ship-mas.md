@@ -19,7 +19,7 @@ Stop at the first step you haven't completed. Do NOT skip steps.
 [!] 2. Evidence gathered? (spawn discoverer agent, file:line citations)
 [!] 5. Plan validated? (structural validation on planned interfaces/types)
 [ ] 1. Structure scanned? (ls)
-[!] 3. Complexity score script ran? (see C_total → Tier Mapping — this drives the thinking budget)
+[!] 3. Complexity score script ran? (C_total routes pipeline depth only; thinking budget is per-step via Tier Budgets table)
 [ ] 4. Level schedule computed?
 [ ] 6. Tasks spawned?
 [ ] 7. GATE passed?
@@ -56,6 +56,7 @@ If you have not completed step N, you may NOT proceed to step N+1. If you catch 
     c. Is verification cheaper than redoing? (Complex output to validate → delegate)
     If NO to ALL THREE: do the work inline — delegation overhead (15× token multiplier per Anthropic 2025) exceeds benefit.
     If YES to ANY: delegate with clear SKILLS and OUTPUT_CONTRACT.
+    (This mirrors the canonical version in skills/mas-decomposition/SKILL.md § Delegation Gate.)
     
     NEVER retry a blocked bash command with alternatives — request permission once, then delegate.
 
@@ -74,20 +75,32 @@ Stop and restructure as a spawn prompt.
 | Deep | 8,000 tokens | Research integration, cross-crate refactoring, multi-level scheduling |
 | **Hard cap** | **12,000 tokens** | Absolute maximum — beyond this, overthinking dominates |
 
-If you catch yourself oscillating between options or re-analyzing decided questions, you are overthinking.
-Stop and spawn a discoverer to resolve the ambiguity. See TECA in mas-verification skill.
+This is the live/in-progress counterpart to the post-hoc TECA check in
+skills/mas-verification/SKILL.md (§ TECA Overthink Detection).
+The TECA check runs before HITL finalization; this section governs
+real-time thinking during the Ladder.
 
-## C_total → Tier Mapping
+### Oscillation-Marker Enforcement (replaces C_total-driven caps)
 
-The thinking tier is determined by the complexity score (C_total) from the script:
+Instead of hard token limits per C_total tier, use hesitation markers to
+detect overthinking in real time. Markers include: "but wait", "actually",
+"hmm", "on the other hand", "let me reconsider", or reverting to a
+previously-discarded option.
 
-| C_total Range | Pipeline | Thinking Tier | Budget |
-|---------------|----------|---------------|--------|
-| < 0.25        | Fast lane | Quick          | 500 tokens |
-| 0.25 - 0.60   | Normal   | Moderate       | 2,000 tokens |
-| > 0.60        | Full     | Complex        | 5,000 tokens |
+| Markers in current block | Action |
+|--------------------------|--------|
+| 0-1 | Continue — even if over the tier target |
+| 2-3 | Spawn a discoverer or diagnostician scoped to the specific ambiguity, then resume using its output |
+| 4+ | Commit to the decision that existed immediately before the first marker; stop deliberating further |
 
-C_total drives both pipeline depth and thinking tier — they form a single unified model.
+**Exception** — Ladder Steps 3-4 (task definition + schedule) and Step 8
+(HITL composition): "restructure as a spawn prompt" has no valid target
+(Red Line #7 forbids relaying orchestrator-produced analysis through a
+sub-agent). For these steps, the 4+ marker case MUST resolve to "commit
+to pre-marker decision," never "spawn."
+
+The **12,000-token hard cap** remains an absolute, C_total-independent
+circuit breaker regardless of marker count.
 
 ## Allowed thinking content
 - "Step X: [step name]" — which Ladder step you're on

@@ -1,10 +1,73 @@
 import { tool } from "@opencode-ai/plugin"
+import { execFile } from "child_process"
+
+function buildArgs(args: {
+  command: string
+  query?: string
+  queries?: string[]
+  count?: number
+  maxChars?: number
+  offset?: number
+  follow?: boolean
+  pdfSubcommand?: string
+  filePath?: string
+  dedup?: string
+  rank?: string
+  followTop?: number
+  warnTabs?: number
+}): string[] {
+  const cmd: string[] = [args.command]
+
+  if (args.command === "pdf" && args.pdfSubcommand) {
+    cmd.push(args.pdfSubcommand)
+  }
+
+  if (args.command === "pdf" && args.pdfSubcommand === "file" && args.filePath) {
+    cmd.push(args.filePath)
+  } else if (args.query) {
+    cmd.push(args.query)
+  } else if (
+    (args.command === "batch" || args.command === "harvest") &&
+    args.queries?.length
+  ) {
+    cmd.push(...args.queries)
+  }
+
+  if (args.count !== undefined) {
+    cmd.push("--count", String(args.count))
+  }
+  if (args.maxChars !== undefined) {
+    cmd.push("--max-chars", String(args.maxChars))
+  }
+  if (args.offset !== undefined) {
+    cmd.push("--offset", String(args.offset))
+  }
+  if (args.follow) {
+    cmd.push("--follow")
+  }
+  if (args.dedup !== undefined) {
+    cmd.push("--dedup", args.dedup)
+  }
+  if (args.rank !== undefined) {
+    cmd.push("--rank", args.rank)
+  }
+  if (args.followTop !== undefined) {
+    cmd.push("--follow-top", String(args.followTop))
+  }
+  if (args.warnTabs !== undefined) {
+    cmd.push("--warn-tabs", String(args.warnTabs))
+  }
+  cmd.push("--json")
+
+  return cmd
+}
 
 export default tool({
-  description: "Browser automation and web research via gthings CLI — search Google, follow pages, batch search, extract content, harvest results, extract PDFs",
+  description:
+    "Browser automation and web research via gthings CLI — search, follow, batch, extract, harvest, pdf, status, update",
   args: {
     command: tool.schema
-      .enum(["search", "follow", "batch", "extract", "harvest", "pdf", "status"])
+      .enum(["search", "follow", "batch", "extract", "harvest", "pdf", "status", "update"])
       .describe("Subcommand to run"),
     query: tool.schema
       .string()
@@ -22,6 +85,10 @@ export default tool({
       .number()
       .describe("Max characters to extract (default: 15000)")
       .optional(),
+    offset: tool.schema
+      .number()
+      .describe("Content offset (default: 0)")
+      .optional(),
     follow: tool.schema
       .boolean()
       .describe("Also follow top result URLs (batch only)")
@@ -34,41 +101,56 @@ export default tool({
       .string()
       .describe("Local file path (pdf file only)")
       .optional(),
+    dedup: tool.schema
+      .string()
+      .describe("Dedup strategy for harvest (default: url)")
+      .optional(),
+    rank: tool.schema
+      .string()
+      .describe("Rank strategy for harvest (default: composite)")
+      .optional(),
+    followTop: tool.schema
+      .number()
+      .describe("Number of top results to follow in harvest (default: 8)")
+      .optional(),
+    warnTabs: tool.schema
+      .number()
+      .describe("Warn tabs threshold for harvest (default: 20)")
+      .optional(),
   },
-  async execute(args) {
-    const parts: string[] = ["gthings"]
-    parts.push(args.command)
+  async execute(args, context) {
+    const cmdArgs = buildArgs(args)
 
-    if (args.command === "pdf" && args.pdfSubcommand) {
-      parts.push(args.pdfSubcommand)
-    }
+    const result = await new Promise<string>((resolve, reject) => {
+      const child = execFile(
+        "gthings",
+        cmdArgs,
+        {
+          encoding: "utf-8",
+          timeout: 120000,
+          env: { ...process.env, RUST_LOG: "error" },
+        },
+        (error, stdout, stderr) => {
+          if (error) {
+            reject(new Error(stderr?.trim() || error.message))
+            return
+          }
+          resolve(stdout?.trim() ?? "")
+        },
+      )
 
-    if (args.command === "pdf" && args.pdfSubcommand === "file" && args.filePath) {
-      parts.push(JSON.stringify(args.filePath))
-    } else if (args.query) {
-      parts.push(JSON.stringify(args.query))
-    } else if ((args.command === "batch" || args.command === "harvest") && args.queries?.length) {
-      for (const q of args.queries) {
-        parts.push(JSON.stringify(q))
+      if (context?.abort) {
+        context.abort.addEventListener(
+          "abort",
+          () => {
+            child.kill()
+            reject(new Error("Aborted"))
+          },
+          { once: true },
+        )
       }
-    }
+    })
 
-    if (args.count) parts.push(`--count=${args.count}`)
-    if (args.maxChars) parts.push(`--max-chars=${args.maxChars}`)
-    if (args.follow) parts.push("--follow")
-    parts.push("--json")
-
-    const { execSync } = await import("child_process")
-    try {
-      const stdout = execSync(parts.join(" "), {
-        encoding: "utf-8",
-        timeout: 60000,
-        stdio: ["pipe", "pipe", "pipe"],
-        env: { ...process.env, RUST_LOG: "error" },
-      })
-      return stdout.trim()
-    } catch (e: any) {
-      return `Error: ${e.stderr?.trim() || e.message}`
-    }
+    return result
   },
 })

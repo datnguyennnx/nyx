@@ -10,15 +10,11 @@ See mas-verification skill for the difficulty assessment table. (Canonical locat
 
 ## Delegation Threshold Calibration
 
-Before spawning any sub-agent, apply the delegation gate:
-1. **Parallelizable?** — Can the work be split into independent units? If yes, delegate.
-2. **Context gap?** — Does the orchestrator lack the files or domain knowledge? If yes, delegate.
-3. **Verify-cheaper-than-redo?** — Is validating the output easier than redoing it? If yes, delegate.
-If NO to all three: do the work inline. Delegation carries 15× token overhead (Anthropic 2025).
+See the canonical Delegation Gate in skills/mas-decomposition/SKILL.md (§ Delegation Gate).
 
 Production benchmarks (GitHub Copilot CLI, June 2026):
-- Raising delegation threshold → 23% fewer tool failures per session
-- Selective delegation → 27% fewer search tool failures
+- Raising delegation threshold → 23% fewer tool failures per session [unverified — single source]
+- Selective delegation → 27% fewer search tool failures [unverified — single source]
 - No quality regression detected in A/B test over 4 weeks
 
 ---
