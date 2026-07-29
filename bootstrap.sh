@@ -7,12 +7,8 @@ DOTFILES="$(cd "$(dirname "$0")" && pwd)"
 
 # -- Path configuration --
 AGENTS_DIR="$HOME/.agents"
-GTHINGS_DIR="$AGENTS_DIR/skills/gthings"
 BIN_DIR="$HOME/.local/bin"
 CACHE_DIR="/tmp/nyx-search-cache"
-
-# Source paths (nyx repo -- single source of truth)
-SRC_GTHINGS="$DOTFILES/agents/skills/gthings"
 
 # Track verification failures
 FAILED=0
@@ -76,7 +72,8 @@ ensure_env_var() {
   fi
 }
 
-# -- Install logic --
+# -- Install logic -- (opencode config, env vars, cache dirs)
+# NOTE: gthings skill files are managed by `gthings update`, not by this script.
 
 install() {
   local opencode_target="$HOME/.config/opencode"
@@ -89,15 +86,9 @@ install() {
     --exclude='sync-*.sh' \
     "$DOTFILES/opencode/" "$opencode_target/"
 
-  rm -rf "$GTHINGS_DIR"
-  mkdir -p "$GTHINGS_DIR"
-  symlink_file "$SRC_GTHINGS/SKILL.md" "$GTHINGS_DIR/SKILL.md"
-
   ensure_path
 
   mkdir -p "$CACHE_DIR"
-
-  verify_symlink "$GTHINGS_DIR/SKILL.md" "gthings: SKILL.md"
 
   verify_dir "$CACHE_DIR" "Cache: $CACHE_DIR"
 
@@ -111,13 +102,12 @@ install() {
 
   echo ""
   echo "  opencode config:  ~/.config/opencode/"
-  echo "  agent skills:     ~/.agents/"
-  echo "    gthings/SKILL.md"
   echo ""
   echo "  Requires: gthings binary installed via 'cargo install gthings'"
   echo "            Browser (Chrome/Dia) running with --remote-debugging-port=9222"
   echo ""
   echo "  Quick start:"
+  echo "    gthings update    # install skill files"
   echo "    gthings status"
   echo "    gthings search --count 2 \"your topic\""
   echo ""

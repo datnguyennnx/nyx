@@ -57,7 +57,9 @@ function buildArgs(args: {
   if (args.warnTabs !== undefined) {
     cmd.push("--warn-tabs", String(args.warnTabs))
   }
-  cmd.push("--json")
+  if (args.command !== "update") {
+    cmd.push("--json")
+  }
 
   return cmd
 }
@@ -122,32 +124,22 @@ export default tool({
     const cmdArgs = buildArgs(args)
 
     const result = await new Promise<string>((resolve, reject) => {
-      const child = execFile(
-        "gthings",
-        cmdArgs,
-        {
-          encoding: "utf-8",
-          timeout: 120000,
-          env: { ...process.env, RUST_LOG: "error" },
-        },
-        (error, stdout, stderr) => {
-          if (error) {
-            reject(new Error(stderr?.trim() || error.message))
-            return
-          }
-          resolve(stdout?.trim() ?? "")
-        },
-      )
+      const child = execFile("gthings", cmdArgs, {
+        encoding: "utf-8",
+        timeout: 120000,
+        env: { ...process.env, RUST_LOG: process.env.RUST_LOG || "warn" },
+      }, (error, stdout, stderr) => {
+        if (error) {
+          const codeStr = error.code ? ` (exit ${error.code})` : ""
+          const signalStr = error.signal ? ` [signal ${error.signal}]` : ""
+          reject(new Error((stderr?.trim() || error.message) + codeStr + signalStr))
+          return
+        }
+        resolve(stdout?.trim() ?? "")
+      })
 
       if (context?.abort) {
-        context.abort.addEventListener(
-          "abort",
-          () => {
-            child.kill()
-            reject(new Error("Aborted"))
-          },
-          { once: true },
-        )
+        context.abort.addEventListener("abort", () => { child.kill() }, { once: true })
       }
     })
 
