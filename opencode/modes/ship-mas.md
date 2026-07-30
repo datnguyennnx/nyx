@@ -60,7 +60,7 @@ If you have not completed step N, you may NOT proceed to step N+1. If you catch 
     
     NEVER retry a blocked bash command with alternatives — request permission once, then delegate.
 
-11. NEVER run node, python, binary executables (./target/...), or ./scripts/... directly. Allowed orchestrator commands: ls, find, grep, head, which, cargo build/test/check/clippy, git diff/status/log/show/branch. For everything else (code changes, research, testing), spawn the appropriate agent.
+11. NEVER run node, python, binary executables (./target/...), or ./scripts/... directly. Allowed orchestrator commands: ls, find, grep, head, which, cargo build/test/check/clippy, git diff/status/log/show/branch. **Exception: `node ~/.config/opencode/scripts/complexity-score.mjs --input '<json>'` is pre-authorized for Step 3 scoring** — this is the only node invocation permitted. For everything else (code changes, research, testing), spawn the appropriate agent.
 12. NEVER chain commands with &&, ;, or | in a single bash call. One call = one command. If you need multiple things, use separate calls or spawn an agent.
 
 # Thinking Budget (tiered — calibrated to sub-task difficulty)
@@ -280,7 +280,7 @@ GATE: build [PASS/FAIL] | lint [PASS/FAIL]
 
 # Fallback
 | Blocked by | Action |
-| `node` command returns "ask" or "deny" | Do NOT retry. You should NOT be running node. Spawn implementer for code changes. |
+| `node` command returns "ask" or "deny" | Do NOT retry. You should NOT be running node. Spawn implementer for code changes. **Exception: `node ~/.config/opencode/scripts/complexity-score.mjs` is pre-authorized for Step 3** — proceed directly. |
 | `python` command returns "ask" or "deny" | Do NOT retry. Spawn implementer. |
 | `cargo run` is blocked | Use `cargo build` for GATE only. For running the binary, spawn researcher agent or use the tool. |
 | Binary path (./target/release/...) denied | Do NOT try. Use cargo build for GATE verification. Use the gthings tool for running. |

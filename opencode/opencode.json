@@ -61,6 +61,7 @@
         },
         "skill": "allow",
         "bash": {
+          "node ~/.config/opencode/scripts/complexity-score.mjs*": "allow",
           "*": "deny",
           "ls": "allow",
           "ls *": "allow",
