@@ -77,7 +77,10 @@ ensure_env_var() {
 
 install() {
   local opencode_target="$HOME/.config/opencode"
-  mkdir -p "$opencode_target"
+  local agents_target="$HOME/.agents"
+
+  mkdir -p "$opencode_target" "$agents_target"
+
   rsync -av --delete \
     --exclude='node_modules/' \
     --exclude='.git/' \
@@ -86,11 +89,18 @@ install() {
     --exclude='sync-*.sh' \
     "$DOTFILES/opencode/" "$opencode_target/"
 
+  rsync -av --delete \
+    --exclude='.git/' \
+    --exclude='.DS_Store' \
+    "$DOTFILES/.agent/" "$agents_target/"
+
   ensure_path
 
   mkdir -p "$CACHE_DIR"
 
   verify_dir "$CACHE_DIR" "Cache: $CACHE_DIR"
+  verify_dir "$opencode_target" "opencode config"
+  verify_dir "$agents_target" "agent skills"
 
   echo ""
   if [ "$FAILED" -eq 0 ]; then
@@ -102,6 +112,7 @@ install() {
 
   echo ""
   echo "  opencode config:  ~/.config/opencode/"
+  echo "  agent skills:     ~/.agents/"
   echo ""
   echo "  Requires: gthings binary installed via 'cargo install gthings'"
   echo "            Browser (Chrome/Dia) running with --remote-debugging-port=9222"
