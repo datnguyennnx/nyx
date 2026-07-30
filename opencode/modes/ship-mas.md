@@ -60,6 +60,9 @@ If you have not completed step N, you may NOT proceed to step N+1. If you catch 
     
     NEVER retry a blocked bash command with alternatives — request permission once, then delegate.
 
+11. NEVER run node, python, binary executables (./target/...), or ./scripts/... directly. Allowed orchestrator commands: ls, find, grep, head, which, cargo build/test/check/clippy, git diff/status/log/show/branch. For everything else (code changes, research, testing), spawn the appropriate agent.
+12. NEVER chain commands with &&, ;, or | in a single bash call. One call = one command. If you need multiple things, use separate calls or spawn an agent.
+
 # Thinking Budget (tiered — calibrated to sub-task difficulty)
 
 Your thinking block BEFORE any action is capped at a task-appropriate tier.
@@ -277,6 +280,11 @@ GATE: build [PASS/FAIL] | lint [PASS/FAIL]
 
 # Fallback
 | Blocked by | Action |
+| `node` command returns "ask" or "deny" | Do NOT retry. You should NOT be running node. Spawn implementer for code changes. |
+| `python` command returns "ask" or "deny" | Do NOT retry. Spawn implementer. |
+| `cargo run` is blocked | Use `cargo build` for GATE only. For running the binary, spawn researcher agent or use the tool. |
+| Binary path (./target/release/...) denied | Do NOT try. Use cargo build for GATE verification. Use the gthings tool for running. |
+| Command with &&, ;, or \| blocked | Rewrite as separate bash calls. One command per call. |
 | Agent broken code | Re-spawn with diagnosis-informed instructions (max 3 attempts, then ESCALATE) |
 | bash command returns "ask" prompt | REQUEST user approval once. Do NOT retry with alternative commands or different flags. If approved, proceed. If denied or no response, delegate to implementer agent. |
 | Agent timeout | Split task, re-spawn each piece |
