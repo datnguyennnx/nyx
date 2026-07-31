@@ -29,7 +29,7 @@
 //   [6] Ebadulla et al. (2025). "Graph-based complexity metrics for
 //       multi-agent curriculum learning." arXiv:2507.07074.
 //       https://arxiv.org/abs/2507.07074
-
+//
 // Deterministic complexity scoring + level-set scheduling for ship-mas.
 // Rejects un-cited edges and overlapping same-level file sets.
 //
@@ -453,18 +453,7 @@ function main() {
   const C_total = alpha * C_min_norm + beta * (1 - clamped_Q) + gamma * avg_cond;
   const C_total_clamped = Math.min(1, Math.max(0, C_total));
 
-  const mathVerification = {
-    H_norm_in_range: H_norm >= 0 && H_norm <= 1,
-    D_JS_in_range: D_JS >= 0 && D_JS <= 1,
-    C_min_norm_in_range: C_min_norm >= 0 && C_min_norm <= 1,
-    Q_in_range: Q >= -0.5 && Q <= 1.0,
-    avg_conductance_in_range: avg_cond >= 0 && avg_cond <= 1,
-    C_total_in_range: C_total_clamped >= 0 && C_total_clamped <= 1,
-    ensemble_equation_verified: true,
-    weights_sum_to_one: Math.abs(alpha + beta + gamma - 1.0) < 0.02
-  };
-
-  const fileConflicts = checkFileOverlap(tasks, levels);
+	const fileConflicts = checkFileOverlap(tasks, levels);
   if (fileConflicts.length > 0) {
     throw new Error(
       `File overlap between same-level (parallel) tasks: ` +
@@ -493,17 +482,7 @@ function main() {
   console.log(JSON.stringify({
     H_norm, D_JS,
     C_min_norm, Q, avg_conductance: avg_cond, C_total: C_total_clamped,
-    routing, levels, recommended,
-    _math: {  // formula documentation — not for consumption
-      ensemble: 'C_total = α·C_min_norm + β·(1-Q) + γ·avg_conductance',
-      weights: { alpha, beta, gamma, sum: (alpha + beta + gamma).toFixed(2) },
-      sources: {
-        min_cut: 'Stoer & Wagner (1997)',
-        modularity: 'Newman & Girvan (2004)',
-        conductance: 'Kannan, Vempala & Vetta (2004)'
-      },
-      verification: mathVerification
-    }
+    routing, levels, recommended
   }, null, 2));
 }
 

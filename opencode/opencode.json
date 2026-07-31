@@ -61,7 +61,6 @@
         },
         "skill": "allow",
         "bash": {
-          "node ~/.config/opencode/scripts/complexity-score.mjs*": "allow",
           "*": "deny",
           "ls": "allow",
           "ls *": "allow",
@@ -88,6 +87,7 @@
           "git rebase*": "ask",
           "git reset*": "ask",
           "git restore*": "ask",
+          "node ~/.config/opencode/scripts/complexity-score.mjs*": "allow",
           "cat .env*": "deny",
           "cat */.env*": "deny",
           "cat *<<*": "deny",
