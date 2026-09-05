@@ -6,7 +6,7 @@ set -euo pipefail
 DOTFILES="$(cd "$(dirname "$0")" && pwd)"
 
 # -- Path configuration --
-AGENTS_DIR="$HOME/.agents"
+AGENTS_DIR="$HOME/.agents/skills"
 BIN_DIR="$HOME/.local/bin"
 CACHE_DIR="/tmp/nyx-search-cache"
 
@@ -77,7 +77,7 @@ ensure_env_var() {
 
 install() {
   local opencode_target="$HOME/.config/opencode"
-  local agents_target="$HOME/.agents"
+  local agents_target="$HOME/.agents/skills"
 
   mkdir -p "$opencode_target" "$agents_target"
 
@@ -89,6 +89,7 @@ install() {
     --exclude='sync-*.sh' \
     "$DOTFILES/opencode/" "$opencode_target/"
 
+  # v2 scans external skills from ~/.agents/skills/<name>/SKILL.md
   rsync -av --delete \
     --exclude='.git/' \
     --exclude='.DS_Store' \
@@ -112,7 +113,7 @@ install() {
 
   echo ""
   echo "  opencode config:  ~/.config/opencode/"
-  echo "  agent skills:     ~/.agents/"
+  echo "  agent skills:     ~/.agents/skills/"
   echo ""
   echo "  Requires: gthings binary installed via 'cargo install gthings'"
   echo "            Browser (Chrome/Dia) running with --remote-debugging-port=9222"
@@ -140,9 +141,9 @@ esac
 # NOTE: One-direction sync only
 #
 # This repo (nyx) is the SINGLE SOURCE OF TRUTH.
-# All sync is one direction: repo -> global (~/.config/opencode, ~/.agents).
+# All sync is one direction: repo -> global (~/.config/opencode, ~/.agents/skills).
 #
 # To apply changes:  ./bootstrap.sh install
 #
 # NEVER sync from global back to repo. If you modified files in
-# ~/.config/opencode or ~/.agents, copy them manually to this repo.
+# ~/.config/opencode or ~/.agents/skills, copy them manually to this repo.

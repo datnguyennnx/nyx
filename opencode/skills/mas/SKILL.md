@@ -1,78 +1,70 @@
 ---
 name: mas
-description: "Multi-Agent Shipping orchestration — decomposing work into parallel tasks, spawning agents level-by-level, and verifying with a binary compilation gate."
+description: "Multi-Agent Shipping orchestration — decompose, batch-spawn level-by-level, verify with a binary compilation gate. Triggers on diagram / flow / visualize / sequential / document / mermaid requests: diagram/single-doc dispatches discoverer fan-out (read-only, parallel where no P-BLOCKING/P-WRITE) then implementer render (P-WRITE serialized) — aggregate fan-out allowed for ≥2 sub-intents. Skip the full MAS ceremony for single-doc/diagram tasks (Classify step handles scope)."
 ---
 
 # Role
-You are an orchestrator. You never write code, read files, or analyze logic. Your job: decompose → spawn agents → verify → present. Every analytical task is delegated to a spawned sub-agent.
+You orchestrate: decompose → batch-spawn → verify → present. You never write code, read files, or analyze logic — every analytical task is delegated to a spawned sub-agent. read/analyse = DENIED.
 
-# Core Rule
-**Never estimate — always run the script. Never skip evidence — it is the foundation of every decision.** Delegate, don't do.
+# Ordered Actions
+Do each step, confirm its completion criteria, then advance. Load lazy refs ONLY when the step needs them — never up front. Branch pointers below expand `<skill-dir>` to this skill's directory; each resolves to a file in `<skill-dir>/references/`, loaded on need — never as standalone skills.
 
-The Delegation Gate: see the canonical version in skills/mas-decomposition/SKILL.md (§ Delegation Gate).
+## 1. Inventory
+- Union all TARGET_FILES from the request into one path set.
+- Consume the request's sub-intent list (router t1 split → map → cover) and register it as the coverage ledger — every sub-intent must be claimed by a spawn output.
+- Completion: every task's files listed; any path owned by >1 task flagged; ledger states N sub-intents.
+- Rule: overlapping paths → single implementer or re-split. Never split a file cluster across parallel tasks.
 
-If you find yourself thinking "this is simple enough to skip discovery" or "I can compute the complexity mentally" — stop. The script (complexity-score.mjs) catches file overlap, cycles, and missing citations that you cannot see from the task list alone.
+## 2. Classify
+- Accept a sub-intent list, not just one scope. Diagram / multi-part document → discoverer fan-out (read-only; parallel where no P-BLOCKING/P-WRITE) then implementer render — aggregate fan-out allowed (each diagram part maps to its own renderer); P-WRITE edges serialize (a diagram route is NOT a fan-out failure; the Classify rule below is the scope gate). Single sub-intent / one coherent scope → one implementer, done — no MAS ceremony (ceremony on simple tasks wastes tokens).
+- ≥2 sub-intents → MAS fan-out continues (fan-out NEVER below this threshold); each sub-intent solved as its own unit and checked for coverage later.
+- Else continue.
+- Completion: verdict stated in one line — "MAS" or "single" — plus the sub-intent ledger count.
 
-# Pre-Flight (before any spawn)
-1. Load ALL 5 skills: mas, mas-decomposition, mas-diagnosis, mas-interaction, mas-verification
-2. Confirm node --version + complexity-score.mjs exists
-3. Confirm all sub-agents have task: deny (recursion lock)
+## 3. Decompose — run the script
+- `node ~/.config/opencode/scripts/complexity-score.mjs --input '<json>'`
+- Script stdout is AUTHORITATIVE. Never estimate. Lazy ref on need: `<skill-dir>/references/decomposition.md` § Complexity Score (only if script output needs interpretation).
+- Completion: script produced a level plan. Script threw → re-run discoverer with "cite or state none" per pair.
+- Lanes: fast / normal / full by C_total band — thresholds are heuristics (see `<skill-dir>/references/decomposition.md` § Complexity Score, load on need).
 
-# Complexity Score
-C_total < 0.25 → fast lane (skip evidence, implementer only)
-C_total 0.25-0.60 → normal pipeline (discoverer + decomposition + implementers)
-C_total > 0.60 → full pipeline (maximum caution, extra verification)
+## 4. Validate plan
+- Lazy ref on need: `<skill-dir>/references/decomposition.md` § Plan Validation / § Edge Taxonomy.
+- Completion: every edge has an evidence citation; no cycles; no file overlap within a level; ambiguous edges = sequential.
+- Rules: P-PARALLEL produces NO edge; P-BLOCKING/P-WRITE produce edges. P-WRITE edges serialize within a level. No-evidence ≠ parallel.
 
-Run: node ~/.config/opencode/scripts/complexity-score.mjs --input '<json>'
-Script output is AUTHORITATIVE. Never estimate.
+## 5. Spawn level-by-level
+- Level 0 ≤ 2 write-capable roots; read-only / discoverer fan-out may exceed 2 roots (aggregate-cap; parallel where no P-BLOCKING/P-WRITE edge). P-WRITE edges serialize within the level. One level = one parallel batch; deeper fan-out only after gated levels pass.
+- Sub-agent prompt = their entire world (fresh context). Lazy ref on need: `<skill-dir>/references/decomposition.md` § Prompt Template.
+- Sub-agents must not re-spawn (recursion lock). Supervisor is silence-first: speak only on batch stop / escalation / handoff; each steer ≤3 sentences (lazy: `<skill-dir>/references/interaction.md` § Silence-First Supervision). Never yield a question mid-pipeline — batch stop and escalation auto-cycle in the same turn (classify → re-spawn with corrected instructions while budget remains, else FAILED Auto Report same turn). Every batch stop / escalation / handoff message MUST chain its tool call same turn — re-spawn subagent(s) or emit FAILED Auto Report envelope — never bare text with no tool call (R-1). ASK is pre-ladder only (R-2; lazy: `<skill-dir>/references/interaction.md` § Human Handoff).
+- Completion: each spawn carries full TARGET_FILES, build/lint commands, and evidence requirements; no parallel race on shared paths (P-WRITE always serialized — keep write guards).
 
-# Script Behavior
-| Script event | What it means | Your move |
+## 6. Verify — binary GATE
+- Lazy ref on need: `<skill-dir>/references/verification.md` § GATE / § Meta-Cognition; `<skill-dir>/references/decomposition.md` § Per-Level Combined GATE.
+- Completion: build AND lint both exit 0 for every agent in the level; a warning = failure. First FAIL halts the batch; no further parallel spawns while a FAIL is open.
+- Failure → auto-cycle in the same turn, never yield/ASK: classify before re-spawning. Lazy ref on need: `<skill-dir>/references/diagnosis.md` (7 failure patterns + root cause); `<skill-dir>/references/interaction.md` § Feedback Classification (re-decompose only on scope change / decision override) and § FAILED Auto Report (on budget exhaustion).
+
+## 7. Retry with corrected instructions
+- Retry budget is verifier-gated; each attempt consumes one unit (lazy: `<skill-dir>/references/verification.md` § Retry Budget). Never re-spawn with the same instructions. Exhaustion → FAILED Auto Report in the same turn (lazy: `<skill-dir>/references/interaction.md` § FAILED Auto Report and § Human Handoff) — never yield, never ASK, never `!continue` wait.
+- Completion: every retry carried NEW corrected instructions; budget log updated.
+
+## 8. Present
+- Sufficiency gate (R-2): every sub-intent in the ledger maps to a verifier-checked subagent output — a diff hunk {file, range, change} or a documented "no-change needed". Unmatched sub-intent → re-cycle (classify → spawn → GATE) — never present partial.
+- Completion criteria (inline): every requirement maps to a diff hunk {file, range, change}; verification {build: PASS/FAIL, lint: PASS/FAIL}; full file replacements report new line count; plans precede structural changes >3 files; maker-checker held.
+
+# Lazy Refs (branch pointers — load on need ONLY, never up front, never as standalone skills)
+| Reference | Load when | Contains |
 |---|---|---|
-| Returns levels | Evidence valid, schedule computed | Spawn per levels |
-| Throws "no evidence" | Discoverer report is incomplete | Re-run discoverer with explicit "cite or state none" per pair |
-| Throws "file overlap" | Same-level tasks share files | Add P-WRITE edge or re-split tasks |
-| Throws "cycle detected" | DAG has cycle | Check P-BLOCKING directions |
-| Returns fastLane: true | C_total < 0.25, single task | Skip evidence, go straight to implementer |
+| `<skill-dir>/references/decomposition.md` | steps 3–6 | Script schema, delta weights, DAG levels, edge taxonomy, plan validation, per-level batch GATE, prompt template |
+| `<skill-dir>/references/diagnosis.md` | step 6, on FAIL | 7 failure patterns + root cause |
+| `<skill-dir>/references/interaction.md` | steps 5–7 | Feedback classification, handoff, silence-first supervision, budgets, re-spawn diversity, FAILED Auto Report |
+| `<skill-dir>/references/verification.md` | step 6 | GATE, meta-cognition, soft confidence, semantic gate, TECA, retry budget, coverage envelope, requirements coverage |
 
-# Edge Taxonomy (3 levels)
-| Type | Condition | Scheduling |
-|---|---|---|
-| P-BLOCKING | A's output is input to B; or A changes shared contract B uses — cited | Sequential (A→B) |
-| P-PARALLEL | discoverer POSITIVELY confirmed no coupling across all file:line pairs | Same level (parallel) |
-| P-WRITE | Both tasks modify the same file — cited | Serialized within level |
-
-Every edge MUST have an evidence citation. No citation = no assignment. Ambiguous = sequential (not parallel).
-P-PARALLEL requires positive confirmation of absence — absence of evidence is NOT evidence of absence.
-
-# Load Supporting Skills (at pre-flight, every session)
-These skills contain the detailed reference material. Load them immediately:
-
-| Skill | Load with | Contains |
-|---|---|---|
-| mas-decomposition | skill({name:'mas-decomposition'}) | Complexity scoring input/output schema, delta-weight table, DAG scheduling, plan validation, per-level GATE, concurrent-writer safety |
-| mas-diagnosis | skill({name:'mas-diagnosis'}) | 6 failure patterns (cross-level type errors, parallel conflicts, GATE-pass wrong output, feedback loops, assertion weakening, overthinking detection), root cause analysis |
-| mas-interaction | skill({name:'mas-interaction'}) | Difficulty assessment, feedback classification, human handoff framework, frustration detection, re-spawn diversity strategy |
-| mas-verification | skill({name:'mas-verification'}) | Binary GATE rules, meta-cognition gate, soft confidence formula, semantic gate, TECA overthink detection |
-
-# Traps (memorize these)
-1. **Scheduling from intuition**: The script catches file overlap and cycles you can't see mentally. Running it is non-negotiable.
-2. **No-evidence-as-parallel**: Only explicit P-PARALLEL with positive confirmation = parallel. Ambiguous = sequential.
-3. **Averaging the GATE**: Build verification and linting must BOTH exit 0. A warning is a failure. Binary, not "close enough."
-4. **Re-decomposing on every feedback**: Classify feedback first. Only scope change and decision override trigger re-decomposition.
-5. **Re-spawning without correcting instructions**: Max 3 attempts. After 3, escalate — the issue is structural.
-6. **Using explore for evidence**: Using explore for evidence (explore is not a separate agent — use discoverer for structured citations with file:line evidence)
-7. **Orchestrator analyzing files**: You CANNOT read files (read=DENIED). You CANNOT produce analysis. Delegate everything to sub-agents.
-8. **Overthinking in the thinking block**: Research (Zhou et al. 2026) shows answer oscillation predicts negative outcomes with r=0.78. Detection and enforcement now use oscillation markers, not fixed token-percentage cutoffs — see modes/ship-mas.md (§ Oscillation-Marker Enforcement) for the real-time rule and skills/mas-verification/SKILL.md (§ TECA Overthink Detection) for the pre-HITL check.
-
-# Before Marking Complete
-- Every coupling pair has non-empty evidence[] (script enforces)
-- Every edge has a non-empty evidence string (script enforces)
-- Every requirement maps to a matching diff hunk
-- Build verification + linting both exited 0 (binary pass)
-- Implementer re-spawned at most 3 times per failure
-- hitl_rounds < 4 (at 4th, pause and ask user)
-- orchestrator checked each level's output against requirements — independent of implementer self-check
-- For structural changes >3 files, orchestrator produced a plan before implementers
-
-OUTPUT_CONTRACT: Confirm the file was fully replaced. Report the new line count. Verify the "Load Supporting Skills" table points to the correct skill() names.
+# Hard Rules
+1. Always run the script — intuition can't see overlaps, cycles, missing citations.
+2. No-evidence-as-parallel is banned; ambiguous = sequential.
+3. GATE is binary; warnings are failures — never average.
+4. Delegate everything; you analyze nothing.
+5. Overthinking: apply TECA (lazy: `<skill-dir>/references/verification.md` § TECA Overthink Detection), not fixed token caps.
+6. Permission ordering (v2): last-match-wins — catch-all `*` allows first, specific denies/asks after.
+7. Sufficiency gate before present: sub-intent coverage ledger must be complete — any unmatched sub-intent blocks Present (R-2).
+8. Parallel ONLY where no P-BLOCKING/P-WRITE edge (R-1); P-WRITE always serializes (R-2); read-only/discoverer fan-out may exceed 2 roots; write-capable roots stay ≤2.

@@ -1,7 +1,9 @@
 {
   "dependencies": {
-    "@opencode-ai/plugin": "1.14.41",
-    "ajv": "^8.20.0",
-    "ajv-formats": "^3.0.1"
+    "@opencode-ai/plugin": "beta"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
   }
 }

@@ -53,14 +53,24 @@ function parseArgs(argv) {
   return out;
 }
 
+function emitError(payload) {
+  console.error(JSON.stringify(payload));
+  process.exit(1);
+}
+
 function loadInput() {
   const { input, inputFile } = parseArgs(process.argv.slice(2));
-  const raw = inputFile ? readFileSync(inputFile, "utf8") : input;
-  if (!raw) {
-    console.error("Missing --input or --input-file");
-    process.exit(1);
+  let raw;
+  try {
+    raw = inputFile ? readFileSync(inputFile, "utf8") : input;
+    if (!raw) throw new Error("missing --input or --input-file");
+    return JSON.parse(raw);
+  } catch (err) {
+    emitError({
+      error: `Missing or unreadable input: ${err.message}`,
+      usage: "node complexity-score.mjs --input '<json>' | --input-file path.json",
+    });
   }
-  return JSON.parse(raw);
 }
 
 // Shannon entropy (1948) [4], normalized [0,1]. >0.7 → splitByFileCluster
@@ -248,8 +258,7 @@ function avgConductance(adj, levels) {
     // Cut: edges from cluster to outside
     let cut = 0;
     let vol = 0;
-    const outsideVol = {vol: 0};
-    
+
     let totalVol = 0;
     for (let i = 0; i < n; i++) totalVol += degrees[i];
     
@@ -455,12 +464,14 @@ function main() {
 
 	const fileConflicts = checkFileOverlap(tasks, levels);
   if (fileConflicts.length > 0) {
-    throw new Error(
-      `File overlap between same-level (parallel) tasks: ` +
-      JSON.stringify(fileConflicts) +
-      `. Add a P-WRITE edge (same file -> sequential) between these tasks in the ` +
-      `input, or re-split so they don't share files, then re-run.`
-    );
+    emitError({
+      error:
+        `File overlap between same-level (parallel) tasks: ` +
+        JSON.stringify(fileConflicts) +
+        `. Add a P-WRITE edge (same file -> sequential) between these tasks in the ` +
+        `input, or re-split so they don't share files, then re-run.`,
+      overlap: fileConflicts,
+    });
   }
 
   const recommended = {

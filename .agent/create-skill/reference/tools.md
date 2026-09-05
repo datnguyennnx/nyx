@@ -14,10 +14,10 @@ Skills run inside agent's agent environment. Every instruction must be compatibl
 | Read a file | `read` | `read("src/components/Button.tsx")` |
 | Search file contents | `grep` | `grep("pattern", "src/**/*.ts")` |
 | Find files by pattern | `glob` | `glob("src/**/*.css")` |
-| Run a command | `bash` | `bash: tsc --noEmit` |
+| Run a command | `shell` | `shell: tsc --noEmit` |
 | Write/change a file | `edit` | `edit("src/file.ts", ...)` |
 | Fetch web content | `webfetch` | `webfetch("https://api.example.com/docs")` |
-| Spawn a sub-agent | `task` | `task(discovery, ...)` |
+| Spawn a sub-agent | `subagent` | `subagent(discovery, ...)` |
 | Load a skill | `skill` | `skill({ name: "mas" })` |
 
 ## Exact Commands Rule
@@ -36,10 +36,10 @@ If the command can be copied and pasted into a terminal, it's specific enough. I
 
 ## Sub-Agent Spawning
 
-When a skill needs to spawn a sub-agent via `task()`:
+When a skill needs to spawn a sub-agent via `subagent()`:
 
 1. **Include SKILLS** in the prompt — the sub-agent needs domain context
-2. **Set tool permissions** — `task: deny` for read-only agents
+2. **Set tool permissions** — `subagent: deny` for read-only agents
 3. **Provide output contract** — specify the format the agent must return
 4. **Isolate context** — the sub-agent has no access to the parent conversation
 
@@ -73,8 +73,8 @@ Skills should tell the agent which tools are safe to use for which operations:
 |---|---|---|
 | `read` | Allow | Always safe — read-only |
 | `edit` | Allow with caution | Restrict for discovery/review-only tasks |
-| `bash` | Allow for build/check commands | Restrict for destructive operations (rm, git push --force) |
-| `task` | Allow for complex subtasks | Restrict for simple lookups (use grep/glob directly) |
+| `shell` | Allow for build/check commands | Restrict for destructive operations (rm, git push --force) |
+| `subagent` | Allow for complex subtasks | Restrict for simple lookups (use grep/glob directly) |
 | `skill` | Allow | Always safe — loads more domain context |
 
 When a skill includes potentially destructive operations (delete, force-push, sudo), add an explicit guard: "Never do X without user confirmation."
@@ -86,16 +86,16 @@ When a skill includes potentially destructive operations (delete, force-push, su
 | Read a file | `read` | `read("src/file.ts")` | Allow |
 | Search contents | `grep` | `grep("pattern", "src/**/*.ts")` | Allow |
 | Find files | `glob` | `glob("src/**/*.css")` | Allow |
-| Run command | `bash` | `bash: tsc --noEmit` | Allow (read-only) |
+| Run command | `shell` | `shell: tsc --noEmit` | Allow (read-only) |
 | Edit a file | `edit` | `edit("src/file.ts", ...)` | Restrict |
-| Spawn agent | `task` | `task(discovery, ...)` | Restrict |
+| Spawn agent | `subagent` | `subagent(discovery, ...)` | Restrict |
 | Load skill | `skill` | `skill({ name: "mas" })` | Allow |
 | Web search | `gsearch` | `gsearch batch search "query"` | Allow |
 | Web follow | `gsearch follow` | `gsearch follow <url>` | Allow |
 
 ## Permission Patterns for Skills
 
-| Skill type | read | edit | bash | task | skill | gsearch |
+| Skill type | read | edit | shell | subagent | skill | gsearch |
 |------------|------|------|------|------|-------|---------|
 | Discovery/Research | PASS | FAIL | FAIL | FAIL | PASS | PASS |
 | Code implementer | PASS | PASS | PASS | FAIL | PASS | FAIL |

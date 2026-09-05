@@ -1,128 +1,49 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "model": "opencode-go/deepseek-v4-flash",
-  "tools": {
-    "webfetch": false,
-    "websearch": false
-  },
+  "default_agent": "ship-mas",
   "instructions": [
-     "MAS uses an orchestrator (ship-mas) that decomposes tasks using information-theoretic complexity scoring, spawns agents in parallel via task tool, and verifies output before completing. 4 sub-agents: discoverer, diagnostician, implementer, researcher. Agents are self-contained with direct tool access. General/explore agent spawning is blocked in mode to prevent recursion.",
+    "MAS uses an orchestrator (ship-mas) that decomposes tasks using information-theoretic complexity scoring, spawns agents in parallel via subagent tool, and verifies output before completing. 4 sub-agents: discoverer, diagnostician, implementer, researcher. Agents are self-contained with direct tool access. General/explore agent spawning is blocked in mode to prevent recursion.",
     "CRITICAL: Respect repository rules. Every repo defines agent rules via AGENTS.md and markdown files in its root. Read them as priority instructions. Never skip or override the instruction author."
   ],
-  "permission": {
-    "read": {
-      "*": "allow",
-      "~/.config/opencode/**/*": "allow",
-      ".env": "deny",
-      "*.env": "deny",
-      "*.env.*": "deny",
-      ".env.example": "ask",
-      "*.env.example": "ask"
-    },
-    "edit": {
-      "*": "allow",
-      ".env": "deny",
-      "*.env": "deny",
-      "*.env.*": "deny",
-      ".env.example": "allow",
-      "*.env.example": "allow"
-    },
-    "bash": {
-      "*": "allow",
-      "rm -rf *": "deny",
-      "git*": "ask",
-      "git diff *": "allow",
-      "git status *": "allow",
-      "git log *": "allow",
-      "git show *": "allow",
-      "git branch *": "allow",
-      "cat .env*": "deny",
-      "cat */.env*": "deny",
-      "printenv*": "deny",
-      "env": "deny",
-      "node*": "ask",
-      "python*": "ask",
-      "python3*": "ask",
-      "rm": "deny"
-    },
-    "external_directory": {
-      "*": "ask",
-      "~/.config/opencode/**/*": "allow"
-    }
-  },
-  "mode": {
-    "ship-mas": {
-      "prompt": "{file:./modes/ship-mas.md}",
-      "permission": {
-        "task": {
-          "general": "deny",
-          "explore": "deny",
-          "*": "allow"
-        },
-        "skill": "allow",
-        "bash": {
-          "*": "deny",
-          "ls": "allow",
-          "ls *": "allow",
-          "find": "allow",
-          "find *": "allow",
-          "grep": "allow",
-          "grep *": "allow",
-          "head": "allow",
-          "head *": "allow",
-          "which": "allow",
-          "which *": "allow",
-          "cargo": "allow",
-          "cargo *": "allow",
-          "git diff *": "allow",
-          "git status": "allow",
-          "git log": "allow",
-          "git show": "allow",
-          "git branch": "allow",
-          "git add*": "ask",
-          "git checkout*": "ask",
-          "git commit*": "ask",
-          "git merge*": "ask",
-          "git push*": "ask",
-          "git rebase*": "ask",
-          "git reset*": "ask",
-          "git restore*": "ask",
-          "node ~/.config/opencode/scripts/complexity-score.mjs*": "allow",
-          "cat .env*": "deny",
-          "cat */.env*": "deny",
-          "cat *<<*": "deny",
-          "cat *>*": "deny",
-          "rm": "deny",
-          "rm -rf *": "deny"
-        },
-        "todowrite": "allow",
-        "question": "allow",
-        "read": "deny",
-        "edit": "deny",
-        "glob": "deny"
-      }
-    }
-  },
-  "agent": {
-    "discoverer": {
-      "permission": {
-        "task": "deny"
-      }
-    },
-    "diagnostician": {
-      "permission": {
-        "task": "deny"
-      }
-    },
-    "implementer": {
-      "permission": {
-        "task": "deny"
-      }
-    },
-    "researcher": {
-      "permission": {
-        "task": "deny"
-      }
-    }
-  }
+  "permissions": [
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "read", "resource": "~/.config/opencode/**/*", "effect": "allow" },
+    { "action": "read", "resource": ".env", "effect": "deny" },
+    { "action": "read", "resource": "*.env", "effect": "deny" },
+    { "action": "read", "resource": "*.env.*", "effect": "deny" },
+    { "action": "read", "resource": ".env.example", "effect": "ask" },
+    { "action": "read", "resource": "*.env.example", "effect": "ask" },
+    { "action": "edit", "resource": "*", "effect": "allow" },
+    { "action": "edit", "resource": ".env", "effect": "deny" },
+    { "action": "edit", "resource": "*.env", "effect": "deny" },
+    { "action": "edit", "resource": "*.env.*", "effect": "deny" },
+    { "action": "edit", "resource": ".env.example", "effect": "allow" },
+    { "action": "edit", "resource": "*.env.example", "effect": "allow" },
+    { "action": "shell", "resource": "*", "effect": "allow" },
+    { "action": "shell", "resource": "rm -rf *", "effect": "deny" },
+    { "action": "shell", "resource": "git*", "effect": "ask" },
+    { "action": "shell", "resource": "git diff *", "effect": "allow" },
+    { "action": "shell", "resource": "git status *", "effect": "allow" },
+    { "action": "shell", "resource": "git log *", "effect": "allow" },
+    { "action": "shell", "resource": "git show *", "effect": "allow" },
+    { "action": "shell", "resource": "git branch *", "effect": "allow" },
+    { "action": "shell", "resource": "cat .env*", "effect": "deny" },
+    { "action": "shell", "resource": "cat */.env*", "effect": "deny" },
+    { "action": "shell", "resource": "printenv*", "effect": "deny" },
+    { "action": "shell", "resource": "env", "effect": "deny" },
+    { "action": "shell", "resource": "node*", "effect": "ask" },
+    { "action": "shell", "resource": "python*", "effect": "ask" },
+    { "action": "shell", "resource": "python3*", "effect": "ask" },
+    { "action": "shell", "resource": "rm", "effect": "deny" },
+    { "action": "external_directory", "resource": "*", "effect": "ask" },
+    { "action": "external_directory", "resource": "~/.config/opencode/**/*", "effect": "allow" },
+    { "action": "skill", "resource": "*", "effect": "allow" },
+    { "action": "grep", "resource": "*", "effect": "allow" },
+    { "action": "webfetch", "resource": "*", "effect": "allow" },
+    { "action": "websearch", "resource": "*", "effect": "allow" },
+    { "action": "question", "resource": "*", "effect": "allow" },
+    { "action": "external_directory", "resource": "~/.agents/skills/*", "effect": "allow" },
+    { "action": "external_directory", "resource": "/tmp/nyx-search-cache/*", "effect": "allow" }
+  ]
 }

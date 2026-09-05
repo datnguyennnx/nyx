@@ -2,7 +2,7 @@
 
 MAS orchestrator for opencode. Uses information-theoretic complexity
 scoring (C_total), evidence-gated dependency graphs, tiered thinking budgets (500-12K tokens),
-Delegation Gate, per-workspace Experience Registry, TECA overthink detection, and binary GATE
+Delegation Gate, TECA overthink detection, and binary GATE
 verification. Context-window preservation for long-running sessions.
 
 ## Quick Start
@@ -12,7 +12,7 @@ git clone <repo-url> && cd nyx
 ./bootstrap.sh install
 ```
 
-Syncs `opencode/` → `~/.config/opencode` and `agents/` → `~/.agents`. Load `ship-mas` mode.
+Syncs `opencode/` → `~/.config/opencode` and `.agent/` → `~/.agents/skills/`. Load `ship-mas` mode with the `opencode2` binary (TUI config: `cli.json`, replaces `tui.json`).
 Run `bootstrap.sh install` after any update.
 
 ## Dependencies
@@ -50,7 +50,6 @@ User → ship-mas
   │   Parallelizable? Context gap? Verify cheaper? → YES = delegate
   │   NO to all → inline (15X token overhead)
   │
-  │ Experience Registry → .opencode/experience-registry.json
   │
   │ Closed-loop failure:
   │   GATE FAIL → DIAGNOSTICIAN → re-spawn implementer (max 3)
