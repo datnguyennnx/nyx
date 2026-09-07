@@ -95,6 +95,11 @@ install() {
     --exclude='.DS_Store' \
     "$DOTFILES/.agent/" "$agents_target/"
 
+  # Prune known stale duplicate sibling from pre-rename layout (exact path only).
+  if [ -d "$HOME/.agents/create-skill" ]; then
+    rm -rf "$HOME/.agents/create-skill"
+  fi
+
   ensure_path
 
   mkdir -p "$CACHE_DIR"

@@ -1,7 +1,9 @@
-import { Plugin } from "@opencode-ai/plugin"
-import { execFile } from "child_process"
+import { tool } from "@opencode-ai/plugin"
+import type { Plugin } from "@opencode-ai/plugin"
+import { execFile } from "node:child_process"
+import { z } from "zod"
 
-interface GthingsArgs {
+function buildArgs(args: {
   command: string
   query?: string
   queries?: string[]
@@ -16,9 +18,7 @@ interface GthingsArgs {
   followTop?: number
   warnTabs?: number
   engine?: string
-}
-
-function buildArgs(args: GthingsArgs): string[] {
+}): string[] {
   const cmd: string[] = [args.command]
 
   // Add positional args based on command
@@ -55,110 +55,75 @@ function buildArgs(args: GthingsArgs): string[] {
   return cmd
 }
 
-export default Plugin.define({
-  id: "gthings",
-  async setup(ctx) {
-    await ctx.tool.transform((draft) => {
-      draft.add({
-        name: "gthings",
+type GthingsInput = Parameters<typeof buildArgs>[0]
+
+async function runGthings(input: GthingsInput): Promise<string> {
+  const cmdArgs = buildArgs(input)
+
+  return new Promise<string>((resolve, reject) => {
+    execFile("gthings", cmdArgs, {
+      encoding: "utf-8",
+      timeout: 30000,
+      env: {
+        ...process.env,
+        RUST_LOG: process.env.RUST_LOG || "error",
+        ...(process.env.GTHINGS_CDP_PORT
+          ? { GTHINGS_CDP_PORT: process.env.GTHINGS_CDP_PORT }
+          : {}),
+      },
+    }, (error, stdout, stderr) => {
+      if (error) {
+        const codeStr = (error as NodeJS.ErrnoException).code
+          ? ` (exit ${(error as NodeJS.ErrnoException).code})`
+          : ""
+        const signalStr = (error as NodeJS.ErrnoException & { signal?: string }).signal
+          ? ` [signal ${(error as NodeJS.ErrnoException & { signal?: string }).signal}]`
+          : ""
+        reject(new Error((stderr?.trim() || error.message) + codeStr + signalStr))
+        return
+      }
+      resolve(stdout?.trim() ?? "")
+    })
+  })
+}
+
+const server: Plugin = async () => {
+  return {
+    tool: {
+      gthings: tool({
         description:
           "Browser automation and web research via gthings CLI — search, extract, ax, pdf-url, pdf-file, status, update. Each call takes ~4-6s due to CDP browser startup (Rust binary + Chrome DevTools Protocol connection).",
-        input: {
-          type: "object",
-          properties: {
-            command: {
-              type: "string",
-              enum: ["search", "extract", "ax", "pdf-url", "pdf-file", "status", "update", "describe"],
-              description: "Subcommand to run",
-            },
-            query: {
-              type: "string",
-              description: "Search query, URL, or file path (depends on command)",
-            },
-            queries: {
-              type: "array",
-              items: { type: "string" },
-              description: "Multiple search queries (search command only)",
-            },
-            count: {
-              type: "number",
-              description: "Number of search results (default: 5)",
-            },
-            strategy: {
-              type: "string",
-              enum: ["simple", "parallel", "harvest"],
-              description: "Search strategy (default: simple)",
-            },
-            engine: {
-              type: "string",
-              enum: ["auto", "brave", "bing", "google"],
-              description: "Search engine (default: auto)",
-            },
-            extractResults: {
-              type: "boolean",
-              description: "Extract full content from search result pages",
-            },
-            maxChars: {
-              type: "number",
-              description: "Max characters to extract (default: 40000)",
-            },
-            offset: {
-              type: "number",
-              description: "Content offset (default: 0)",
-            },
-            maxNodes: {
-              type: "number",
-              description: "Max DOM nodes for ax traversal (default: 500)",
-            },
-            dedup: {
-              type: "string",
-              description: "Dedup strategy for harvest search (default: url)",
-            },
-            rank: {
-              type: "string",
-              description: "Rank strategy for harvest search (default: composite)",
-            },
-            followTop: {
-              type: "number",
-              description: "Number of top results to follow in harvest search (default: 8)",
-            },
-            warnTabs: {
-              type: "number",
-              description: "Warn tabs threshold for harvest search (default: 20)",
-            },
-          },
-          required: ["command"],
-          additionalProperties: false,
+        args: {
+          command: z
+            .enum(["search", "extract", "ax", "pdf-url", "pdf-file", "status", "update", "describe"])
+            .describe("Subcommand to run"),
+          query: z.string().optional().describe("Search query, URL, or file path (depends on command)"),
+          queries: z
+            .array(z.string())
+            .optional()
+            .describe("Multiple search queries (search command only)"),
+          count: z.number().optional().describe("Number of search results (default: 5)"),
+          strategy: z.enum(["simple", "parallel", "harvest"]).optional().describe("Search strategy (default: simple)"),
+          engine: z.enum(["auto", "brave", "bing", "google"]).optional().describe("Search engine (default: auto)"),
+          extractResults: z.boolean().optional().describe("Extract full content from search result pages"),
+          maxChars: z.number().optional().describe("Max characters to extract (default: 40000)"),
+          offset: z.number().optional().describe("Content offset (default: 0)"),
+          maxNodes: z.number().optional().describe("Max DOM nodes for ax traversal (default: 500)"),
+          dedup: z.string().optional().describe("Dedup strategy for harvest search (default: url)"),
+          rank: z.string().optional().describe("Rank strategy for harvest search (default: composite)"),
+          followTop: z
+            .number()
+            .optional()
+            .describe("Number of top results to follow in harvest search (default: 8)"),
+          warnTabs: z
+            .number()
+            .optional()
+            .describe("Warn tabs threshold for harvest search (default: 20)"),
         },
-        execute: async (input) => {
-          const args = input as GthingsArgs
-          const cmdArgs = buildArgs(args)
+        execute: async (args) => runGthings(args as GthingsInput),
+      }),
+    },
+  }
+}
 
-          const result = await new Promise<string>((resolve, reject) => {
-            const child = execFile("gthings", cmdArgs, {
-              encoding: "utf-8",
-              timeout: 30000,
-              env: {
-                ...process.env,
-                RUST_LOG: process.env.RUST_LOG || "error",
-                ...(process.env.GTHINGS_CDP_PORT
-                  ? { GTHINGS_CDP_PORT: process.env.GTHINGS_CDP_PORT }
-                  : {}),
-              },
-            }, (error, stdout, stderr) => {
-              if (error) {
-                const codeStr = error.code ? ` (exit ${error.code})` : ""
-                const signalStr = error.signal ? ` [signal ${error.signal}]` : ""
-                reject(new Error((stderr?.trim() || error.message) + codeStr + signalStr))
-                return
-              }
-              resolve(stdout?.trim() ?? "")
-            })
-          })
-
-          return { content: result }
-        },
-      })
-    })
-  },
-})
+export default { id: "gthings", server }

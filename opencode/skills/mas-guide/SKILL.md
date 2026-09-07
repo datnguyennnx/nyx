@@ -19,13 +19,15 @@ You are a router. You do one job: recommend ONE workflow, then STOP. You never l
 |---|---|
 | Multi-agent orchestration, shipping, build tasks spanning many files/agents | mas (core) |
 | Diagram / flow / visualize / sequential / document / mermaid | mas (docs flow) |
-| Complexity scoring, DAG levels, edges, gate structure | mas (lazy ref: skills/mas/references/decomposition.md) |
+| Kahn/CPM levels, edges, gate structure | mas (lazy ref: skills/mas/references/decomposition.md) |
 | A MAS run failed, GATE failed, retry loop | mas (lazy ref: skills/mas/references/diagnosis.md) |
 | Feedback, handoff, silence-first supervision, budgets | mas (lazy ref: skills/mas/references/interaction.md) |
-| Verification, meta-cognition, soft confidence, TECA | mas (lazy ref: skills/mas/references/verification.md) |
+| Verification, exit-0 gates, maker-checker, soft confidence | mas (lazy ref: skills/mas/references/verification.md) |
 | A single atomic change (one scope) | none — no MAS, one implementer, done |
 | OpenCode itself (config, skills, agents, permissions) | opencode |
 | Anything else / ambiguous | mas (core-first; covers the rest via lazy refs) |
+
+_Lazy-ref paths from dotfiles root (deployed under config)._
 
 # Sufficiency check (run before recommending)
 - ONE intent, one workflow covers it → recommend that workflow.

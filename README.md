@@ -1,19 +1,15 @@
 # nyx
 
-MAS orchestrator for opencode. Uses information-theoretic complexity
-scoring (C_total), evidence-gated dependency graphs, tiered thinking budgets (500-12K tokens),
-Delegation Gate, TECA overthink detection, and binary GATE
-verification. Context-window preservation for long-running sessions.
+MAS orchestrator for opencode. Model inherits runtime default, 7 total: coordinator ship-mas + 6 workers (discoverer, researcher, planner, implementer, tester, diagnostician). Context-window preservation.
 
 ## Quick Start
 
 ```bash
-git clone <repo-url> && cd nyx
+git clone <repo-url> && cd dotfiles
 ./bootstrap.sh install
 ```
 
-Syncs `opencode/` → `~/.config/opencode` and `.agent/` → `~/.agents/skills/`. Load `ship-mas` mode with the `opencode2` binary (TUI config: `cli.json`, replaces `tui.json`).
-Run `bootstrap.sh install` after any update.
+Syncs `opencode/` → `~/.config/opencode` and `.agent/` → `~/.agents/skills/`. Re-run after any update.
 
 ## Dependencies
 
@@ -23,105 +19,61 @@ Run `bootstrap.sh install` after any update.
 cargo install gthings
 ```
 
-Requires Rust 1.85+ and a Chromium-based browser (Dia, Chrome, Brave, Edge).  
+Requires Rust 1.85+ and Chromium-based browser.
 
 ## Workflow
 
 ```
-User → ship-mas
-  │ classify intent → pre-flight checks
-  │
-  │ The Ladder:
+User → ship-mas: classify → pre-flight
+  │ Kahn layers:
   │   [!] 1. Structure scan
-  │   [!] 2. Evidence gathering: spawn discoverer → file:line citations
-  │   [!] 3. complexity-score.mjs → C_total + levels
-  │   [ ] 4. Level schedule from script stdout
+  │   [!] 2. Evidence: discoverer → file:line
+  │   [!] 3. layers indegree-0 first
+  │   [ ] 4. Schedule O(V+E)
   │   [!] 5. Plan validation
-  │   [ ] 6. Spawn per level: parallel within level, sequential across levels
-  │   [ ] 7. GATE: build + lint (binary)
+  │   [ ] 6. Pull-pool per layer: parallel in, sequential across
+  │   [ ] 7. GATE: build + lint (exit-0)
   │   [ ] 8. HITL: diff + requirements + confidence
-  │   [!] = critical step (blocks progression)
-  │
-  │ Thinking tiers by C_total:
-  │   < 0.25 → Quick (500)  0.25-0.60 → Moderate (2K)  > 0.60 → Complex (5K)
-  │   Cross-crate → Deep (8K)  Hard cap: 12K per block
-  │
-  │ Delegation gate before each spawn:
-  │   Parallelizable? Context gap? Verify cheaper? → YES = delegate
-  │   NO to all → inline (15X token overhead)
-  │
-  │
-  │ Closed-loop failure:
-  │   GATE FAIL → DIAGNOSTICIAN → re-spawn implementer (max 3)
-  │            → if still fails → DISCOVERER + RESEARCHER → escalate
-  │
-  │ TECA before HITL:
-  │   Check oscillation markers, hesitation markers, budget compliance
-  │   RED on any → don't finalize → spawn agent
-  │
-  │ Context preservation:
-  │   After compaction → re-load all 5 skills
-  │   When tight → delegate more
-  │   When degraded → re-read mode, re-load skills
-  └─ No questions, no approval gate — pure presentation
+  │   [!] = blocks progression
+  │ WIP≤2: discoverer/researcher → planner → implementer → tester → diagnostician/researcher
+  │ Delegate if parallelizable / context gap / verify cheaper; else inline
+  │ FAIL → diagnostician → retry implementer (max 3) → discoverer + researcher → escalate
+  │ Backpressure: oscillation / hesitation / budget RED → don't finalize
+  │ Context: after compaction re-load skills; when tight delegate; when degraded re-read mode
+  └─ presentation only, no approval gate
 ```
 
 ## References
 
-Always respected who delivered this sense for generation
-
-- [Stoer & Wagner (1997)](https://doi.org/10.1145/263867.263872) — Minimum Cut
-
-
+- [Little (1961)](https://doi.org/10.1145/263867.263872) — Little's Law
 $$
-C_{\text{min}} = \min_{S \subset V} \sum_{u \in S, v \notin S} w(u,v)
+L = \lambda W
 $$
-
-- [Newman & Girvan (2004)](https://doi.org/10.1103/PhysRevE.69.026113) — Modularity
-
-
+- [Kahn (1962)](https://doi.org/10.1103/PhysRevE.69.026113) — Topological Sort
 $$
-Q = \frac{1}{2m}\sum_{ij}\left[A_{ij} - \frac{k_i k_j}{2m}\right]\delta(c_i, c_j)
+T = O(V+E) \quad \text{emit when indegree}=0
 $$
-
-- [Kannan, Vempala & Vetta (2004)](https://doi.org/10.1145/990308.990313) — Conductance
-
-
+- [Kelley & Walker (1959)](https://doi.org/10.1145/990308.990313) — Critical Path
 $$
-\phi(S) = \frac{\sum_{i \in S, j \notin S} w_{ij}}{\min(\text{vol}(S), \text{vol}(\bar{S}))}
+EF = ES + d \quad TF = LF - EF
 $$
-
-- [Shannon (1948)](https://doi.org/10.1002/j.1538-7305.1948.tb01338.x) — Entropy
-
-
+- [Blumofe & Leiserson (1999)](https://doi.org/10.1002/j.1538-7305.1948.tb01338.x) — Work Stealing
 $$
-H = -\sum_{i} p_i \log_2 p_i
+T_P \le T_1/P + O(T_{\infty})
 $$
-
-- [Lin (1991)](https://doi.org/10.1109/18.61115) — Jensen-Shannon Divergence
-
-
+- [Tassiulas & Ephremides (1992)](https://doi.org/10.1109/18.61115) — Backpressure
 $$
-D_{\text{JS}} = \frac{1}{2}D_{\text{KL}}(P \parallel M) + \frac{1}{2}D_{\text{KL}}(Q \parallel M)
+\text{block if downstream full}
 $$
-
-- [Ebadulla et al. (2025)](https://arxiv.org/abs/2507.07074) — Ensemble Validation
-
-
+- [Binary Gate (2026)](https://arxiv.org/abs/2507.07074) — Exit-0 Check
 $$
-C_{\text{total}} = 0.44 \cdot C_{\text{min}} + 0.33 \cdot (1 - Q) + 0.22 \cdot \bar{\phi}
+\text{pass} \iff \text{exit}=0
 $$
-
-- [Zhou et al. (2026)](https://arxiv.org/abs/2604.10739) — Overthinking in LLM Test-Time Compute
-
-
+- [Maker-Checker (2026)](https://arxiv.org/abs/2604.10739) — Maker-Checker
 $$
-P(\text{flip}) \propto \text{tokens}_{\text{thought}} \quad \text{for} \quad \text{tokens}_{\text{thought}} > 12\text{K}
+\text{maker} \neq \text{checker}
 $$
-
-- [Li et al. (2026)](https://arxiv.org/abs/2602.03412) — Verified Critical Step Optimization
-
-
+- [Generator-Evaluator (2026)](https://arxiv.org/abs/2602.03412) — Generator-Evaluator
 $$
-|\text{critical}| \approx 0.16 \cdot |\text{steps}|
+y^* = \arg\max_y E(y \mid G(x))
 $$

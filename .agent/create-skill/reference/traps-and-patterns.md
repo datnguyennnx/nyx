@@ -172,14 +172,14 @@ Bad uses:
 
 Code blocks are for EXACT commands — never for prose explanations.
 
-Good: 
+Good:
 ```
-bash: node complexity-score.mjs --input '<json>'
+bash: jq '.levels' plan.json
 ```
 
 Bad:
 ```
-bash: run the complexity scoring script with your task data as JSON input
+bash: list the Kahn levels from your plan file
 ```
 
 If the agent must type the command, give the exact command. If they need to understand a concept, use prose. Never mix the two in a code block.
