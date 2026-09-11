@@ -1,22 +1,18 @@
 # Little's Law — proven
 
-L=λW: cap WIP to bound wait. Writers ≤2 per batch; readers fan out only when no P-BLOCKING/P-WRITE.
-https://en.wikipedia.org/wiki/Little%27s_law
+L=λW: cap WIP ≤2 to bound wait. Single-implementer fallback: ~/.config/opencode/skills/mas/SKILL.md Readers fan out only when no P-BLOCKING/P-WRITE.
 
 # Backpressure — proven
 
-See `references/verification.md` Gate.
-https://unseel.com/cs/backpressure
+One flow: EDIT→BUILD→LINT→REPORT before the next pull; never open a pull while a gate is unresolved. Gate: build + `~/.config/opencode/scripts/validate-mas.mjs` + `~/.config/opencode/scripts/envelope-lint.mjs`, all exit 0 → `~/.config/opencode/skills/mas/references/verification.md`.
 
 # Work-Stealing — proven
 
-Idle agents steal from loaded queues; expected time T1/P+O(Tinf). Keep batches balanced, same-level tasks disjoint so steals stay safe.
-https://en.wikipedia.org/wiki/Work_stealing
+Idle agents steal from loaded queues; keep batches balanced and same-level tasks disjoint. Expected time T1/P+O(Tinf).
 
 # Supervision
 
-Silence-first: speak on batch stop, escalation, handoff. Steer ≤3 sentences.
-Loop state: Step N/9 + Level N lines in-transcript ARE persisted state; resume from last status line.
+Silence-first: speak on batch stop, escalation, handoff; steer ≤3 sentences. `Step N/7` status lines in-transcript ARE persisted state — resume from last status line.
 
 # Feedback → Re-entry
 
@@ -30,15 +26,10 @@ Loop state: Step N/9 + Level N lines in-transcript ARE persisted state; resume f
 
 # Loop Guardrails (cap + autocycle)
 
-Budget: see `references/verification.md` Retry Budget; bounds: see `references/decomposition.md` Breadth Rule; Autocycle: see `references/diagnosis.md` Auto-Cycle. Never stall on bare question — else FAILED same turn: `FAIL` + JSON {files, hunks, verification:{build,lint}} + unmatched intents + first FAIL evidence.
+Budget → `~/.config/opencode/skills/mas/references/verification.md` Retry Budget; bounds → `~/.config/opencode/skills/mas/references/decomposition.md` Breadth Rule; Autocycle → `~/.config/opencode/skills/mas/references/diagnosis.md` Auto-Cycle.
 
-Ask user only if request uninterpretable AND zero spawns yet.
-Confirm-when-unsure: insufficient info → spawn scoped discoverer/researcher to confirm, never guess; spawning-as-confirmation is not stalling.
+Never stall on a bare question — else FAILED same turn. Ask user only if request uninterpretable AND zero spawns yet. Confirm-when-unsure: insufficient info → spawn scoped discoverer/researcher, never guess. Gate weakening → restore baseline, re-spawn fresh with prohibition (`~/.config/opencode/skills/mas/references/diagnosis.md` Failure Patterns §6).
 
-# Assertion Weakening
+# Re-spawn
 
-See `references/diagnosis.md` Failure Patterns §6.
-
-# Re-spawn Diversity
-
-1: error output + narrowed scope. 2: discovery + broader context. 3: boundary → FAILED report. Never identical instructions.
+Retry Budget: ~/.config/opencode/skills/mas/references/verification.md

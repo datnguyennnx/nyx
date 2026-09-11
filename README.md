@@ -1,15 +1,15 @@
 # nyx
 
-MAS orchestrator for opencode. Model inherits runtime default, 7 total: coordinator ship-mas + 6 workers (discoverer, researcher, planner, implementer, tester, diagnostician). Context-window preservation.
+MAS orchestrator for opencode (V2). Model inherits runtime default; 7 custom agent defs: primary `ship-mas` + 6 subagents (discoverer, researcher, planner, implementer, tester, diagnostician). Context-window preservation via file-disjoint Kahn/CPM scheduling and an exit-0 gate.
 
 ## Quick Start
 
 ```bash
-git clone <repo-url> && cd dotfiles
+git clone https://github.com/datnguyennnx/nyx && cd nyx
 ./bootstrap.sh install
 ```
 
-Syncs `opencode/` → `~/.config/opencode` and `.agent/` → `~/.agents/skills/`. Re-run after any update.
+Syncs `opencode/` → `~/.config/opencode` and `.agent/` → `~/.agents/skills/`. Re-run after any update. One-direction only: this repo is the single source of truth; never sync global back to repo.
 
 ## Dependencies
 
@@ -19,7 +19,7 @@ Syncs `opencode/` → `~/.config/opencode` and `.agent/` → `~/.agents/skills/`
 cargo install gthings
 ```
 
-Requires Rust 1.85+ and Chromium-based browser.
+Requires Rust 1.85+ and a Chromium-based browser running with `--remote-debugging-port=9222`. gthings skill files are managed by `gthings update`, not by `bootstrap.sh`.
 
 ## Workflow
 

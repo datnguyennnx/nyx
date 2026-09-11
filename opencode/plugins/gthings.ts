@@ -1,7 +1,6 @@
-import { tool } from "@opencode-ai/plugin"
-import type { Plugin } from "@opencode-ai/plugin"
 import { execFile } from "node:child_process"
 import { z } from "zod"
+import { Plugin } from "@opencode/plugin"
 
 function buildArgs(args: {
   command: string
@@ -87,13 +86,15 @@ async function runGthings(input: GthingsInput): Promise<string> {
   })
 }
 
-const server: Plugin = async () => {
-  return {
-    tool: {
-      gthings: tool({
+export default Plugin.define({
+  id: "gthings",
+  async setup(ctx) {
+    await ctx.tool.transform((editor) => {
+      editor.add({
+        name: "gthings",
         description:
           "Browser automation and web research via gthings CLI — search, extract, ax, pdf-url, pdf-file, status, update. Each call takes ~4-6s due to CDP browser startup (Rust binary + Chrome DevTools Protocol connection).",
-        args: {
+        input: z.object({
           command: z
             .enum(["search", "extract", "ax", "pdf-url", "pdf-file", "status", "update", "describe"])
             .describe("Subcommand to run"),
@@ -119,11 +120,12 @@ const server: Plugin = async () => {
             .number()
             .optional()
             .describe("Warn tabs threshold for harvest search (default: 20)"),
+        }),
+        execute: async (args) => {
+          const output = await runGthings(args as GthingsInput)
+          return { content: output }
         },
-        execute: async (args) => runGthings(args as GthingsInput),
-      }),
-    },
-  }
-}
-
-export default { id: "gthings", server }
+      })
+    })
+  },
+})
