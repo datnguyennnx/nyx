@@ -8,7 +8,7 @@ DOTFILES="$(cd "$(dirname "$0")" && pwd)"
 # -- Path configuration --
 AGENTS_DIR="$HOME/.agents/skills"
 BIN_DIR="$HOME/.local/bin"
-CACHE_DIR="/tmp/nyx-search-cache"
+CACHE_DIR="${TMPDIR:-/tmp}/nyx-search-cache"
 
 # Track verification failures
 FAILED=0
@@ -81,24 +81,22 @@ install() {
 
   mkdir -p "$opencode_target" "$agents_target"
 
+  # cli.json and service.json are runtime-only global files, absent from the repo;
+  # they must survive this mirror despite --delete.
   rsync -av --delete \
     --exclude='node_modules/' \
     --exclude='.git/' \
     --exclude='.DS_Store' \
     --exclude='skills-lock.json' \
-    --exclude='sync-*.sh' \
+    --exclude='cli.json' \
+    --exclude='service.json' \
     "$DOTFILES/opencode/" "$opencode_target/"
 
-  # v2 scans external skills from ~/.agents/skills/<name>/SKILL.md
+  # External skills are scanned from ~/.agents/skills/<name>/SKILL.md
   rsync -av --delete \
     --exclude='.git/' \
     --exclude='.DS_Store' \
     "$DOTFILES/.agent/" "$agents_target/"
-
-  # Prune known stale duplicate sibling from pre-rename layout (exact path only).
-  if [ -d "$HOME/.agents/create-skill" ]; then
-    rm -rf "$HOME/.agents/create-skill"
-  fi
 
   ensure_path
 
