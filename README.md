@@ -47,42 +47,61 @@ User → ship-mas: Step 0/7 — Ground+Classify
 *Each model states the invariant its mechanism enforces.*
 
 - **Well-founded decomposition** [1] — a task graph is schedulable if and only if acyclic; a cycle halts instead of emitting.
+
 $$
 \text{schedulable}(G) \iff \text{acyclic}(G), \qquad \text{cyclic}(G) \Rightarrow \text{halt}
 $$
+
 - **Level disjointness** [2] — writers in one level claim disjoint files, so concurrent writes cannot collide.
+
 $$
 \forall L, \forall a,b \in L : a \ne b \Rightarrow \text{write}(a) \cap \text{write}(b) = \varnothing
 $$
+
 - **Critical-path bound** [3] — makespan is at least the longest dependency chain; positive slack marks what may slip.
+
 $$
 T \ge \max_{p \in \Pi} \sum_{t \in p} d(t), \qquad \text{slack}(t) > 0 \Rightarrow t \text{ may slip}
 $$
+
 - **WIP cap** [4] — capping concurrency at two bounds in-flight work, and Little's Law then bounds latency.
+
 $$
 L = \lambda W, \qquad W \le 2 \;\Rightarrow\; L \le 2\lambda
 $$
+
 - **Gate conjunction** [5] — ship requires every blocking predicate; one failure blocks.
+
 $$
 \text{ship} \iff \bigwedge_{i} P_i, \qquad \neg P_k \Rightarrow \neg \text{ship}
 $$
+
 - **Maker-checker independence** [6] — an independent verifier makes false accept the product of two error rates, far below either alone.
+
 $$
 P(\text{false accept}) = \epsilon_{maker} \cdot \epsilon_{checker} \ll \min(\epsilon_{maker}, \epsilon_{checker})
 $$
+
 - **Clean-context re-spawn** [7] — inherited context accumulates error linearly in the attempt index; a clean restart does not.
+
 $$
 e_n^{inh} \le n\epsilon \qquad \text{versus} \qquad e_n^{clean} = \epsilon
 $$
+
 - **Bounded retry** [8] — a finite attempt cap terminates the failure feedback edge instead of looping.
+
 $$
 n \le N_{max} < \infty \Rightarrow \text{the failure edge terminates}
 $$
+
 - **Sufficiency** [9] — the gate passes if and only if every declared assertion is matched; partial coverage fails.
+
 $$
 \text{gate} \iff \forall a \in A_{decl} : \text{match}(a), \qquad A_{matched} \subset A_{decl} \Rightarrow \neg \text{gate}
 $$
+
 - **Budget** [10] — total spend is bounded by the sum of per-spawn token caps.
+
 $$
 \text{spend} \le \sum_{i=1}^{n} \text{cap}_i
 $$
