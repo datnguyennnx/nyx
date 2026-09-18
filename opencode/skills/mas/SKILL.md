@@ -37,7 +37,7 @@ Recommend exactly ONE workflow, in words, then STOP: never a menu, never load a 
 1. **Step 1/7 — Scan.** Scoped discoverer/explore; returns `file:line`, never pasted content.
 2. **Step 2/7 — Plan (Kahn/CPM).** File-cluster split; Kahn levels + CPM order per `references/decomposition.md`; every edge carries `file:line`; no cycles; before a batch is spawned, the batch's lanes' `TARGET_FILES` are passed to `node ~/.config/opencode/scripts/check-slices.mjs` as a flat JSON array, and same-level overlap is an error — no new artifact, no default path. Slice plan + per-slice acceptance criteria are approved at HITL-2.
 3. **Step 3/7 — Spawn.** One batch per Kahn level, level-by-level; pull model, WIP ≤2; budgets in `references/interaction.md`; each agent runs under a capability contract (allowed files + allowed verbs). The first write lane starts only after HITL-3.
-4. **Step 4/7 — GATE (exit-0).** The TESTER verifies STATICALLY — it reads the diff and maps requirements to hunks. The OPERATOR runs the TWO validators, `~/.config/opencode/scripts/validate-mas.mjs` and `~/.config/opencode/scripts/envelope-lint.mjs --selftest`; gate semantics: shared block. Maker-checker + envelope per `references/verification.md`; FAIL → `references/diagnosis.md`.
+4. **Step 4/7 — GATE (exit-0).** The TESTER verifies STATICALLY — it reads the diff and maps requirements to hunks. The TESTER runs the TWO validators, `~/.config/opencode/scripts/validate-mas.mjs` and `~/.config/opencode/scripts/envelope-lint.mjs --selftest`; gate semantics: shared block. Maker-checker + envelope per `references/verification.md`; FAIL → `references/diagnosis.md`.
 5. **Step 5/7 — Sufficiency.** Consume the tester's `S-N → file:line` table AND the acceptance assertions (`S-N → <assertion> → file:line`) from the Handoff; every requirement matched else FAILED + narrowed re-spawn.
 6. **Step 6/7 — Auto Report.** Human-first: ONE plain sentence, then the envelope defined in `references/verification.md`; detail after. Acceptance before ship is HITL-5.
 
@@ -62,5 +62,9 @@ Dispatch: PASS advances a level; FAIL spawns the diagnostician then a clean-cont
 Retry: at most 3 attempts per task; each re-spawn is clean-context, seeded only by the diagnostician's reflection.
 Routes: QUESTION | DOCS | TRIVIAL | CODE | unknown.
 HITL: HITL-1 scope+route; HITL-2 plan+acceptance; HITL-3 first write; HITL-4 first gate failure; HITL-5 accept before ship; HITL-6 destructive operations.
-Gate: no agent executes; the operator runs both validators and both block; a missing result yields NO_VERIFICATION.
+Gate: the tester runs both validators and both block; a missing result yields NO_VERIFICATION.
+Shell: every shell command is approved by the operator — nothing is pre-approved; destructive and egress commands are refused without a prompt.
+Explore: do not use shell to read the tree — use glob, read and grep, which carry the secret-path denies and need no approval.
+Repos: git -C is NOT allowlisted; to work in another repo run `cd <repo> && <command>` in ONE shell call — compound parts are checked separately.
+Changed set: the tester obtains it with git; any changed file not declared in a lane's TARGET_FILES is a FAIL.
 <!-- shared-rules:end -->

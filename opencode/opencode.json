@@ -11,7 +11,7 @@
   },
   "default_agent": "ship-mas",
   "permissions": [
-    { "action": "shell", "resource": "*", "effect": "deny" },
+    { "action": "shell", "resource": "*", "effect": "ask" },
     { "action": "execute", "resource": "*", "effect": "deny" },
     { "action": "read", "resource": "**/*.env*", "effect": "deny" },
     { "action": "read", "resource": "**/*secret*", "effect": "deny" },
@@ -74,6 +74,28 @@
     { "action": "external_directory", "resource": "~/.config/opencode/**", "effect": "ask" },
     { "action": "external_directory", "resource": "~/.ssh/**", "effect": "deny" },
     { "action": "external_directory", "resource": "~/.aws/**", "effect": "deny" },
-    { "action": "external_directory", "resource": "~/.gnupg/**", "effect": "deny" }
+    { "action": "external_directory", "resource": "~/.gnupg/**", "effect": "deny" },
+    { "action": "shell", "resource": "rm *", "effect": "deny" },
+    { "action": "shell", "resource": "rmdir *", "effect": "deny" },
+    { "action": "shell", "resource": "mv *", "effect": "deny" },
+    { "action": "shell", "resource": "dd *", "effect": "deny" },
+    { "action": "shell", "resource": "truncate *", "effect": "deny" },
+    { "action": "shell", "resource": "shred *", "effect": "deny" },
+    { "action": "shell", "resource": "chmod *", "effect": "deny" },
+    { "action": "shell", "resource": "chown *", "effect": "deny" },
+    { "action": "shell", "resource": "curl *", "effect": "deny" },
+    { "action": "shell", "resource": "wget *", "effect": "deny" },
+    { "action": "shell", "resource": "nc *", "effect": "deny" },
+    { "action": "shell", "resource": "ssh *", "effect": "deny" },
+    { "action": "shell", "resource": "scp *", "effect": "deny" },
+    { "action": "shell", "resource": "git clean *", "effect": "deny" },
+    { "action": "shell", "resource": "git reset *", "effect": "deny" },
+    { "action": "shell", "resource": "git checkout *", "effect": "deny" },
+    { "action": "shell", "resource": "git restore *", "effect": "deny" },
+    { "action": "shell", "resource": "git -C *", "effect": "deny" },
+    { "action": "shell", "resource": "python *", "effect": "deny" },
+    { "action": "shell", "resource": "python3 *", "effect": "deny" },
+    { "action": "shell", "resource": "sh -c *", "effect": "deny" },
+    { "action": "shell", "resource": "bash -c *", "effect": "deny" }
   ]
 }

@@ -28,7 +28,7 @@ User → ship-mas: Step 0/7 — Ground+Classify
   │ Step 1/7 — Scan (structure + evidence: discoverer → file:line)
   │ Step 2/7 — Plan (Kahn levels + CPM, P-WRITE serial)
   │ Step 3/7 — Spawn (pull, WIP ≤2)
-  │ Step 4/7 — GATE (operator runs two blocking checks; both block)
+  │ Step 4/7 — GATE (tester runs both validators; both block)
   │ Step 5/7 — Sufficiency (acceptance assertions + S-N/file:line)
   │ Step 6/7 — Auto Report
   │ HITL gates (legal pause points): HITL-1 scope+route · HITL-2 plan+acceptance
@@ -120,3 +120,38 @@ $$
 10. [Anthropic (2025)](https://www.anthropic.com/engineering/multi-agent-research-system) — effort scaled to task complexity.
 11. [Blumofe & Leiserson (1999)](https://doi.org/10.1145/324133.324234) — work stealing.
 12. [Tassiulas & Ephremides (1992)](https://doi.org/10.1109/18.61115) — backpressure.
+
+## Permissions
+
+Shell rules match per resource and the LAST match wins, so the broad `ask` sits first and the specific denies follow.
+Nothing is pre-approved.
+An unlisted command prompts the operator.
+A listed command is refused with no prompt.
+
+| Shell resource | Effect | Meaning for an agent |
+| --- | --- | --- |
+| `*` | ask | every command prompts the operator; nothing runs silently |
+| `rm *` | deny | destructive filesystem: refused with no prompt |
+| `rmdir *` | deny | destructive filesystem: refused with no prompt |
+| `mv *` | deny | destructive filesystem: refused with no prompt |
+| `dd *` | deny | destructive filesystem: refused with no prompt |
+| `truncate *` | deny | destructive filesystem: refused with no prompt |
+| `shred *` | deny | destructive filesystem: refused with no prompt |
+| `chmod *` | deny | destructive filesystem: refused with no prompt |
+| `chown *` | deny | destructive filesystem: refused with no prompt |
+| `curl *` | deny | network egress: refused with no prompt |
+| `wget *` | deny | network egress: refused with no prompt |
+| `nc *` | deny | network egress: refused with no prompt |
+| `ssh *` | deny | network egress: refused with no prompt |
+| `scp *` | deny | network egress: refused with no prompt |
+| `git clean *` | deny | destructive git: refused with no prompt |
+| `git reset *` | deny | destructive git: refused with no prompt |
+| `git checkout *` | deny | destructive git: refused with no prompt |
+| `git restore *` | deny | destructive git: refused with no prompt |
+| `git -C *` | deny | destructive git: refused with no prompt |
+| `python *` | deny | interpreter one-liner: refused with no prompt |
+| `python3 *` | deny | interpreter one-liner: refused with no prompt |
+| `sh -c *` | deny | interpreter one-liner: refused with no prompt |
+| `bash -c *` | deny | interpreter one-liner: refused with no prompt |
+
+`node` is deliberately not refused: the validator scripts are `node` invocations and must be runnable, so `node` prompts instead.

@@ -19,10 +19,23 @@
 //      `doom_loop`, `lsp`, `gthings_*`) anywhere in a permission entry
 //   9. config keys rejected by this schema + rejected `mcp` shape
 //  10. `instructions` top-level key (accepted but not loaded)
-//  11. permission coverage: `shell`/`execute`/`gthings` denied with `*`, a
-//      `read` deny covering `.env`, and at least 20 deny entries in total
+//  11. permission coverage: `execute` and a `.env` `read` are denied (each
+//      with the required resource), and at least 20 deny entries total; the
+//      shell invariant lives in check 13. `gthings` is deliberately NOT denied
+//      globally (see check EgressScope)
 //  12. exactly one skill owns each `Triggers:` token (a skill without the
 //      marker is not an error)
+//  13. shell policy: no `shell` entry in opencode.json may have effect
+//      `allow` (nothing is pre-approved any more), the broad `shell *` entry
+//      must be `ask` so the capability is never silently open, the required
+//      destructive/egress/interpreter denies are present, the primary denies
+//      `shell`, and no subagent denies it. `node` is deliberately NOT denied,
+//      because the project's own validator scripts are `node` invocations and
+//      the tester must be able to run them, so a `node` command reaches the
+//      operator as a prompt rather than a refusal. `git -C` is deliberately denied:
+//      `*` matches spaces, so no `-C` allow pattern can ever be written safely,
+//      and an explicit deny is the only correct expression that survives any
+//      later widening of what an operator will approve.
 //
 // Prints one `file:line reason` line per finding, a per-rule count, then a
 // final `findings:N` line; exit 1 on any finding, 0 when clean.
@@ -535,12 +548,12 @@ function checkConfigKeys(abs) {
 }
 
 // --- check E: permission coverage -------------------------------------------
-// A config that denies nothing must not pass. The unpatternable capabilities
-// (`shell`, `execute`) must be denied with resource "*", `read`
-// must deny `.env`, and the deny list must stay substantial. (`gthings` is
-// deliberately NOT denied globally; see check EgressScope below.)
+// A config that denies nothing must not pass. `execute` must be denied with
+// resource "*", `read` must deny `.env`, and the deny list must stay
+// substantial. The shell invariant (no allow, broad `ask`) is owned by
+// checkShellPolicy (check H). (`gthings` is deliberately NOT denied globally;
+// see check EgressScope below.)
 const REQUIRED_DENIES = [
-  { action: "shell", reason: "missing deny shell *", match: (r) => r === "*" },
   { action: "execute", reason: "missing deny execute *", match: (r) => r === "*" },
   { action: "read", reason: "missing deny read **/*.env*", match: (r) => r.includes(".env") },
 ];
@@ -652,6 +665,89 @@ function checkOrchestratorOnly(abs) {
   }
 }
 
+// --- check H: shell policy ---------------------------------------------------
+// Nothing is pre-approved: no `shell` entry in opencode.json may have effect
+// `allow`, and the broad `shell *` entry must be `ask` so the capability is
+// never silently open. Permission matching is LAST-match-wins, so a later
+// `shell *` allow would win over everything; this check fails on any shell
+// allow at all. It also requires a `shell` deny for every destructive,
+// egress or interpreter resource, keeps the primary orchestrator denying
+// shell, and keeps subagents from denying it. Reuses the shared frontmatter
+// helpers (frontmatter/permEntries/permFields) and the trailing-comma
+// normalisation below, because the inline entry form otherwise yields
+// `action === "shell,"` and a false negative. `git -C` stays explicitly
+// denied: `*` matches spaces, so no `-C` pattern can ever be written safely.
+
+// Destructive/egress/interpreter shell resources that must each carry an
+// explicit deny. Permissions are matched LAST-match-wins; a backstop that
+// silently disappears is worse than none.
+const SHELL_REQUIRED_DENIES = new Set([
+  "rm *", "rmdir *", "mv *", "dd *", "truncate *", "shred *",
+  "chmod *", "chown *", "curl *", "wget *", "nc *", "ssh *", "scp *",
+  "git clean *", "git reset *", "git checkout *", "git restore *",
+  "git -C *",
+  "python *", "python3 *", "sh -c *", "bash -c *",
+]);
+
+function checkShellPolicy(abs) {
+  const text = readText(abs);
+  if (text === null) return;
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    return;
+  }
+  const arr = data && data.permissions;
+  const at = topLevelKeyLines(text).get("permissions") || 1;
+  const list = Array.isArray(arr) ? arr : [];
+  for (const e of list) {
+    if (!e || e.action !== "shell" || e.effect !== "allow") continue;
+    const resource = String((e && e.resource) || "");
+    report(abs, at, `shell allow must not exist: ${resource}`, "shell-policy");
+  }
+
+  const askDefault = list.some(
+    (e) =>
+      e && e.action === "shell" && e.effect === "ask" &&
+      String((e && e.resource) || "") === "*",
+  );
+  if (!askDefault) {
+    report(abs, at, "shell default must be ask", "shell-policy");
+  }
+
+  for (const resource of SHELL_REQUIRED_DENIES) {
+    const ok = list.some(
+      (e) =>
+        e && e.action === "shell" && e.effect === "deny" &&
+        String((e && e.resource) || "") === resource,
+    );
+    if (!ok) report(abs, at, `missing destructive deny: ${resource}`, "shell-policy");
+  }
+
+  for (const f of agentFiles) {
+    const fm = frontmatter(f);
+    if (!fm || !fm.ok) continue;
+    const modeKey = topKeys(fm).find((k) => k.key === "mode");
+    if (!modeKey) continue;
+    const mode = unquote(modeKey.value);
+    const entries = permEntries(fm);
+    const norm = (v) => (typeof v === "string" ? v.trim().replace(/,$/, "") : v);
+    const perms = (entries || []).map((e) => {
+      const p = permFields(e.parts.join(" "));
+      return { action: norm(p.action), effect: norm(p.effect), line: e.line };
+    });
+    const keyLine = topKeys(fm).find((k) => k.key === "permissions");
+    const pat = (keyLine && keyLine.line) || 1;
+    const denied = perms.find((p) => p.action === "shell" && p.effect === "deny");
+    if (mode === "primary") {
+      if (!denied) report(f, pat, "primary must deny shell", "shell-policy");
+    } else if (mode === "subagent" && denied) {
+      report(f, denied.line, "subagent must not deny shell", "shell-policy");
+    }
+  }
+}
+
 // --- check B: absolute paths ------------------------------------------------
 function checkAbsPath(abs) {
   const text = readText(abs);
@@ -729,6 +825,7 @@ checkConfigKeys(jsonFile);
 checkPermissionCoverage(jsonFile);
 checkEgressScope(jsonFile);
 for (const f of agentFiles) checkOrchestratorOnly(f);
+checkShellPolicy(jsonFile);
 for (const f of skillFiles) {
   checkSkill(f);
   checkSkillKeys(f);
