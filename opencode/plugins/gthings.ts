@@ -93,7 +93,7 @@ export default Plugin.define({
       editor.add({
         name: "gthings",
         description:
-          "Browser automation and web research via gthings CLI — search, extract, ax, pdf-url, pdf-file, status, update. Each call takes ~4-6s due to CDP browser startup (Rust binary + Chrome DevTools Protocol connection).",
+          "Browser automation and web research via gthings CLI: search, extract, ax, pdf-url, pdf-file, status, update. Each call takes ~4-6s due to CDP browser startup (Rust binary + Chrome DevTools Protocol connection).",
         input: z.object({
           command: z
             .enum(["search", "extract", "ax", "pdf-url", "pdf-file", "status", "update", "describe"])

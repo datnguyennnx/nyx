@@ -5,6 +5,7 @@ const tok = (s) => (s.trim() ? s.trim().split(/\s+/).length : 0);
 const has = (t, re) => re.test(t);
 const FILELINE = /[\w./-]+\.[A-Za-z]+:\d+/;
 const REQREF = /[SR]-\d+\s*(→|->)/;
+const CANON_STATUS = new Set(["PASS", "FAIL", "PARTIAL", "NO_VERIFICATION", "NO_RESULTS"]);
 function lint(t) {
   if (!t.trim()) return { ok: false, reason: "FAIL empty input" };
   const n = tok(t), ls = t.split("\n");
@@ -59,7 +60,9 @@ function lint(t) {
   if (has(t, /rootCause/) && has(t, /errorType/) && has(t, /affectedFiles/) && has(t, /fix/) && has(t, /confidence/))
     return has(t, FILELINE) ? { ok: true, reason: "PASS diagnostician JSON" } : { ok: false, reason: "FAIL diagnostician missing file:line" };
   if (has(t, /https?:\/\//) && has(t, /(^|\n)\s*[-*]/)) return n < 800 ? { ok: true, reason: "PASS researcher bullets+URLs" } : { ok: false, reason: `FAIL researcher >=800 (${n})` };
-  if (has(t, /Status/i) && has(t, /Pairs?/i)) {
+  const sm = t.match(/Status\s*:?\s*([A-Za-z_]+)/i);
+  if (sm && has(t, /Pairs?/i)) {
+    if (!CANON_STATUS.has(sm[1].toUpperCase())) return { ok: false, reason: `FAIL discoverer non-canonical Status ${sm[1]}` };
     if (n > 1000) return { ok: false, reason: `FAIL discoverer >1000 (${n})` };
     return has(t, FILELINE) ? { ok: true, reason: "PASS discoverer Status+Pairs" } : { ok: false, reason: "FAIL discoverer missing file:line" };
   }
@@ -83,7 +86,8 @@ function selftest() {
     [`{"status":"FAIL","unit":"task-3","raw":{"build":"err"}}\nS-1 → a.ts:5\ntail line`, true],
     [`{"status":"FAIL","x":"${"w ".repeat(350)}"}`, false],
     [`{"status":"FAIL","raw":"x"}\n${tail21}`, false],
-    [`Status: ok\nPairs:\n- a.ts:10 evidence`, true],
+    [`Status: PASS\nPairs:\n- a.ts:10 evidence`, true],
+    [`Status: ok\nPairs:\n- a.ts:10 evidence`, false],
     [`Levels:\nS-1 → a.ts:12 do x\nS-2 → b.ts:3 do y`, true],
     [`NO_VERIFICATION reason here a.ts:1`, true],
     [`NO_VERIFICATION ${big}`, false],

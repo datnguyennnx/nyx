@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// validate-mas.mjs — S-13 validator for the OpenCode MAS surface.
+// validate-mas.mjs: S-13 validator for the OpenCode MAS surface.
 // Zero dependencies, pure ESM, Node stdlib only.
 //
 // Checks:
@@ -36,6 +36,10 @@
 //      `*` matches spaces, so no `-C` allow pattern can ever be written safely,
 //      and an explicit deny is the only correct expression that survives any
 //      later widening of what an operator will approve.
+//  14. shared-rules mirrors: agents/ship-mas.md and skills/mas/SKILL.md each
+//      carry, strictly between their begin/end sentinels, the full text of the
+//      canonical skills/mas/references/shared-rules.md; the block is non-empty
+//      and the two hosts agree.
 //
 // Prints one `file:line reason` line per finding, a per-rule count, then a
 // final `findings:N` line; exit 1 on any finding, 0 when clean.
@@ -313,23 +317,49 @@ function checkSkillTriggerOwnership(files) {
   }
 }
 
-// --- shared-rules drift: agents/ship-mas.md vs skills/mas/SKILL.md --------
-// Both surfaces must carry a byte-identical block between the sentinel lines.
-const SHARED_RULES_FILES = [
+// --- shared-rules canonical mirrors ----------------------------------------
+// The canonical contract is the full content of
+// skills/mas/references/shared-rules.md (no markers). Every host surface
+// mirrors that text verbatim between the sentinels:
+//   <!-- shared-rules:begin -->
+//   ...exactly the canonical text...
+//   <!-- shared-rules:end -->
+// Each host block must be non-empty and equal the canonical text, comparing
+// while ignoring only a single trailing newline. Missing markers, an empty
+// block, or any other difference is a finding, and the hosts must also agree
+// with each other.
+const SHARED_RULES_CANONICAL = path.join(
+  ROOT,
+  "skills",
+  "mas",
+  "references",
+  "shared-rules.md",
+);
+const SHARED_RULES_HOSTS = [
   path.join(ROOT, "agents", "ship-mas.md"),
   path.join(ROOT, "skills", "mas", "SKILL.md"),
 ];
 const SHARED_BEGIN = "<!-- shared-rules:begin -->";
 const SHARED_END = "<!-- shared-rules:end -->";
 
-// Block strictly between the sentinels (exclusive), one trailing newline
-// trimmed; no other normalisation. null when the block is absent.
-function sharedRulesBlock(abs) {
+// Drop exactly one trailing newline (LF or CRLF); this is the only
+// normalisation the mirror comparison allows.
+function stripOneTrailingNewline(text) {
+  if (text.endsWith("\r\n")) return text.slice(0, -2);
+  if (text.endsWith("\n")) return text.slice(0, -1);
+  return text;
+}
+
+// The block strictly between the sentinels. Returns null (missing file) or
+// { ok:true, text, line } | { ok:false, line, reason }.
+function sharedBlock(abs) {
   const text = readText(abs);
   if (text === null) return null;
   const lines = text.split(/\r?\n/);
   const begin = lines.findIndex((l) => l.trim() === SHARED_BEGIN);
-  if (begin === -1) return null;
+  if (begin === -1) {
+    return { ok: false, line: 1, reason: "missing shared-rules:begin marker" };
+  }
   let end = -1;
   for (let i = begin + 1; i < lines.length; i++) {
     if (lines[i].trim() === SHARED_END) {
@@ -337,32 +367,74 @@ function sharedRulesBlock(abs) {
       break;
     }
   }
-  if (end === -1) return null;
-  return lines.slice(begin + 1, end).join("\n").replace(/\n$/, "");
+  if (end === -1) {
+    return { ok: false, line: begin + 1, reason: "missing shared-rules:end marker" };
+  }
+  return { ok: true, text: lines.slice(begin + 1, end).join("\n"), line: end + 1 };
+}
+
+// 1-based line numbers spanning the block, markers included; empty when the
+// file carries no begin marker. The canonical contract names paths in prose
+// (the gate line names skills/mas/, agents/, and scripts/), so its mirrored
+// region is exempt from the path scans; the canonical file is exempt whole.
+function sharedBlockLines(abs) {
+  const exempt = new Set();
+  const text = readText(abs);
+  if (text === null) return exempt;
+  const lines = text.split(/\r?\n/);
+  const begin = lines.findIndex((l) => l.trim() === SHARED_BEGIN);
+  if (begin === -1) return exempt;
+  exempt.add(begin + 1);
+  for (let i = begin + 1; i < lines.length; i++) {
+    exempt.add(i + 1);
+    if (lines[i].trim() === SHARED_END) break;
+  }
+  return exempt;
+}
+
+function isSharedRulesCanonical(abs) {
+  return path.resolve(abs) === path.resolve(SHARED_RULES_CANONICAL);
 }
 
 function checkSharedRules() {
-  const blocks = SHARED_RULES_FILES.map((abs) => ({ abs, block: sharedRulesBlock(abs) }));
-  let missing = false;
-  for (const { abs, block } of blocks) {
-    if (block === null) {
-      missing = true;
-      report(abs, 0, "missing shared-rules block", "shared-rules");
-    }
+  const canonicalRaw = readText(SHARED_RULES_CANONICAL);
+  if (canonicalRaw === null) {
+    report(SHARED_RULES_CANONICAL, 0, "missing canonical shared-rules file", "shared-rules-mirror");
+    return;
   }
-  if (missing) return;
-  const [a, b] = blocks;
-  if (a.block === b.block) return;
-  const al = a.block.split("\n");
-  const bl = b.block.split("\n");
-  let off = 0;
-  while (off < al.length && off < bl.length && al[off] === bl[off]) off++;
-  report(
-    a.abs,
-    0,
-    `shared-rules drift vs skills/mas/SKILL.md (first differing line offset ${off + 1})`,
-    "shared-rules",
-  );
+  const canonical = stripOneTrailingNewline(canonicalRaw);
+  const blocks = [];
+  for (const abs of SHARED_RULES_HOSTS) {
+    const block = sharedBlock(abs);
+    if (block === null) {
+      report(abs, 0, "missing file", "shared-rules-mirror");
+      continue;
+    }
+    if (!block.ok) {
+      report(abs, block.line, block.reason, "shared-rules-mirror");
+      continue;
+    }
+    const body = stripOneTrailingNewline(block.text);
+    if (body.trim().length === 0) {
+      report(abs, block.line, "empty shared-rules block", "shared-rules-mirror");
+      continue;
+    }
+    if (body !== canonical) {
+      report(
+        abs,
+        block.line,
+        `shared-rules block differs from canonical ${rel(SHARED_RULES_CANONICAL)}`,
+        "shared-rules-mirror",
+      );
+    }
+    blocks.push({ abs, line: block.line, body });
+  }
+  if (blocks.length !== SHARED_RULES_HOSTS.length) return;
+  const first = blocks[0];
+  for (const b of blocks.slice(1)) {
+    if (b.body === first.body) continue;
+    report(b.abs, b.line, `shared-rules block differs from ${rel(first.abs)}`, "shared-rules-mirror");
+  }
 }
 
 // --- requirement 4: step/loop phrasing ------------------------------------
@@ -429,6 +501,19 @@ function permFields(blob) {
   while ((m = re.exec(blob))) fields[m[1]] = m[2].replace(/^["']|["']$/g, "");
   return fields;
 }
+// True when a later `ask` resource re-matches (a subset of) an earlier `deny`
+// resource, so last-match-wins lets the ask shadow the deny. Mirrors the
+// equality/`*` rule of the allow check and extends it with a glob-prefix test
+// (a general `curl *` deny is shadowed by a narrower `curl *127.0.0.1...*` ask).
+function resourceShadows(denyRes, askRes) {
+  const d = String(denyRes || "");
+  const a = String(askRes || "");
+  if (!d || !a) return false;
+  if (d === "*" || a === "*") return true;
+  if (d === a) return true;
+  const prefix = d.replace(/\*+$/, "");
+  return prefix.length > 0 && a.startsWith(prefix);
+}
 function checkPermOrder(abs, list) {
   for (let j = 0; j < list.length; j++) {
     const d = list[j];
@@ -439,6 +524,22 @@ function checkPermOrder(abs, list) {
       if (d.resource === "*" || (a.resource && d.resource === a.resource)) {
         const pat = d.resource === "*" ? "* deny" : `${d.resource} deny`;
         report(abs, a.line, `shadowing: ${a.action} allow before ${pat}`, "perm-order");
+        break;
+      }
+    }
+  }
+  // LAST-match-wins also means an `ask` placed AFTER a `deny` for the same
+  // action re-opens what the deny closed; report the shadow so the deny-first
+  // ordering invariant holds for every effect, not just `allow`.
+  for (let j = 0; j < list.length; j++) {
+    const a = list[j];
+    if (a.effect !== "ask" || !a.action) continue;
+    for (let i = 0; i < j; i++) {
+      const d = list[i];
+      if (d.effect !== "deny" || d.action !== a.action) continue;
+      if (resourceShadows(d.resource, a.resource)) {
+        const pat = d.resource === "*" ? "* deny" : `${d.resource} deny`;
+        report(abs, a.line, `shadowing: ${a.action} ask after ${pat}`, "perm-order");
         break;
       }
     }
@@ -753,10 +854,17 @@ function checkAbsPath(abs) {
   const text = readText(abs);
   if (text === null) return;
   const norm = abs.split(path.sep).join("/");
+  // The canonical shared-rules file is exempt in full, and each host's
+  // mirrored block is exempt across its own span, because the canonical
+  // contract names paths in prose (the gate line names skills/mas/, agents/,
+  // and scripts/). Every other file and block-external line is still scanned.
+  if (isSharedRulesCanonical(abs)) return;
+  const exemptLines = sharedBlockLines(abs);
   const isAgent = /\/agents\/[^/]+\.md$/.test(norm);
   const isSkillMd = /\/skills\/.*SKILL\.md$/.test(norm);
   const extended = isAgent || isSkillMd;
   text.split(/\r?\n/).forEach((line, i) => {
+    if (exemptLines.has(i + 1)) return;
     const t = line
       .split("~/.config/opencode/scripts/").join("<ABS>/")
       .split("~/.config/opencode/skills/").join("<ABS>/");
