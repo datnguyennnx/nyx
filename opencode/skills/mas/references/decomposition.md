@@ -10,7 +10,7 @@ Gate rules, operator role, blocking commands, and the re-spawn budget live in `~
 
 # Atomic split
 
-One task covers one file cluster and one scope, with zero overlap against parallel tasks. For coupled changes, change the interface first, then producer → consumer.
+One task covers one file cluster and one scope, with zero overlap against parallel tasks. A lane's diff budget is about 400 changed lines; exceeding it requires a stated justification in the handoff, and the scope contract is in `~/.config/opencode/skills/mas/references/antislop.md`. For coupled changes, change the interface first, then producer → consumer. Build a conflict graph from each lane's write-set: nodes are lanes, and an edge joins two lanes that share a write or where one lane's write is another lane's read. Compute the connected components of that graph; lanes in different components may run in parallel, and lanes in the same connected component must serialize.
 
 # Kahn levels
 
@@ -39,7 +39,7 @@ Critical Path Method (CPM) gives each slice its schedule position:
 
 Tag every slice with its float. Zero-float (critical) slices run first within a level. Critical-path slices receive verifier attention first, so tester and diagnostician effort routes to float 0 before positive-float work.
 
-Float computed from estimated durations is advisory, never a hard gate. A check earns its place only if its outcome can change the action. A check that cannot change the action does not belong in the gate.
+Scheduling float is advisory and never a gate check. A check earns its place only if its outcome can change the action. A check that cannot change the action does not belong in the gate.
 
 # Edge taxonomy
 
@@ -90,7 +90,7 @@ Exactly `QUESTION | DOCS | TRIVIAL | CODE | unknown`; no `CONFIG-ONLY`, no `-CHA
 
 # Breadth rule
 
-Scale angles by tier: SIMPLE 2, COMPLEX 4+. Stop on saturation after 2 consecutive rounds with no new finding. Require corroboration ≥2 on contested points. Flag contradictions.
+Scale angles by effort weight: SIMPLE 2, COMPLEX 4+. Stop on saturation after 2 consecutive rounds with no new finding. Require corroboration ≥2 on contested points. Flag contradictions.
 
 Report PARTIAL on overflow. Never run unbounded. Local coherence is not global coherence.
 
@@ -98,10 +98,11 @@ When a batch composes work from more than one lane, check that the parts glue. T
 
 # Handoff
 
-Sent and returned messages share ONE status vocabulary and ONE envelope shape. The shape is one-line JSON, findings as `file:line` only, never pasted content. Vocabulary and dispatch live in the shared block in `~/.config/opencode/skills/mas/SKILL.md`. The evidence rule is in `~/.config/opencode/skills/mas/references/verification.md` Evidence, untrusted by default.
+Sent and returned messages share ONE status vocabulary and ONE envelope shape. The shape is one-line JSON, findings as `file:line` only, never pasted content. Vocabulary and dispatch live in the shared block, whose canonical home is `~/.config/opencode/skills/mas/references/shared-rules.md` (SKILL.md and ship-mas.md mirror it). The evidence rule is in `~/.config/opencode/skills/mas/references/verification.md` Evidence, untrusted by default.
 
-Delegation MUST carry exactly:
+Delegation MUST carry the 11 core fields:
 CONTEXT, TASK, TARGET_FILES, REQUIREMENTS, ACCEPTANCE, OUTPUT_CONTRACT, EFFORT, SKILLS, TOKEN_CAP, KAHN_LEVEL/EDGE_ID, EVIDENCE_ATTACHMENT.
+plus `AUTHORIZED_SCOPE` (required) and `WORKTREE` (optional).
 
 Field to role:
 - **CONTEXT**: frame (≤2 sentences).
@@ -110,17 +111,29 @@ Field to role:
 - **REQUIREMENTS**: testable binary scope.
 - **ACCEPTANCE**: machine-checkable assertion set (test ids, artifact paths, schema checks, state assertions), which the gate consumes, not a bare exit code.
 - **OUTPUT_CONTRACT**: envelope format.
-- **EFFORT**: tier, SIMPLE 1 / MEDIUM 3 / COMPLEX 5 / CROSS-CUTTING 5.
+- **EFFORT**: effort weight, SIMPLE 1 / MEDIUM 3 / COMPLEX 5 / CROSS-CUTTING 5.
 - **SKILLS**: domain tools/sources.
 - **TOKEN_CAP**: budget ceiling.
 - **KAHN_LEVEL/EDGE_ID**: schedule position (`Step N/7`).
 - **EVIDENCE_ATTACHMENT**: `file:line` citations.
+- **AUTHORIZED_SCOPE**: the files the lane may touch and what is allowed there (verbs, paths); work outside it requires ask-to-continue, never a widened boundary mid-slice.
+- **WORKTREE** (optional): the worktree path plus its branch, e.g. `path=<dir> branch=<name>`. Present only when the lane writes in a dedicated worktree; omit it when the lane writes in the primary tree; the model is in `~/.config/opencode/skills/mas/references/worktrees.md`.
+One lane = one worktree/branch. A lane's worktree and branch are declared once in its handoff, are not shared with another lane, and never change mid-slice.
 
 Drop priority over TOKEN_CAP: keep ACCEPTANCE and OUTPUT_CONTRACT first, then TARGET_FILES. Truncate EVIDENCE_ATTACHMENT oldest-first and note it. Split TARGET_FILES when still over cap. Overflow: `~/.config/opencode/skills/mas/references/verification.md`.
 
+## Lane output contract
+
+Lane returns stay terse and machine-parseable, matching the handoff fields above: `S-N -> file:line` plus a one-line status, never pasted content and never prose. Failure tokens:
+
+- `too-big.` the slice exceeds TARGET_FILES, so re-decompose.
+- `needs-confirm.` a premise or interface is unverified against the repo.
+- `ambiguous.` the handoff does not resolve to ONE outcome.
+- `regressed.` the change breaks a previously passing check.
+
 ## Spawn prompt
 
-The orchestrator composes the spawn prompt by writing each of the eleven field names followed by its value. TARGET_FILES is a hard boundary, so nothing outside it changes. ACCEPTANCE is the machine-checkable assertion set the return is judged against. Forward `file:line` references only, never file content.
+The orchestrator composes the spawn prompt by writing each of the 11 core field names plus `AUTHORIZED_SCOPE` (and `WORKTREE` when present) followed by its value. TARGET_FILES is a hard boundary, so nothing outside it changes. ACCEPTANCE is the machine-checkable assertion set the return is judged against. Forward `file:line` references only, never file content.
 
 # Capability contracts
 

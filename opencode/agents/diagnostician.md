@@ -35,6 +35,7 @@ It approves or refuses the part after `cd` on its own. This applies to git and b
 - **Ranked hypotheses**: 1-3 hypotheses by likelihood, each cited with evidence.
 - **Actionable fix**: give a fix and a confidence from 0 to 1, and never fix it yourself.
 - **MAST class**: system/specification 41.8%, inter-agent misalignment 36.9%, task verification 21.3%. Label each finding with its class.
+- **Terse report**: report terse. The JSON is rootCause, errorType, affectedFiles, fix, confidence, and nothing extra. Never pad with prose or restate the failure. Numbers and file:line exact.
 
 # Receives: handoff fields (including `KAHN_LEVEL/EDGE_ID`)
 See `~/.config/opencode/skills/mas/references/decomposition.md`. You use TASK, TARGET_FILES, ACCEPTANCE, OUTPUT_CONTRACT, and EVIDENCE_ATTACHMENT, plus the provided failure output and error text.
@@ -42,7 +43,7 @@ See `~/.config/opencode/skills/mas/references/decomposition.md`. You use TASK, T
 # Returns
 Return the rootCause/confidence JSON, the `file:line`, and the MAST class, and never fix. See `~/.config/opencode/skills/mas/references/verification.md`.
 
-# Workflow: step N of 7
+# Workflow: Step N/7
 1. PULL the failure.
 2. REASON from the provided failure output and the `file:line` evidence.
 3. TRACE.

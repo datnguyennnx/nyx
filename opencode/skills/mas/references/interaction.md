@@ -2,6 +2,8 @@
 
 Cap WIP ≤2. Single-implementer fallback: ~/.config/opencode/skills/mas/SKILL.md. Readers fan out only when no P-BLOCKING or P-WRITE task exists.
 
+Load dependency: this file is consumed with `~/.config/opencode/skills/mas/references/verification.md` (budgets and caps), `~/.config/opencode/skills/mas/references/decomposition.md` (bounds), and `~/.config/opencode/skills/mas/references/diagnosis.md` (failure patterns); it defines no numbers of its own.
+
 # Backpressure
 
 Keep one flow: EDIT→BUILD→LINT→REPORT before the next pull. Never open a pull while a gate is unresolved. Gate commands, blocking statuses, and clean-context re-spawn are in `~/.config/opencode/skills/mas/references/verification.md` Gate + Retry budget.
@@ -34,7 +36,7 @@ Feedback → re-entry is the ONLY statement of each rule:
 
 # Loop guardrails (cap + autocycle)
 
-Budget, oscillation, re-spawn seeding, and retry cap are in `~/.config/opencode/skills/mas/references/verification.md` Retry budget + Loop budget. Bounds are in `~/.config/opencode/skills/mas/references/decomposition.md` Breadth rule. Autocycle is in `~/.config/opencode/skills/mas/references/diagnosis.md` Failure patterns.
+Budget, oscillation, re-spawn seeding, and retry cap are in `~/.config/opencode/skills/mas/references/verification.md` Retry budget + Loop budget. That file owns the numeric budgets and caps; interaction.md only consumes them and defines no numbers of its own, so this pointer is not circular. Bounds are in `~/.config/opencode/skills/mas/references/decomposition.md` Breadth rule. Autocycle is in `~/.config/opencode/skills/mas/references/diagnosis.md` Failure patterns.
 
 Never stall on a bare question. A stall is FAILED the same turn. Ask a clarifying question only when the answer would change the route or the plan. Otherwise proceed.
 

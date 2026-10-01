@@ -40,7 +40,17 @@ A needed file outside the contract means STOP and re-decompose. Never widen the 
 
 Read and explore with `glob`, `read`, and `grep`. The permission layer refuses `git -C <path> ...`.
 
+When a WORKTREE is assigned, the lane operates ONLY inside that worktree and never touches the main checkout. The lane returns its branch so the merge queue can integrate it.
+
 To work in another repository, use `cd <repo> && <command>` in ONE shell call. The permission layer checks commands part by part, so it approves or refuses the part after `cd` on its own. That form covers git and build commands only, never reading files.
+
+Stay inside `AUTHORIZED_SCOPE`. Any work outside it means STOP and ask to continue; never act outside the scope on assumption.
+
+Respect the diff budget of about 400 changed lines. Past it means STOP and re-decompose.
+
+Run the cleanup pass before returning: deletion-first, drop dead code, then report.
+
+Comment policy: default to no comment. A comment says why, never what. Never narrate the edit.
 
 # Principles: raw
 
@@ -55,6 +65,8 @@ Report the hunk and every file touched. Use the PASS-hunk/FAIL-tail form.
 S-N → hunk `<file:range change>` and the files touched, `file:line` cited → `~/.config/opencode/skills/mas/references/verification.md`.
 
 # Workflow: Step N/7
+
+The denominator is always 7: it counts the orchestrator pipeline steps, not this file's local list, so adding or renumbering workflow steps never changes it.
 
 1. Read the targets.
 2. Plan 1 to 3 edits.

@@ -32,6 +32,8 @@ RULE: never explore or read the tree through shell. The tools `ls`, `cat`, `head
 
 The plan declares each writer's allowed files and verbs. Writers run single-threaded, and read-only delegates carry no write verb.
 
+Plan the smallest thing that works (YAGNI). Plan no feature and no artifact that was not requested. Prefer the minimum number of lanes that still keeps targets disjoint.
+
 The permission layer refuses `git -C <path> ...`. To work in another repository, use `cd <repo> && <command>` in one shell call. The permission layer checks commands part by part, so it approves or refuses the part after `cd` on its own. This applies to git and build commands only, never to reading files.
 
 # Output

@@ -443,6 +443,18 @@ const MAS_FILES = [
   path.join(ROOT, "skills", "mas", "references", "interaction.md"),
   path.join(ROOT, "agents", "ship-mas.md"),
 ];
+// Narrow, negative-only scan: forbidden denominators and legacy loop phrasing.
+// Safe for every agent file because it never demands a `Step N/7` literal.
+function checkStepPhrasingNegative(abs) {
+  const text = readText(abs);
+  if (text === null) return;
+  text.split(/\r?\n/).forEach((line, i) => {
+    const loop = line.match(/\bLoop 0[-\u2013]6\b/);
+    if (loop) report(abs, i + 1, `forbidden phrasing "${loop[0]}" (expected Step N/7)`, "step-phrasing");
+    const m = line.match(/\bN\/[89]\b/);
+    if (m) report(abs, i + 1, `forbidden phrasing "${m[0]}" (expected Step N/7)`, "step-phrasing");
+  });
+}
 function checkStepPhrasing(abs) {
   const text = readText(abs);
   if (text === null) {
@@ -452,12 +464,7 @@ function checkStepPhrasing(abs) {
   if (!/\bStep N\/7\b/.test(text)) {
     report(abs, 1, 'missing "Step N/7" phrasing', "step-phrasing");
   }
-  text.split(/\r?\n/).forEach((line, i) => {
-    const loop = line.match(/\bLoop 0[-\u2013]6\b/);
-    if (loop) report(abs, i + 1, `forbidden phrasing "${loop[0]}" (expected Step N/7)`, "step-phrasing");
-    const m = line.match(/\bN\/[89]\b/);
-    if (m) report(abs, i + 1, `forbidden phrasing "${m[0]}" (expected Step N/7)`, "step-phrasing");
-  });
+  checkStepPhrasingNegative(abs);
 }
 
 // --- requirement 3: resolve references/... and skills/... links -----------
@@ -940,6 +947,10 @@ for (const f of skillFiles) {
 }
 checkSkillTriggerOwnership(skillFiles);
 for (const f of MAS_FILES) checkStepPhrasing(f);
+for (const f of agentFiles) {
+  if (MAS_FILES.includes(f)) continue;
+  checkStepPhrasingNegative(f);
+}
 checkSharedRules();
 for (const f of [...agentFiles, ...skillFiles, ...masRefFiles]) checkLinks(f);
 for (const f of [...agentFiles, ...allSkillsMd]) {

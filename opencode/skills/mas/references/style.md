@@ -51,6 +51,14 @@ Curated rules for mas prose: mas documents, skill files, agent files, and agent 
 - Cut generic conclusions. End with a specific fact, decision, or next step.
 - Cut summary transitions such as “With this setup complete…” or “Now that we've explored…”. Start with the next point.
 - Cut “additionally” when the next sentence already makes the connection clear.
+- Prefer the smallest thing that works (YAGNI). Do not add artifacts, files, or abstractions the job does not need.
+- Never compress a human-in-the-loop gate, a safety warning, or the JSON envelope. Terseness applies to explanation prose only.
+
+## Comments
+
+- Default to no comment. Add one only to carry why.
+- State why, never what. Never narrate the code or the change.
+- A one-line summary on a public entry point is allowed.
 
 ## Claims and evidence
 
@@ -134,5 +142,5 @@ Curated rules for mas prose: mas documents, skill files, agent files, and agent 
 ## Scope and carve-outs
 
 - (a) These rules apply to mas prose and agent envelopes.
-- (b) The shared-rules contract block in `~/.config/opencode/skills/mas/references/shared-rules.md` is byte-enforced and is EXEMPT from restyling, so its existing punctuation stands.
+- (b) The shared block in `~/.config/opencode/skills/mas/references/shared-rules.md`, `~/.config/opencode/skills/mas/SKILL.md`, and `~/.config/opencode/agents/ship-mas.md` is byte-enforced and is EXEMPT from restyling, so its existing punctuation stands.
 - (c) Code, paths, identifiers, and quoted output keep straight quotes and exact syntax.

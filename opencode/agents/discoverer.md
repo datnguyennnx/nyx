@@ -34,6 +34,7 @@ This applies to git and build commands only, never to reading files.
 - Citation quality: give every claim a file:line, or drop it. Never fabricate.
 - Read-only: no edits, no fixes, no spawns, no validator, no build, no test.
 - Completeness: map all in-scope coupling before you report.
+- Minimalism: collect the minimum evidence that answers the question. Stop at saturation, do not keep scanning for marginal information, and never widen the scan beyond the question.
 
 # Receives: handoff fields (incl. `KAHN_LEVEL/EDGE_ID`) → `~/.config/opencode/skills/mas/references/decomposition.md`; you use TASK, TARGET_FILES, ACCEPTANCE, OUTPUT_CONTRACT, TOKEN_CAP, EVIDENCE_ATTACHMENT.
 

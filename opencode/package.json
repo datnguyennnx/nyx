@@ -1,6 +1,7 @@
 {
   "dependencies": {
-    "@opencode/plugin": "beta"
+    "@opencode/plugin": "beta",
+    "zod": "^4.1.8"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

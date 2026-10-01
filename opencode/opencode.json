@@ -2,6 +2,9 @@
   "$schema": "https://opencode.ai/config.json",
   "share": "manual",
   "snapshots": false,
+  "worktree": {
+    "directory": "../.worktrees"
+  },
   "compaction": {
     "auto": true,
     "keep": {
@@ -97,5 +100,15 @@
     { "action": "shell", "resource": "python3 *", "effect": "deny" },
     { "action": "shell", "resource": "sh -c *", "effect": "deny" },
     { "action": "shell", "resource": "bash -c *", "effect": "deny" }
-  ]
+  ],
+  "agents": {
+    "general": {
+      "permissions": [
+        { "action": "read", "resource": "*", "effect": "deny" },
+        { "action": "glob", "resource": "*", "effect": "deny" },
+        { "action": "grep", "resource": "*", "effect": "deny" },
+        { "action": "edit", "resource": "*", "effect": "deny" }
+      ]
+    }
+  }
 }

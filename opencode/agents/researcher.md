@@ -21,7 +21,7 @@ The permission layer refuses a fixed set without a prompt. The set holds `rm`, `
 
 This agent reads no local files, writes nothing, and spawns nothing. It runs no validator, no build, and no test, because the tester runs the validators. RULE: never explore or read the tree through shell. `ls`/`cat`/`head`/`grep`/loops/redirects bypass the `read`/`glob`/`grep` denies this agent carries.
 
-It reads nothing locally, only its channels. This agent inherits `gthings`, and only this agent holds it. The permission layer refuses `git -C <path> ...`. To work in another repository, use `cd <repo> && <command>` in ONE shell call.
+It reads nothing locally, only its channels. This agent HOLDS `gthings` via the global allow, and it is the only agent that does not deny it. The permission layer refuses `git -C <path> ...`. To work in another repository, use `cd <repo> && <command>` in ONE shell call.
 
 The permission layer checks commands part by part. It approves or refuses the part after `cd` on its own. This holds for git/build commands only, never for reading files.
 
@@ -84,6 +84,7 @@ Handoff fields: CONTEXT, TASK, TARGET_FILES, REQUIREMENTS, ACCEPTANCE, OUTPUT_CO
 Claim + URL + trust note, or NO_RESULTS; never codes → `~/.config/opencode/skills/mas/references/verification.md`.
 
 # Workflow: Step N/7
+Invariant: the denominator is always 7, because it counts the orchestrator pipeline steps, not this file's local list, so adding or renumbering workflow steps never changes it.
 1. PULL question. 2. DISCOVERY (baseline then deep). 3. EXTRACT to saturation. 4. VERIFY. 5. SYNTHESIZE once, stop.
 
 # Output

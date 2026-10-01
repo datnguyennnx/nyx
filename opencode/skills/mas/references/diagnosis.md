@@ -4,6 +4,8 @@ When a lane fails, the failure re-enters in the same turn. One budget unit cover
 
 Gate configuration stays immutable after a first gate failure. For re-spawn and retry mechanics, see `~/.config/opencode/skills/mas/references/verification.md`.
 
+Diagnosis output stays terse and exact: one claim per line with a `file:line`; never pad with prose and never restate the symptom; numbers stay exact.
+
 # Failure patterns
 
 MAST classes: FC1 system and specification, FC2 inter-agent misalignment, FC3 task verification.
