@@ -28,16 +28,17 @@ Recommend exactly ONE workflow, in words, then STOP. Never present a menu, load 
 | Feedback, handoff, silence-first supervision, budgets | mas (`references/interaction.md`; budgets: `references/verification.md`) |
 | Verification, exit-0 gates, maker-checker, envelope | mas (`references/verification.md`) |
 | Single atomic change | none: no MAS, one implementer directly |
-| OpenCode itself (config, skills, agents, permissions) | opencode |
+| OpenCode itself (config, skills, agents, permissions) | opencode (built-in `/builtin`; not present in the mirror) |
+| Delegated script/checker execution and worktree pointers | mas (`references/automation.md`) |
 | Anything else / ambiguous | mas (core-first; covers the rest via lazy refs) |
 
 # Step N/7
 
 0. **Step 0/7: Ground+Classify.** Premise-check vs the repo, plus an optional discoverer/explore scan (both harness built-ins). Union TARGET_FILES. Route via the Applicability matrix in `references/decomposition.md` (route vocabulary: shared block). `unknown` routes to the full pipeline. Classify each request item (ACT/MERGE/DRAFT/DISCARD); when there are two or more items or any ambiguous item, print the triage table before spawning. Ask ≤3 `question`, each only when the answer would change the route or the plan. You confirm the scope and route at HITL-1 before any spawn.
 1. **Step 1/7: Scan.** Scoped discoverer/explore; returns `file:line`, never pasted content.
-2. **Step 2/7: Plan (Kahn/CPM).** Split the work into file clusters. Set Kahn levels and CPM order per `references/decomposition.md`; every edge carries `file:line`; no cycles. Before you spawn a batch, pass the batch's lanes' `TARGET_FILES` to `node ~/.config/opencode/scripts/check-slices.mjs` as a flat JSON array. When a CODE batch needs isolation, create one worktree per lane before spawn, and all git worktree operations go through HITL-6. Same-level overlap is an error, with no new artifact and no default path. The human approves the slice plan and per-slice acceptance criteria at HITL-2.
+2. **Step 2/7: Plan (Kahn/CPM).** Split the work into file clusters. Set Kahn levels and CPM order per `references/decomposition.md`; every edge carries `file:line`; no cycles. Before you spawn a batch, delegate the batch's lanes' `TARGET_FILES` as a flat JSON array to a shell-capable delegate, which runs `node ~/.config/opencode/scripts/check-slices.mjs '<flat json>'`, or surface that command for the operator. Every shell command stays operator-approved, and you never run scripts yourself. Exit 0 unlocks the spawn, and you aggregate the returned exit code. Same-level overlap is an error, so re-slice, with no new artifact and no default path. check-slices is not a gate. When a CODE batch needs isolation, create one worktree per lane before spawn, and all git worktree operations go through HITL-6. The human approves the slice plan and per-slice acceptance criteria at HITL-2.
 3. **Step 3/7: Spawn.** One batch per Kahn level, level-by-level. Use the pull model with WIP ≤2, and budgets in `references/verification.md`. Each agent runs under a capability contract (allowed files + allowed verbs). The first write lane starts only after HITL-3.
-4. **Step 4/7: GATE (exit-0).** The TESTER verifies STATICALLY. It reads the diff and maps requirements to hunks. The TESTER runs the deliverable validators. The config validator `~/.config/opencode/scripts/validate-mas.mjs` runs only when the task edits mas config: the skill, the agents, or the scripts. `--selftest` runs at authoring time, not per task. Gate semantics: shared block. Maker-checker and envelope per `references/verification.md`. FAIL → `references/diagnosis.md`.
+4. **Step 4/7: GATE (exit-0).** The TESTER verifies STATICALLY. It reads the diff and maps requirements to hunks. The TESTER runs the deliverable validators. The config validator `~/.config/opencode/scripts/validate-mas.mjs` runs only when the task edits mas config: the skill, the agents, or the scripts, and it runs plain with no argv. `~/.config/opencode/scripts/envelope-lint.mjs` implements `--selftest`, which runs at authoring time, not per task. Gate semantics: shared block. Maker-checker and envelope per `references/verification.md`. FAIL → `references/diagnosis.md`.
 5. **Step 5/7: Sufficiency.** Consume the tester's `S-N → file:line` table AND the acceptance assertions (`S-N → <assertion> → file:line`) from the Handoff; every requirement matched else FAILED + narrowed re-spawn.
 6. **Step 6/7: Auto Report.** Human-first: ONE plain sentence, then the envelope defined in `references/verification.md`; detail after. Acceptance before ship is HITL-5.
 
@@ -52,6 +53,7 @@ Step lines read `Step N/7: <NAME>: <what happened>`. The machine envelope stays 
 | Any dispatch or status vocabulary question | `references/shared-rules.md` (shared block) |
 | Planning a batch (Step 2) | `references/decomposition.md` |
 | Isolating a CODE batch in worktrees (Step 2) | `references/worktrees.md` |
+| Delegating script/checker execution or worktree pointers | `references/automation.md` |
 | Running a gate or reading the envelope (Step 4) | `references/verification.md` |
 | Pacing or supervising a running batch | `references/interaction.md` |
 | A lane returned FAIL or PARTIAL | `references/diagnosis.md` |

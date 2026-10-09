@@ -2,7 +2,7 @@
 
 Cap WIP ≤2. Single-implementer fallback: ~/.config/opencode/skills/mas/SKILL.md. Readers fan out only when no P-BLOCKING or P-WRITE task exists.
 
-Load dependency: this file is consumed with `~/.config/opencode/skills/mas/references/verification.md` (budgets and caps), `~/.config/opencode/skills/mas/references/decomposition.md` (bounds), and `~/.config/opencode/skills/mas/references/diagnosis.md` (failure patterns); it defines no numbers of its own.
+Load dependency: this file is consumed with `~/.config/opencode/skills/mas/references/verification.md` (budgets and caps), `~/.config/opencode/skills/mas/references/decomposition.md` (bounds), and `~/.config/opencode/skills/mas/references/diagnosis.md` (failure patterns); it defines no retry numbers of its own.
 
 # Backpressure
 
@@ -15,6 +15,8 @@ Idle agents steal from loaded queues. Keep batches balanced, and keep same-level
 # Supervision
 
 Silence-first: speak on batch stop, escalation, and handoff. Steer in ≤3 sentences. The `Step N/7` status lines in the transcript ARE the resume cursor. Resume from them, never from a truncated transcript.
+
+Gates sit at points of consequence (first write, ship, destructive). An unanswered gate denies by default.
 
 Declared pause points are the HITL (human-in-the-loop) gates in `~/.config/opencode/skills/mas/references/verification.md` HITL gates. A declared HITL gate IS a legal turn boundary.
 
@@ -36,11 +38,11 @@ Feedback → re-entry is the ONLY statement of each rule:
 
 # Loop guardrails (cap + autocycle)
 
-Budget, oscillation, re-spawn seeding, and retry cap are in `~/.config/opencode/skills/mas/references/verification.md` Retry budget + Loop budget. That file owns the numeric budgets and caps; interaction.md only consumes them and defines no numbers of its own, so this pointer is not circular. Bounds are in `~/.config/opencode/skills/mas/references/decomposition.md` Breadth rule. Autocycle is in `~/.config/opencode/skills/mas/references/diagnosis.md` Failure patterns.
+Budget, oscillation, re-spawn seeding, and retry cap are in `~/.config/opencode/skills/mas/references/verification.md` Retry budget + Loop budget. That file owns the numeric budgets and caps; interaction.md only consumes them and defines no retry numbers of its own. Bounds are in `~/.config/opencode/skills/mas/references/decomposition.md` Breadth rule. Autocycle is in `~/.config/opencode/skills/mas/references/diagnosis.md` Failure patterns.
 
-Never stall on a bare question. A stall is FAILED the same turn. Ask a clarifying question only when the answer would change the route or the plan. Otherwise proceed.
+Never stall on a bare question. A stall is FAILED the same turn. Ask a clarifying question only when the answer would change the route or the plan. Otherwise proceed. A named artifact absent from a scan is a scope question, not a license to reinterpret. Surface it before proceeding.
 
-Cap at 3. A question that does not change the route or the plan is not asked. Confirm-when-unsure: if information is insufficient, spawn a scoped discoverer or researcher, and never guess. If you weaken a gate, restore the baseline. Then re-spawn per `~/.config/opencode/skills/mas/references/verification.md` Retry budget and `~/.config/opencode/skills/mas/references/diagnosis.md` Failure patterns.
+The retry cap is owned by `~/.config/opencode/skills/mas/references/verification.md` Retry budget. A question that does not change the route or the plan is not asked. Confirm-when-unsure: if information is insufficient, spawn a scoped discoverer or researcher, and never guess. If you weaken a gate, restore the baseline. Then re-spawn per `~/.config/opencode/skills/mas/references/verification.md` Retry budget and `~/.config/opencode/skills/mas/references/diagnosis.md` Failure patterns.
 
 # Context discipline
 
@@ -48,10 +50,14 @@ Keep a session log plus per-delegate summaries. Compact ONLY at step boundaries,
 
 The session log is append-only. Never re-summarize a summary.
 
+Prefer focused re-contextualization over full-history or raw dumps. Strip distractors. Early wrong turns persist, so handoffs stay minimal and targeted.
+
 # Contested artifact cross-check
 
 Local coherence is not global coherence. After composing work from more than one agent, check that the parts glue. This check is mandatory, not conditional on a prior disagreement.
 
 Two agents may assert incompatible things about the same target. That conflict is a ship blocker, even when each part passed its own check.
+
+Contradicting delegate returns are surfaced as open items, never averaged or silently merged. Disagreements escalate.
 
 The contested artifact case is when two agents' verdicts disagree, and there the check fires early. Run at most ONE bounded cross-check round, never a default path, and cost-account it against the loop budget. No round 2, no unbounded exchange.

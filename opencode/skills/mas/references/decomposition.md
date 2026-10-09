@@ -24,11 +24,11 @@ Sort topologically with Kahn's algorithm: O(V+E). indegree-0 → level 0. Advanc
 
 # Batch targets
 
-A batch's lanes declare `TARGET_FILES` in their handoff, and that list is each lane's effect scope. Before you spawn a batch, pass the batch's targets to the checker as an argument:
+A batch's lanes declare `TARGET_FILES` in their handoff, and that list is each lane's effect scope. Before you spawn a batch, delegate the batch's lanes' `TARGET_FILES` as the exact command to a shell-capable delegate, or surface that command for the operator. You never run scripts yourself, and every shell command stays operator-approved.
 
 `node ~/.config/opencode/scripts/check-slices.mjs '[{"id":"L1","level":0,"targets":["opencode/a.md"]}]'`
 
-The payload is a flat JSON array of lanes, each with `id`, `level` and `targets`. Two lanes at the same level must not share a path. A path reused at a later level is a serialised dependency, and it is legal. A finding means the plan is wrong, not the checker.
+The payload is a flat JSON array of lanes, each with `id`, `level` and `targets`. Two lanes at the same level must not share a path. A path reused at a later level is a serialised dependency, and it is legal. Exit 0 unlocks the spawn; you aggregate the returned exit code. A finding means the plan is wrong, not the checker. A V2-native variant (a plugin-wrapped checker tool or a scoped `ask` rule) implements the same delegated contract.
 
 # CPM
 
@@ -76,7 +76,7 @@ Exactly `QUESTION | DOCS | TRIVIAL | CODE | unknown`; no `CONFIG-ONLY`, no `-CHA
 | QUESTION | answer-only |
 | DOCS | skip tester-build, keep the deliverable validator `~/.config/opencode/scripts/envelope-lint.mjs` |
 | TRIVIAL | single implementer |
-| CODE | full, gate runs the deliverable validators; add `~/.config/opencode/scripts/validate-mas.mjs` only when the task edits mas config: the skill, the agents, or the scripts; `--selftest` runs at authoring time, not per task |
+| CODE | full, gate runs the deliverable validators; add `~/.config/opencode/scripts/validate-mas.mjs` (plain, no argv) only when the task edits mas config: the skill, the agents, or the scripts; `~/.config/opencode/scripts/envelope-lint.mjs` implements `--selftest`, which runs at authoring time, not per task |
 | unknown | full pipeline fallback, same gate as CODE |
 
 # Grounding rule
@@ -133,9 +133,11 @@ Lane returns stay terse and machine-parseable, matching the handoff fields above
 
 ## Spawn prompt
 
-The orchestrator composes the spawn prompt by writing each of the 11 core field names plus `AUTHORIZED_SCOPE` (and `WORKTREE` when present) followed by its value. TARGET_FILES is a hard boundary, so nothing outside it changes. ACCEPTANCE is the machine-checkable assertion set the return is judged against. Forward `file:line` references only, never file content.
+The orchestrator composes the spawn prompt by writing each of the 11 core field names plus `AUTHORIZED_SCOPE` (and `WORKTREE` when present) followed by its value. TARGET_FILES is a hard boundary, so nothing outside it changes. ACCEPTANCE is the machine-checkable assertion set the return is judged against. Forward `file:line` references only, never file content. Declare a context mode per handoff: isolated (default) or shared-by-reference. Pass decisions as artifacts plus provenance, never raw context through the orchestrator. Conflicting assertions on one target are ship blockers.
 
 # Capability contracts
+
+Name an actor for every requirement: the orchestrator, an agent, or the operator. An actor-less prescription is defective - fix the spec or the contract, or route the action to the operator.
 
 Every slice names the allowed files and the allowed verbs for its writer. Writers stay single-threaded; read-only delegates carry no write verb. A writer that needs a file outside its contract MUST stop and re-decompose, never widen its own boundary mid-slice.
 

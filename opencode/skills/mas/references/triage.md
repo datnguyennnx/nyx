@@ -33,7 +33,7 @@ When a request has two or more items, or any ambiguous item, print this table be
 
 | item | class | reason |
 |---|---|---|
-| Add the retry cap | MERGE | `references/interaction.md` already sets the cap |
+| Add the retry cap | MERGE | `references/verification.md` already sets the cap |
 | Rewrite storage | DRAFT | No verified target file exists |
 
 Keep the table terse: one line per row, item then class then reason. Never pad a row to sound thorough. Never compress a safety warning or an irreversible-action callout.

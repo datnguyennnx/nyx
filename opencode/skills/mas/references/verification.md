@@ -6,7 +6,7 @@ The per-task gate runs the deliverable validators. `~/.config/opencode/scripts/e
 
 The operator has not pre-approved shell, so each run reaches the operator as an approval prompt. A missing result yields `NO_VERIFICATION`.
 
-When the task edits mas config (the skill, the agents, or the scripts), the gate also runs `~/.config/opencode/scripts/validate-mas.mjs`. The gate runs that config validator only then, never otherwise. `--selftest` runs at authoring time, not per task. The project build (tsc --noEmit, cargo check, pytest) is the TESTER's gate step and blocks too.
+When the task edits mas config (the skill, the agents, or the scripts), the gate also runs `~/.config/opencode/scripts/validate-mas.mjs`. The gate runs that config validator only then, never otherwise. `~/.config/opencode/scripts/envelope-lint.mjs` implements `--selftest`, which runs at authoring time, not per task. `~/.config/opencode/scripts/validate-mas.mjs` runs plain, with no argv. The project build (tsc --noEmit, cargo check, pytest) is the TESTER's gate step and blocks too.
 
 Budget a lane at about 400 changed lines. A lane that exceeds the diff budget without a stated justification in its handoff blocks.
 
@@ -23,6 +23,8 @@ For the checks in the gate:
 - `gthings` is allowed globally (held by the gthings plugin).
 
 Local coherence is not global coherence. After composing work from more than one agent, the gate checks that the parts glue. Two agents that assert incompatible things about the same target are a ship blocker, even when each part passed its own check.
+
+When composing work from more than one agent, verify the shared state's facts with provenance, not only each part's self-report.
 
 Worktree isolation:
 
@@ -54,7 +56,7 @@ The declared set for a run is the union of every lane's `TARGET_FILES`. Every pa
 
 The change set need not be a subset of ONE lane's targets, because different lanes hold different files. Only undeclared paths fail. If the list is unobtainable, that gate input is missing. A missing gate input yields `NO_VERIFICATION`, which counts as FAIL.
 
-`~/.config/opencode/scripts/check-slices.mjs` is NOT part of the gate. It runs before a batch is spawned, and its answer is about the plan, not about the config.
+`~/.config/opencode/scripts/check-slices.mjs` is NOT part of the gate. It runs before a batch is spawned, and its answer is about the plan, not about the config. The system executes it at the orchestrator's request, through a shell-capable delegate or the operator. Every shell command needs operator approval. An exit-0 answer is a spawn precondition, not a PASS condition.
 
 # Handoff dispatch
 
