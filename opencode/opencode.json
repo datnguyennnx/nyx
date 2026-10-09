@@ -15,6 +15,9 @@
   "default_agent": "ship-mas",
   "permissions": [
     { "action": "shell", "resource": "*", "effect": "ask" },
+    { "action": "shell", "resource": "npm *", "effect": "ask" },
+    { "action": "shell", "resource": "npx *", "effect": "ask" },
+    { "action": "shell", "resource": "node *", "effect": "ask" },
     { "action": "execute", "resource": "*", "effect": "deny" },
     { "action": "read", "resource": "**/*.env*", "effect": "deny" },
     { "action": "read", "resource": "**/*secret*", "effect": "deny" },
@@ -97,15 +100,5 @@
     { "action": "shell", "resource": "python3 *", "effect": "deny" },
     { "action": "shell", "resource": "sh -c *", "effect": "deny" },
     { "action": "shell", "resource": "bash -c *", "effect": "deny" }
-  ],
-  "agents": {
-    "general": {
-      "permissions": [
-        { "action": "read", "resource": "*", "effect": "deny" },
-        { "action": "glob", "resource": "*", "effect": "deny" },
-        { "action": "grep", "resource": "*", "effect": "deny" },
-        { "action": "edit", "resource": "*", "effect": "deny" }
-      ]
-    }
-  }
+  ]
 }

@@ -55,7 +55,7 @@ The declared set for a run is the union of every lane's `TARGET_FILES`. Every pa
 
 The change set need not be a subset of ONE lane's targets, because different lanes hold different files. Only undeclared paths fail. If the list is unobtainable, that gate input is missing. A missing gate input yields `NO_VERIFICATION`, which counts as FAIL.
 
-`~/.config/opencode/scripts/check-slices.mjs` is NOT part of the gate. It runs before a batch is spawned, and its answer is about the plan, not about the config. The system executes it at the orchestrator's request, through a shell-capable delegate or the operator. Every shell command needs operator approval. An exit-0 answer is a spawn precondition, not a PASS condition.
+`~/.config/opencode/scripts/check-slices.mjs` is NOT part of the gate. It runs before a batch is spawned, and its answer is about the plan, not about the config. The orchestrator runs the native tool `mas_plan_check`; if unavailable, the operator runs `node ~/.config/opencode/scripts/check-slices.mjs`. Every shell command needs operator approval. An exit-0 answer is a spawn precondition, not a PASS condition.
 
 # Handoff dispatch
 

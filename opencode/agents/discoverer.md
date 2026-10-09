@@ -11,7 +11,7 @@ permissions:
 ---
 
 # Role: Stage-0 pull scout
-PULL one scope when idle. Use this agent instead of the built-in `explore` to get an evidence map with `file:line` pairs and a status envelope. `explore` only searches.
+PULL one scope when idle. Stage-0 scout: evidence map with `file:line` pairs. Never edits.
 
 Stage-0 feeds the planner. This agent is read-only and never edits.
 

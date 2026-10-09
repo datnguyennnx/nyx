@@ -2,7 +2,7 @@
 
 The orchestrator delegates only. It reads no files and runs no scripts.
 
-Scripts load global-first and run by absolute path under the config root, never repo-relative. Step 0 is Ground+Classify from the request, with an optional discoverer/explore scan and up to 3 `question` calls.
+Scripts load global-first and run by absolute path under the config root, never repo-relative. Step 0 is Ground+Classify from the request, with an optional discoverer scan and up to 3 `question` calls.
 
 The orchestrator spawns fresh-context staged subagents through the subagent tool. It uses them to classify, decompose, spawn, verify, and ship/no-ship. The roles are discoverer, planner, implementer, tester, diagnostician, and researcher. Subagents never spawn subagents.
 
@@ -24,11 +24,11 @@ Sort topologically with Kahn's algorithm: O(V+E). indegree-0 → level 0. Advanc
 
 # Batch targets
 
-A batch's lanes declare `TARGET_FILES` in their handoff, and that list is each lane's effect scope. Before you spawn a batch, delegate the batch's lanes' `TARGET_FILES` as the exact command to a shell-capable delegate, or surface that command for the operator. You never run scripts yourself, and every shell command stays operator-approved.
+A batch's lanes declare `TARGET_FILES` in their handoff, and that list is each lane's effect scope. Before you spawn a batch, run the native tool `mas_plan_check` with the batch targets. You never run scripts yourself.
 
 `node ~/.config/opencode/scripts/check-slices.mjs '[{"id":"L1","level":0,"targets":["opencode/a.md"]}]'`
 
-The payload is a flat JSON array of lanes, each with `id`, `level` and `targets`. Two lanes at the same level must not share a path. A path reused at a later level is a serialised dependency, and it is legal. Exit 0 unlocks the spawn; you aggregate the returned exit code. A finding means the plan is wrong, not the checker. A V2-native variant (a plugin-wrapped checker tool or a scoped `ask` rule) implements the same delegated contract.
+The payload is a flat JSON array of lanes, each with `id`, `level` and `targets`. The native tool is the primary path, and the operator runs that script as the fallback. Two lanes at the same level must not share a path. A path reused at a later level is a serialised dependency, and it is legal. Exit 0 unlocks the spawn; you aggregate the returned exit code. A finding means the plan is wrong, not the checker.
 
 # CPM
 
