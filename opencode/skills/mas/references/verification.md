@@ -20,7 +20,6 @@ For the checks in the gate:
 - A check earns its place only if its outcome can change the action.
 - A check that cannot change the action does not enter the gate.
 - `execute` stays denied.
-- `gthings` is allowed globally (held by the gthings plugin).
 
 Local coherence is not global coherence. After composing work from more than one agent, the gate checks that the parts glue. Two agents that assert incompatible things about the same target are a ship blocker, even when each part passed its own check.
 

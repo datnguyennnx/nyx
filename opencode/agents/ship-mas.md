@@ -23,9 +23,6 @@ permissions:
   - action: websearch
     resource: '*'
     effect: deny
-  - action: gthings
-    resource: '*'
-    effect: deny
 ---
 
 # Role: delegate-only (output: Auto Report and closed-loop ship)

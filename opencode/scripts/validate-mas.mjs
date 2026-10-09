@@ -16,13 +16,12 @@
 //   7. status vocab outside verification.md: envelope
 //      PASS|FAIL|PARTIAL|NO_VERIFICATION|NO_RESULTS only
 //   8. actions that must never appear (`bash`,`task`,`write`,`patch`,
-//      `doom_loop`, `lsp`, `gthings_*`) anywhere in a permission entry
+//      `doom_loop`, `lsp`) anywhere in a permission entry
 //   9. config keys rejected by this schema + rejected `mcp` shape
 //  10. `instructions` top-level key (accepted but not loaded)
 //  11. permission coverage: `execute` and a `.env` `read` are denied (each
 //      with the required resource), and at least 20 deny entries total; the
-//      shell invariant lives in check 13. `gthings` is deliberately NOT denied
-//      globally (see check EgressScope)
+//      shell invariant lives in check 13.
 //  12. exactly one skill owns each `Triggers:` token (a skill without the
 //      marker is not an error)
 //  13. shell policy: no `shell` entry in opencode.json may have effect
@@ -82,7 +81,7 @@ const findings = [];
 
 function isForbiddenAction(action) {
   const a = String(action || "").toLowerCase();
-  return FORBIDDEN_ACTIONS.has(a) || /^gthings_/.test(a);
+  return FORBIDDEN_ACTIONS.has(a);
 }
 
 function rel(abs) {
@@ -659,8 +658,7 @@ function checkConfigKeys(abs) {
 // A config that denies nothing must not pass. `execute` must be denied with
 // resource "*", `read` must deny `.env`, and the deny list must stay
 // substantial. The shell invariant (no allow, broad `ask`) is owned by
-// checkShellPolicy (check H). (`gthings` is deliberately NOT denied globally;
-// see check EgressScope below.)
+// checkShellPolicy (check H).
 const REQUIRED_DENIES = [
   { action: "execute", reason: "missing deny execute *", match: (r) => r === "*" },
   { action: "read", reason: "missing deny read **/*.env*", match: (r) => r.includes(".env") },
@@ -693,60 +691,11 @@ function checkPermissionCoverage(abs) {
   }
 }
 
-// --- check F: egress scope ---------------------------------------------------
-// `gthings` is globally ALLOWED and held by exactly one agent (`researcher.md`);
-// every other agent file must deny it. Reuses permEntries/permFields (the same
-// helper the agent check uses) rather than a second YAML parser.
-function checkEgressScope(abs) {
-  const text = readText(abs);
-  if (text === null) return;
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch {
-    return;
-  }
-  const arr = data && data.permissions;
-  const at = topLevelKeyLines(text).get("permissions") || 1;
-  const list = Array.isArray(arr) ? arr : [];
-  const hasAllow = list.some(
-    (e) => e && e.action === "gthings" && e.effect === "allow",
-  );
-  if (!hasAllow) report(abs, at, "missing allow gthings", "egress-scope");
-
-  let holders = 0;
-  for (const f of agentFiles) {
-    const fm = frontmatter(f);
-    const entries = fm && fm.ok ? permEntries(fm) : null;
-    if (entries === null) continue; // no permissions list -> not a holder
-    const norm = (v) => (typeof v === "string" ? v.trim().replace(/,$/, "") : v);
-    const gthings = entries
-      .map((e) => {
-        const p = permFields(e.parts.join(" "));
-        return { action: norm(p.action), resource: norm(p.resource), effect: norm(p.effect), line: e.line };
-      })
-      .filter((p) => p.action === "gthings");
-    const deny = gthings.find((p) => p.effect === "deny");
-    const keyLine = topKeys(fm).find((k) => k.key === "permissions");
-    if (path.basename(f) === "researcher.md") {
-      if (deny) {
-        report(f, deny.line, "researcher must hold gthings", "egress-scope");
-      }
-    } else if (!deny) {
-      report(f, (keyLine && keyLine.line) || 1, "agent must deny gthings", "egress-scope");
-    }
-    if (!deny) holders++;
-  }
-  if (holders !== 1) {
-    report(abs, at, `egress scope: ${holders} agents hold gthings`, "egress-scope");
-  }
-}
-
 // --- check G: orchestrator-only capabilities ---------------------------------
 // `skill` and `subagent` are globally allowed and held by the primary
 // orchestrator alone; every subagent file must deny both. Reuses the shared
-// frontmatter helpers (frontmatter/permEntries/permFields) and checkEgressScope's
-// trailing-comma normalisation, because the inline entry form otherwise yields
+// frontmatter helpers (frontmatter/permEntries/permFields) and the trailing-
+// comma normalisation, because the inline entry form otherwise yields
 // `action === "skill,"` and a false negative.
 function checkOrchestratorOnly(abs) {
   const fm = frontmatter(abs);
@@ -938,7 +887,6 @@ for (const f of agentFiles) checkAgent(f);
 checkJsonPerms(jsonFile);
 checkConfigKeys(jsonFile);
 checkPermissionCoverage(jsonFile);
-checkEgressScope(jsonFile);
 for (const f of agentFiles) checkOrchestratorOnly(f);
 checkShellPolicy(jsonFile);
 for (const f of skillFiles) {

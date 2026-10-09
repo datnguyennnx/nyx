@@ -73,7 +73,6 @@ ensure_env_var() {
 }
 
 # -- Install logic -- (opencode config, env vars, cache dirs)
-# NOTE: gthings skill files are managed by `gthings update`, not by this script.
 
 install() {
   local opencode_target="$HOME/.config/opencode"
@@ -117,14 +116,6 @@ install() {
   echo ""
   echo "  opencode config:  ~/.config/opencode/"
   echo "  agent skills:     ~/.agents/skills/"
-  echo ""
-  echo "  Requires: gthings binary installed via 'cargo install gthings'"
-  echo "            Browser (Chrome/Dia) running with --remote-debugging-port=9222"
-  echo ""
-  echo "  Quick start:"
-  echo "    gthings update    # install skill files"
-  echo "    gthings status"
-  echo "    gthings search --count 2 \"your topic\""
   echo ""
   echo "  To reinstall: $0 install"
   echo "  Repo: https://github.com/datnguyennnx/nyx"

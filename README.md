@@ -11,16 +11,6 @@ git clone https://github.com/datnguyennnx/nyx && cd nyx
 
 Syncs `opencode/` → `~/.config/opencode` and `.agent/` → `~/.agents/skills/`. Re-run after any update. One-direction only: this repo is the single source of truth; never sync global back to repo.
 
-## Dependencies
-
-### gthings (browser automation, search, PDF extraction)
-
-```bash
-cargo install gthings
-```
-
-Requires Rust 1.85+ and a Chromium-based browser running with `--remote-debugging-port=9222`. gthings skill files are managed by `gthings update`, not by `bootstrap.sh`.
-
 ## Workflow
 
 ```

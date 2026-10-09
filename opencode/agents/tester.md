@@ -20,9 +20,6 @@ permissions:
   - action: question
     resource: "*"
     effect: deny
-  - action: gthings
-    resource: "*"
-    effect: deny
 ---
 
 # Role: Stage-3 static gate verifier (maker-checker)

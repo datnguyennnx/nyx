@@ -17,9 +17,6 @@ permissions:
   - action: question
     resource: "*"
     effect: deny
-  - action: gthings
-    resource: "*"
-    effect: deny
 ---
 
 # Role: Stage-2 pull builder

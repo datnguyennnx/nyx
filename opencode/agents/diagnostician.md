@@ -8,9 +8,6 @@ permissions:
   - { action: webfetch, resource: "*", effect: deny }
   - { action: websearch, resource: "*", effect: deny }
   - { action: question, resource: "*", effect: deny }
-  - action: gthings
-    resource: "*"
-    effect: deny
 ---
 
 # Role: fallback pull triage
