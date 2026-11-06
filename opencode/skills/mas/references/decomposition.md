@@ -28,7 +28,7 @@ A batch's lanes declare `TARGET_FILES` in their handoff, and that list is each l
 
 `node ~/.config/opencode/scripts/check-slices.mjs '[{"id":"L1","level":0,"targets":["opencode/a.md"]}]'`
 
-The payload is a flat JSON array of lanes, each with `id`, `level` and `targets`. The native tool is the primary path, and the operator runs that script as the fallback. Two lanes at the same level must not share a path. A path reused at a later level is a serialised dependency, and it is legal. Exit 0 unlocks the spawn; you aggregate the returned exit code. A finding means the plan is wrong, not the checker.
+The payload is a flat JSON array of lanes, each with `id`, `level` and `targets`. The native tool is the primary path; if the tool is unavailable, delegate the run to a shell-capable own agent. Two lanes at the same level must not share a path. A path reused at a later level is a serialised dependency, and it is legal. Exit 0 unlocks the spawn; you aggregate the returned exit code. A finding means the plan is wrong, not the checker.
 
 # CPM
 

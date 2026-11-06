@@ -10,13 +10,15 @@ The native tools are the primary path. Each has one surface:
 - `mas_config_validate`: mas-config validator. Call it when a task edits the mas config: the skill, the agents, or the scripts. Call it plain, with no argv; the tester runs it at the gate.
 - `mas_envelope_lint`: deliverable validator on the DOCS route. `--selftest` is authoring-only, never per task.
 
-The three scripts under `~/.config/opencode/scripts/` remain the implementation and the operator/CI fallback. Read the script header when you need exact behavior.
+The three scripts under `~/.config/opencode/scripts/` remain the implementation and the agent/CI fallback. Read the script header when you need exact behavior.
 
 ## Execution
 
 Never execute scripts yourself, not through a loop, a redirect, or a shell one-liner.
 
-The orchestrator calls the tool. If the tool is unavailable, the operator runs the script, in absolute form `node ~/.config/opencode/scripts/<name>.mjs`.
+The orchestrator calls the tool. If the tool is unavailable, a shell-capable own agent, such as `tester`, runs the script in absolute form `node ~/.config/opencode/scripts/<name>.mjs`. Shell approval still applies.
+
+The orchestrator never hands the command to the operator.
 
 - For the plan check, call `mas_plan_check` with the flat JSON. The `@<path>` form reads the array from a file.
 - Aggregate the returned exit code and output only. Never re-run a check to confirm a return.
