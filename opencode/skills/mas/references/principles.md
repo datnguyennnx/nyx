@@ -9,6 +9,8 @@ Three principles shape every mas pull: process, compression, minimalism.
 - Evidence over claims: cite the command, output, or `file:line` that supports the statement. An unverified claim is not evidence, so never report one as done.
 - Repeat the loop: RED, GREEN, then clean up while the check still passes.
 - Keep the failing check in the diff, so the fix and its guard travel together.
+- Every test qualifies code: it asserts required behaviour.
+- Line and branch coverage percentages are not quality signals. Never add a test to raise them.
 
 ## Compression
 

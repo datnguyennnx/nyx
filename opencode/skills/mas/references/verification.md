@@ -92,6 +92,7 @@ Test-first rule:
 - For route CODE, write the failing check (RED) before the change (GREEN). Acceptance is the test going RED then GREEN.
 - Non-trivial logic leaves ONE runnable check behind.
 - Explicit waiver: route TRIVIAL does not require a test.
+- Every test must qualify code: it asserts a requirement's behaviour. Line and branch coverage percentages never justify a test; do not add tests to raise them.
 
 # Token caps
 

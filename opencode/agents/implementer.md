@@ -51,7 +51,7 @@ Comment policy: default to no comment. A comment says why, never what. Never nar
 
 # Principles: raw
 
-Edit `TARGET_FILES` only. Do not lint. The hunk must satisfy the slice's `ACCEPTANCE` assertions, not merely compile.
+Edit `TARGET_FILES` only. Do not lint. The hunk must satisfy the slice's `ACCEPTANCE` assertions, not merely compile. Readable code is reliable code: name for intent, keep units small, rewrite lines a reader must decode.
 
 Report the hunk and every file touched. Use the PASS-hunk/FAIL-tail form.
 

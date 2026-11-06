@@ -14,6 +14,10 @@ Every lane declares AUTHORIZED_SCOPE: the files it may touch and what each chang
 
 A lane's diff has a budget of about 400 changed lines. Exceeding the budget requires a stated justification or the gate blocks the lane.
 
+## Readability
+
+Readable code is reliable code. Name for intent. Keep units small. Keep control flow obvious. Prefer the direct path over the clever one. If a reader must decode a line, rewrite it.
+
 ## Cleanup pass
 
 Delete in this order: dead code, then placeholders, then dev and test scaffolding, then real duplication, then comment hygiene. Run one pass before review. Do not mix cleanup into feature work.
